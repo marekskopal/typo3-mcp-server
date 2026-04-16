@@ -52,6 +52,9 @@ final readonly class McpServerMiddleware implements MiddlewareInterface
             return $this->withCorsHeaders($this->createUnauthorizedResponse($request, $e->getMessage()));
         }
 
+        // Strip session header — PHP is stateless, each request must be treated as fresh
+        $request = $request->withoutHeader('Mcp-Session-Id');
+
         $server = $this->mcpServerFactory->create();
         $transport = new StreamableHttpTransport($request, $this->responseFactory, $this->streamFactory);
 
