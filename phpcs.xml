@@ -1,0 +1,8 @@
+<?xml version="1.0"?>
+<ruleset name="Legito PSR12"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:noNamespaceSchemaLocation="vendor/squizlabs/php_codesniffer/phpcs.xsd">
+    <file>Classes/</file>
+    <file>Configuration/TCA/</file>
+    <rule ref="ruleset.xml"/>
+</ruleset>

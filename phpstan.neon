@@ -1,0 +1,27 @@
+includes:
+	- phar://phpstan.phar/conf/bleedingEdge.neon
+
+parameters:
+    level: max
+    phpVersion: 80300
+    parallel:
+        processTimeout: 300.0
+    paths:
+       - Classes
+
+    checkImplicitMixed: true
+    checkBenevolentUnionTypes: true
+    checkUninitializedProperties: true
+    checkMissingCallableSignature: true
+    checkTooWideReturnTypesInProtectedAndPublicMethods: true
+    reportAnyTypeWideningInVarTag: true
+
+    shipmonkRules:
+        allowComparingOnlyComparableTypes:
+            enabled: false
+        forbidCheckedExceptionInCallable:
+            enabled: false
+        uselessPrivatePropertyDefaultValue:
+            enabled: false
+        forbidUnusedMatchResult:
+            enabled: false

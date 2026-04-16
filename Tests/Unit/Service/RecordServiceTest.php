@@ -1,0 +1,117 @@
+<?php
+
+declare(strict_types=1);
+
+namespace MarekSkopal\MsMcpServer\Tests\Unit\Service;
+
+use Doctrine\DBAL\Result;
+use MarekSkopal\MsMcpServer\Service\RecordService;
+use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\TestCase;
+use TYPO3\CMS\Core\Database\ConnectionPool;
+use TYPO3\CMS\Core\Database\Query\Expression\ExpressionBuilder;
+use TYPO3\CMS\Core\Database\Query\QueryBuilder;
+
+#[CoversClass(RecordService::class)]
+final class RecordServiceTest extends TestCase
+{
+    public function testFindByUidReturnsRecordWhenFound(): void
+    {
+        $expectedRecord = ['uid' => 1, 'title' => 'Test Page'];
+
+        $result = $this->createStub(Result::class);
+        $result->method('fetchAssociative')->willReturn($expectedRecord);
+
+        $expressionBuilder = $this->createStub(ExpressionBuilder::class);
+
+        $queryBuilder = $this->createMock(QueryBuilder::class);
+        $queryBuilder->method('select')->willReturnSelf();
+        $queryBuilder->method('from')->willReturnSelf();
+        $queryBuilder->method('where')->willReturnSelf();
+        $queryBuilder->method('expr')->willReturn($expressionBuilder);
+        $queryBuilder->method('createNamedParameter')->willReturn("'1'");
+        $queryBuilder->method('executeQuery')->willReturn($result);
+
+        $connectionPool = $this->createStub(ConnectionPool::class);
+        $connectionPool->method('getQueryBuilderForTable')->willReturn($queryBuilder);
+
+        $service = new RecordService($connectionPool);
+        $record = $service->findByUid('pages', 1, ['uid', 'title']);
+
+        self::assertSame($expectedRecord, $record);
+    }
+
+    public function testFindByUidReturnsNullWhenNotFound(): void
+    {
+        $result = $this->createStub(Result::class);
+        $result->method('fetchAssociative')->willReturn(false);
+
+        $expressionBuilder = $this->createStub(ExpressionBuilder::class);
+
+        $queryBuilder = $this->createMock(QueryBuilder::class);
+        $queryBuilder->method('select')->willReturnSelf();
+        $queryBuilder->method('from')->willReturnSelf();
+        $queryBuilder->method('where')->willReturnSelf();
+        $queryBuilder->method('expr')->willReturn($expressionBuilder);
+        $queryBuilder->method('createNamedParameter')->willReturn("'999'");
+        $queryBuilder->method('executeQuery')->willReturn($result);
+
+        $connectionPool = $this->createStub(ConnectionPool::class);
+        $connectionPool->method('getQueryBuilderForTable')->willReturn($queryBuilder);
+
+        $service = new RecordService($connectionPool);
+        $record = $service->findByUid('pages', 999, ['uid', 'title']);
+
+        self::assertNull($record);
+    }
+
+    public function testFindByPidReturnsRecordsAndTotal(): void
+    {
+        $expectedRecords = [
+            ['uid' => 1, 'title' => 'Page 1'],
+            ['uid' => 2, 'title' => 'Page 2'],
+        ];
+
+        $countResult = $this->createStub(Result::class);
+        $countResult->method('fetchOne')->willReturn(5);
+
+        $listResult = $this->createStub(Result::class);
+        $listResult->method('fetchAllAssociative')->willReturn($expectedRecords);
+
+        $expressionBuilder = $this->createStub(ExpressionBuilder::class);
+
+        $countQueryBuilder = $this->createMock(QueryBuilder::class);
+        $countQueryBuilder->method('count')->willReturnSelf();
+        $countQueryBuilder->method('from')->willReturnSelf();
+        $countQueryBuilder->method('where')->willReturnSelf();
+        $countQueryBuilder->method('expr')->willReturn($expressionBuilder);
+        $countQueryBuilder->method('createNamedParameter')->willReturn("'0'");
+        $countQueryBuilder->method('executeQuery')->willReturn($countResult);
+
+        $listQueryBuilder = $this->createMock(QueryBuilder::class);
+        $listQueryBuilder->method('select')->willReturnSelf();
+        $listQueryBuilder->method('from')->willReturnSelf();
+        $listQueryBuilder->method('where')->willReturnSelf();
+        $listQueryBuilder->method('setMaxResults')->willReturnSelf();
+        $listQueryBuilder->method('setFirstResult')->willReturnSelf();
+        $listQueryBuilder->method('orderBy')->willReturnSelf();
+        $listQueryBuilder->method('expr')->willReturn($expressionBuilder);
+        $listQueryBuilder->method('createNamedParameter')->willReturn("'0'");
+        $listQueryBuilder->method('executeQuery')->willReturn($listResult);
+
+        $callCount = 0;
+        $connectionPool = $this->createMock(ConnectionPool::class);
+        $connectionPool->method('getQueryBuilderForTable')
+            ->willReturnCallback(function () use (&$callCount, $listQueryBuilder, $countQueryBuilder): QueryBuilder {
+                $callCount++;
+
+                return $callCount === 1 ? $listQueryBuilder : $countQueryBuilder;
+            });
+
+        $service = new RecordService($connectionPool);
+        $result = $service->findByPid('pages', 0, 20, 0, ['uid', 'title']);
+
+        self::assertSame($expectedRecords, $result['records']);
+        self::assertSame(5, $result['total']);
+    }
+}

@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<xliff version="1.2" xmlns="urn:oasis:names:tc:xliff:document:1.2">
+    <file source-language="en" datatype="plaintext" original="messages" date="2024-01-01T00:00:00Z" product-name="ms_mcp_server">
+        <header/>
+        <body>
+            <trans-unit id="module.title" resname="module.title">
+                <source>MCP Server Tokens</source>
+            </trans-unit>
+            <trans-unit id="module.description" resname="module.description">
+                <source>Manage MCP server API tokens</source>
+            </trans-unit>
+            <trans-unit id="tx_msmcpserver_token" resname="tx_msmcpserver_token">
+                <source>MCP Token</source>
+            </trans-unit>
+            <trans-unit id="tx_msmcpserver_token.name" resname="tx_msmcpserver_token.name">
+                <source>Name</source>
+            </trans-unit>
+            <trans-unit id="tx_msmcpserver_token.token_hash" resname="tx_msmcpserver_token.token_hash">
+                <source>Token Hash</source>
+            </trans-unit>
+            <trans-unit id="tx_msmcpserver_token.be_user" resname="tx_msmcpserver_token.be_user">
+                <source>Backend User</source>
+            </trans-unit>
+            <trans-unit id="tx_msmcpserver_token.expires" resname="tx_msmcpserver_token.expires">
+                <source>Expires</source>
+            </trans-unit>
+        </body>
+    </file>
+</xliff>
