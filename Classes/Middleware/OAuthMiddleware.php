@@ -26,6 +26,8 @@ final readonly class OAuthMiddleware implements MiddlewareInterface
 
     private const string TOKEN_PATH = '/mcp/oauth/token';
 
+    private const string REGISTER_PATH = '/mcp/oauth/register';
+
     public function __construct(
         private AuthorizationService $authorizationService,
         private ClientRepository $clientRepository,
@@ -46,6 +48,7 @@ final readonly class OAuthMiddleware implements MiddlewareInterface
             $path === self::AUTHORIZE_PATH && $method === 'GET' => $this->handleAuthorizeGet($request),
             $path === self::AUTHORIZE_PATH && $method === 'POST' => $this->handleAuthorizePost($request),
             $path === self::TOKEN_PATH && $method === 'POST' => $this->handleToken($request),
+            $path === self::REGISTER_PATH && $method === 'POST' => $this->handleRegister($request),
             default => $handler->handle($request),
         };
     }
@@ -62,6 +65,7 @@ final readonly class OAuthMiddleware implements MiddlewareInterface
             'issuer' => $baseUrl,
             'authorization_endpoint' => $baseUrl . self::AUTHORIZE_PATH,
             'token_endpoint' => $baseUrl . self::TOKEN_PATH,
+            'registration_endpoint' => $baseUrl . self::REGISTER_PATH,
             'response_types_supported' => ['code'],
             'grant_types_supported' => ['authorization_code', 'refresh_token'],
             'code_challenge_methods_supported' => ['S256'],
@@ -194,6 +198,47 @@ final readonly class OAuthMiddleware implements MiddlewareInterface
             'token_type' => $tokenPair->tokenType,
             'expires_in' => $tokenPair->expiresIn,
             'refresh_token' => $tokenPair->refreshToken,
+        ]);
+    }
+
+    private function handleRegister(ServerRequestInterface $request): ResponseInterface
+    {
+        $contentType = $request->getHeaderLine('Content-Type');
+        if (!str_contains($contentType, 'application/json')) {
+            return $this->createJsonResponse(
+                400,
+                ['error' => 'invalid_request', 'error_description' => 'Content-Type must be application/json'],
+            );
+        }
+
+        /** @var array<string, mixed> $body */
+        $body = json_decode((string) $request->getBody(), true, 16, JSON_THROW_ON_ERROR);
+
+        $clientName = is_string($body['client_name'] ?? null) ? $body['client_name'] : 'MCP Client';
+
+        $redirectUris = [];
+        if (is_array($body['redirect_uris'] ?? null)) {
+            foreach ($body['redirect_uris'] as $uri) {
+                if (is_string($uri) && $uri !== '') {
+                    $redirectUris[] = $uri;
+                }
+            }
+        }
+
+        if ($redirectUris === []) {
+            return $this->createJsonResponse(
+                400,
+                ['error' => 'invalid_request', 'error_description' => 'At least one redirect_uri is required'],
+            );
+        }
+
+        $client = $this->clientRepository->registerClient($clientName, $redirectUris);
+
+        return $this->createJsonResponse(201, [
+            'client_id' => $client['client_id'],
+            'client_name' => $client['client_name'],
+            'redirect_uris' => $client['redirect_uris'],
+            'token_endpoint_auth_method' => 'none',
         ]);
     }
 

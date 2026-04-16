@@ -54,6 +54,32 @@ final readonly class ClientRepository
         return false;
     }
 
+    /**
+     * @param list<string> $redirectUris
+     * @return array{client_id: string, client_name: string, redirect_uris: list<string>}
+     */
+    public function registerClient(string $clientName, array $redirectUris): array
+    {
+        $clientId = bin2hex(random_bytes(16));
+
+        $connection = $this->connectionPool->getConnectionForTable(self::TABLE);
+        $connection->insert(self::TABLE, [
+            'client_id' => $clientId,
+            'client_name' => $clientName,
+            'redirect_uris' => json_encode($redirectUris, JSON_THROW_ON_ERROR),
+            'be_user' => 0,
+            'crdate' => time(),
+            'tstamp' => time(),
+            'pid' => 0,
+        ]);
+
+        return [
+            'client_id' => $clientId,
+            'client_name' => $clientName,
+            'redirect_uris' => $redirectUris,
+        ];
+    }
+
     private function matchesRedirectUri(string $allowedUri, string $requestedUri): bool
     {
         $allowedParsed = parse_url($allowedUri);
