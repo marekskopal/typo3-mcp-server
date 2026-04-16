@@ -37,14 +37,14 @@ final readonly class McpServerMiddleware implements MiddlewareInterface
 
         $token = $this->extractBearerToken($request);
         if ($token === null) {
-            return $this->createJsonResponse(401, ['error' => 'Missing or invalid Authorization header']);
+            return $this->createUnauthorizedResponse($request, 'Missing or invalid Authorization header');
         }
 
         try {
             $beUserUid = $this->authorizationService->validateAccessToken($token);
             $this->backendUserBootstrap->bootstrap($beUserUid);
         } catch (\RuntimeException $e) {
-            return $this->createJsonResponse(401, ['error' => $e->getMessage()]);
+            return $this->createUnauthorizedResponse($request, $e->getMessage());
         }
 
         $server = $this->mcpServerFactory->create();
@@ -77,14 +77,22 @@ final readonly class McpServerMiddleware implements MiddlewareInterface
         return $token !== '' ? $token : null;
     }
 
-    /** @param array<string, string> $data */
-    private function createJsonResponse(int $statusCode, array $data): ResponseInterface
+    private function createUnauthorizedResponse(ServerRequestInterface $request, string $error): ResponseInterface
     {
-        $body = $this->streamFactory->createStream(json_encode($data, JSON_THROW_ON_ERROR));
+        $uri = $request->getUri();
+        $baseUrl = $uri->getScheme() . '://' . $uri->getHost();
+        if ($uri->getPort() !== null) {
+            $baseUrl .= ':' . $uri->getPort();
+        }
+
+        $resourceMetadataUrl = $baseUrl . '/.well-known/oauth-protected-resource';
+
+        $body = $this->streamFactory->createStream(json_encode(['error' => $error], JSON_THROW_ON_ERROR));
 
         return $this->responseFactory
-            ->createResponse($statusCode)
+            ->createResponse(401)
             ->withHeader('Content-Type', 'application/json')
+            ->withHeader('WWW-Authenticate', sprintf('Bearer resource_metadata="%s"', $resourceMetadataUrl))
             ->withBody($body);
     }
 }

@@ -28,6 +28,8 @@ final readonly class OAuthMiddleware implements MiddlewareInterface
 
     private const string REGISTER_PATH = '/mcp/oauth/register';
 
+    private const string RESOURCE_METADATA_PATH = '/.well-known/oauth-protected-resource';
+
     public function __construct(
         private AuthorizationService $authorizationService,
         private ClientRepository $clientRepository,
@@ -45,6 +47,7 @@ final readonly class OAuthMiddleware implements MiddlewareInterface
 
         return match (true) {
             $path === self::METADATA_PATH && $method === 'GET' => $this->handleMetadata($request),
+            $path === self::RESOURCE_METADATA_PATH && $method === 'GET' => $this->handleResourceMetadata($request),
             $path === self::AUTHORIZE_PATH && $method === 'GET' => $this->handleAuthorizeGet($request),
             $path === self::AUTHORIZE_PATH && $method === 'POST' => $this->handleAuthorizePost($request),
             $path === self::TOKEN_PATH && $method === 'POST' => $this->handleToken($request),
@@ -70,6 +73,22 @@ final readonly class OAuthMiddleware implements MiddlewareInterface
             'grant_types_supported' => ['authorization_code', 'refresh_token'],
             'code_challenge_methods_supported' => ['S256'],
             'token_endpoint_auth_methods_supported' => ['none'],
+        ];
+
+        return $this->createJsonResponse(200, $metadata);
+    }
+
+    private function handleResourceMetadata(ServerRequestInterface $request): ResponseInterface
+    {
+        $uri = $request->getUri();
+        $baseUrl = $uri->getScheme() . '://' . $uri->getHost();
+        if ($uri->getPort() !== null) {
+            $baseUrl .= ':' . $uri->getPort();
+        }
+
+        $metadata = [
+            'resource' => $baseUrl . '/mcp',
+            'authorization_servers' => [$baseUrl],
         ];
 
         return $this->createJsonResponse(200, $metadata);
