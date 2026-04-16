@@ -60,7 +60,12 @@ final readonly class McpServerMiddleware implements MiddlewareInterface
     {
         $authHeader = $request->getHeaderLine('Authorization');
         if ($authHeader === '') {
-            return null;
+            $serverParams = $request->getServerParams();
+            if (is_string($serverParams['HTTP_AUTHORIZATION'] ?? null)) {
+                $authHeader = $serverParams['HTTP_AUTHORIZATION'];
+            } elseif (is_string($serverParams['REDIRECT_HTTP_AUTHORIZATION'] ?? null)) {
+                $authHeader = $serverParams['REDIRECT_HTTP_AUTHORIZATION'];
+            }
         }
 
         if (!str_starts_with($authHeader, 'Bearer ')) {
