@@ -8,7 +8,7 @@
     <f:flashMessages queueIdentifier="msmcpserver.tokens" />
 
     <h2>Create New Token</h2>
-    <form method="post" action="{f:be.uri(route: 'system_msmcpserver_tokens.create')}">
+    <form method="post" action="{f:be.uri(route: 'msmcpserver_tokens.create')}">
         <div class="form-group mb-3">
             <label for="name" class="form-label">Name</label>
             <input type="text" name="name" id="name" class="form-control" required="required" placeholder="Token description" />
@@ -58,7 +58,7 @@
                                 </f:if>
                             </td>
                             <td>
-                                <form method="post" action="{f:be.uri(route: 'system_msmcpserver_tokens.delete')}" style="display:inline">
+                                <form method="post" action="{f:be.uri(route: 'msmcpserver_tokens.delete')}" style="display:inline">
                                     <input type="hidden" name="uid" value="{token.uid}" />
                                     <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Delete this token?')">Delete</button>
                                 </form>

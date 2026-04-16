@@ -124,7 +124,7 @@ final readonly class TokenManagementController
 
     private function redirect(): ResponseInterface
     {
-        $uri = (string) $this->uriBuilder->buildUriFromRoute('system_msmcpserver_tokens');
+        $uri = (string) $this->uriBuilder->buildUriFromRoute('msmcpserver_tokens');
 
         return $this->responseFactory->createResponse(303)->withHeader('Location', $uri);
     }
