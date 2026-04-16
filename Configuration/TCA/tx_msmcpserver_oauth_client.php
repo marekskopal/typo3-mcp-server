@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 return [
     'ctrl' => [
-        'title' => 'LLL:EXT:ms_mcp_server/Resources/Private/Language/locallang.xlf:tx_msmcpserver_token',
-        'label' => 'name',
+        'title' => 'LLL:EXT:ms_mcp_server/Resources/Private/Language/locallang.xlf:tx_msmcpserver_oauth_client',
+        'label' => 'client_name',
         'tstamp' => 'tstamp',
         'crdate' => 'crdate',
         'delete' => 'deleted',
@@ -18,8 +18,17 @@ return [
         ],
     ],
     'columns' => [
-        'name' => [
-            'label' => 'LLL:EXT:ms_mcp_server/Resources/Private/Language/locallang.xlf:tx_msmcpserver_token.name',
+        'client_id' => [
+            'label' => 'LLL:EXT:ms_mcp_server/Resources/Private/Language/locallang.xlf:tx_msmcpserver_oauth_client.client_id',
+            'config' => [
+                'type' => 'input',
+                'size' => 64,
+                'max' => 128,
+                'readOnly' => true,
+            ],
+        ],
+        'client_name' => [
+            'label' => 'LLL:EXT:ms_mcp_server/Resources/Private/Language/locallang.xlf:tx_msmcpserver_oauth_client.client_name',
             'config' => [
                 'type' => 'input',
                 'size' => 50,
@@ -28,30 +37,22 @@ return [
                 'required' => true,
             ],
         ],
-        'token_hash' => [
-            'label' => 'LLL:EXT:ms_mcp_server/Resources/Private/Language/locallang.xlf:tx_msmcpserver_token.token_hash',
+        'redirect_uris' => [
+            'label' => 'LLL:EXT:ms_mcp_server/Resources/Private/Language/locallang.xlf:tx_msmcpserver_oauth_client.redirect_uris',
             'config' => [
-                'type' => 'input',
-                'size' => 64,
-                'max' => 64,
-                'readOnly' => true,
+                'type' => 'text',
+                'rows' => 5,
+                'cols' => 50,
+                'required' => true,
             ],
         ],
         'be_user' => [
-            'label' => 'LLL:EXT:ms_mcp_server/Resources/Private/Language/locallang.xlf:tx_msmcpserver_token.be_user',
+            'label' => 'LLL:EXT:ms_mcp_server/Resources/Private/Language/locallang.xlf:tx_msmcpserver_oauth_client.be_user',
             'config' => [
                 'type' => 'group',
                 'allowed' => 'be_users',
                 'maxitems' => 1,
                 'size' => 1,
-                'required' => true,
-            ],
-        ],
-        'expires' => [
-            'label' => 'LLL:EXT:ms_mcp_server/Resources/Private/Language/locallang.xlf:tx_msmcpserver_token.expires',
-            'config' => [
-                'type' => 'datetime',
-                'default' => 0,
             ],
         ],
         'hidden' => [
@@ -64,7 +65,7 @@ return [
     ],
     'types' => [
         '0' => [
-            'showitem' => 'name, token_hash, be_user, expires, hidden',
+            'showitem' => 'client_name, client_id, redirect_uris, be_user, hidden',
         ],
     ],
 ];

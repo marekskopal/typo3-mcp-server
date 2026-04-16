@@ -1,0 +1,81 @@
+<html xmlns:f="http://typo3.org/ns/TYPO3/CMS/Fluid/ViewHelpers"
+      xmlns:be="http://typo3.org/ns/TYPO3/CMS/Backend/ViewHelpers"
+      data-namespace-typo3-fluid="true">
+
+<f:layout name="Module" />
+
+<f:section name="Content">
+    <f:flashMessages queueIdentifier="msmcpserver.oauth" />
+
+    <h2>Register New OAuth Client</h2>
+    <form method="post" action="{f:be.uri(route: 'msmcpserver_oauth_clients.create')}">
+        <div class="form-group mb-3">
+            <label for="client_name" class="form-label">Client Name</label>
+            <input type="text" name="client_name" id="client_name" class="form-control" required="required" placeholder="e.g. Claude Code" />
+        </div>
+        <div class="form-group mb-3">
+            <label for="redirect_uris" class="form-label">Redirect URIs (one per line)</label>
+            <textarea name="redirect_uris" id="redirect_uris" class="form-control" rows="3" required="required" placeholder="http://localhost:3000/callback"></textarea>
+        </div>
+        <div class="form-group mb-3">
+            <label for="be_user" class="form-label">Backend User (optional, restricts authorization to this user)</label>
+            <select name="be_user" id="be_user" class="form-select">
+                <option value="0">-- Any user --</option>
+                <f:for each="{beUsers}" as="user">
+                    <option value="{user.uid}">{user.username}</option>
+                </f:for>
+            </select>
+        </div>
+        <button type="submit" class="btn btn-primary">Register Client</button>
+    </form>
+
+    <h2 class="mt-5">Registered OAuth Clients</h2>
+    <f:if condition="{clients}">
+        <f:then>
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>Client Name</th>
+                        <th>Client ID</th>
+                        <th>User</th>
+                        <th>Created</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <f:for each="{clients}" as="client">
+                        <tr>
+                            <td>{client.client_name}</td>
+                            <td><code>{client.client_id}</code></td>
+                            <td>
+                                <f:if condition="{client.username}">
+                                    <f:then>{client.username}</f:then>
+                                    <f:else><em>Any</em></f:else>
+                                </f:if>
+                            </td>
+                            <td><f:format.date format="Y-m-d H:i">{client.crdate}</f:format.date></td>
+                            <td>
+                                <f:if condition="{client.hidden}">
+                                    <f:then><span class="badge bg-danger">Disabled</span></f:then>
+                                    <f:else><span class="badge bg-success">Active</span></f:else>
+                                </f:if>
+                            </td>
+                            <td>
+                                <form method="post" action="{f:be.uri(route: 'msmcpserver_oauth_clients.delete')}" style="display:inline">
+                                    <input type="hidden" name="uid" value="{client.uid}" />
+                                    <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Delete this OAuth client?')">Delete</button>
+                                </form>
+                            </td>
+                        </tr>
+                    </f:for>
+                </tbody>
+            </table>
+        </f:then>
+        <f:else>
+            <p class="text-muted">No OAuth clients registered.</p>
+        </f:else>
+    </f:if>
+</f:section>
+
+</html>

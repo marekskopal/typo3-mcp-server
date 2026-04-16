@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace MarekSkopal\MsMcpServer\Middleware;
 
 use MarekSkopal\MsMcpServer\Authentication\BackendUserBootstrap;
-use MarekSkopal\MsMcpServer\Authentication\TokenAuthenticator;
+use MarekSkopal\MsMcpServer\OAuth\AuthorizationService;
 use MarekSkopal\MsMcpServer\Server\McpServerFactory;
 use Mcp\Server\Transport\StreamableHttpTransport;
 use Psr\Http\Message\ResponseFactoryInterface;
@@ -21,7 +21,7 @@ final readonly class McpServerMiddleware implements MiddlewareInterface
     private const string MCP_PATH = '/mcp';
 
     public function __construct(
-        private TokenAuthenticator $tokenAuthenticator,
+        private AuthorizationService $authorizationService,
         private BackendUserBootstrap $backendUserBootstrap,
         private McpServerFactory $mcpServerFactory,
         private ResponseFactoryInterface $responseFactory,
@@ -41,7 +41,7 @@ final readonly class McpServerMiddleware implements MiddlewareInterface
         }
 
         try {
-            $beUserUid = $this->tokenAuthenticator->authenticate($token);
+            $beUserUid = $this->authorizationService->validateAccessToken($token);
             $this->backendUserBootstrap->bootstrap($beUserUid);
         } catch (\RuntimeException $e) {
             return $this->createJsonResponse(401, ['error' => $e->getMessage()]);

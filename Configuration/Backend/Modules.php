@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-use MarekSkopal\MsMcpServer\Controller\TokenManagementController;
+use MarekSkopal\MsMcpServer\Controller\OAuthClientController;
 
 return [
-    'msmcpserver_tokens' => [
+    'msmcpserver_oauth_clients' => [
         'parent' => 'system',
         'position' => [],
         'access' => 'admin',
@@ -13,14 +13,14 @@ return [
         'labels' => 'LLL:EXT:ms_mcp_server/Resources/Private/Language/locallang.xlf:module',
         'routes' => [
             '_default' => [
-                'target' => TokenManagementController::class . '::indexAction',
+                'target' => OAuthClientController::class . '::indexAction',
             ],
             'create' => [
-                'target' => TokenManagementController::class . '::createAction',
+                'target' => OAuthClientController::class . '::createAction',
                 'methods' => ['POST'],
             ],
             'delete' => [
-                'target' => TokenManagementController::class . '::deleteAction',
+                'target' => OAuthClientController::class . '::deleteAction',
                 'methods' => ['POST'],
             ],
         ],

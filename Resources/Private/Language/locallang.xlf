@@ -4,25 +4,25 @@
         <header/>
         <body>
             <trans-unit id="module.title" resname="module.title">
-                <source>MCP Server Tokens</source>
+                <source>MCP Server OAuth</source>
             </trans-unit>
             <trans-unit id="module.description" resname="module.description">
-                <source>Manage MCP server API tokens</source>
+                <source>Manage MCP server OAuth clients</source>
             </trans-unit>
-            <trans-unit id="tx_msmcpserver_token" resname="tx_msmcpserver_token">
-                <source>MCP Token</source>
+            <trans-unit id="tx_msmcpserver_oauth_client" resname="tx_msmcpserver_oauth_client">
+                <source>OAuth Client</source>
             </trans-unit>
-            <trans-unit id="tx_msmcpserver_token.name" resname="tx_msmcpserver_token.name">
-                <source>Name</source>
+            <trans-unit id="tx_msmcpserver_oauth_client.client_id" resname="tx_msmcpserver_oauth_client.client_id">
+                <source>Client ID</source>
             </trans-unit>
-            <trans-unit id="tx_msmcpserver_token.token_hash" resname="tx_msmcpserver_token.token_hash">
-                <source>Token Hash</source>
+            <trans-unit id="tx_msmcpserver_oauth_client.client_name" resname="tx_msmcpserver_oauth_client.client_name">
+                <source>Client Name</source>
             </trans-unit>
-            <trans-unit id="tx_msmcpserver_token.be_user" resname="tx_msmcpserver_token.be_user">
+            <trans-unit id="tx_msmcpserver_oauth_client.redirect_uris" resname="tx_msmcpserver_oauth_client.redirect_uris">
+                <source>Redirect URIs</source>
+            </trans-unit>
+            <trans-unit id="tx_msmcpserver_oauth_client.be_user" resname="tx_msmcpserver_oauth_client.be_user">
                 <source>Backend User</source>
-            </trans-unit>
-            <trans-unit id="tx_msmcpserver_token.expires" resname="tx_msmcpserver_token.expires">
-                <source>Expires</source>
             </trans-unit>
         </body>
     </file>
