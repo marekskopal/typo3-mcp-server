@@ -5,7 +5,7 @@
 <f:layout name="Module" />
 
 <f:section name="Content">
-    <f:flashMessages />
+    <f:flashMessages queueIdentifier="msmcpserver.tokens" />
 
     <h2>Create New Token</h2>
     <form method="post" action="{f:be.uri(route: 'system_msmcpserver_tokens.create')}">

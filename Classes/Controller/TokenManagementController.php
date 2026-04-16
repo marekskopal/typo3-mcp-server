@@ -119,7 +119,7 @@ final readonly class TokenManagementController
     private function addFlashMessage(string $message, ContextualFeedbackSeverity $severity): void
     {
         $flashMessage = new FlashMessage($message, '', $severity, true);
-        $this->flashMessageService->getMessageQueueByIdentifier()->enqueue($flashMessage);
+        $this->flashMessageService->getMessageQueueByIdentifier('msmcpserver.tokens')->enqueue($flashMessage);
     }
 
     private function redirect(): ResponseInterface
