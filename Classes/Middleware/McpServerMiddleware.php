@@ -35,16 +35,21 @@ final readonly class McpServerMiddleware implements MiddlewareInterface
             return $handler->handle($request);
         }
 
+        // Handle CORS preflight without auth
+        if ($request->getMethod() === 'OPTIONS') {
+            return $this->withCorsHeaders($this->responseFactory->createResponse(204));
+        }
+
         $token = $this->extractBearerToken($request);
         if ($token === null) {
-            return $this->createUnauthorizedResponse($request, 'Missing or invalid Authorization header');
+            return $this->withCorsHeaders($this->createUnauthorizedResponse($request, 'Missing or invalid Authorization header'));
         }
 
         try {
             $beUserUid = $this->authorizationService->validateAccessToken($token);
             $this->backendUserBootstrap->bootstrap($beUserUid);
         } catch (\RuntimeException $e) {
-            return $this->createUnauthorizedResponse($request, $e->getMessage());
+            return $this->withCorsHeaders($this->createUnauthorizedResponse($request, $e->getMessage()));
         }
 
         $server = $this->mcpServerFactory->create();
@@ -94,5 +99,17 @@ final readonly class McpServerMiddleware implements MiddlewareInterface
             ->withHeader('Content-Type', 'application/json')
             ->withHeader('WWW-Authenticate', sprintf('Bearer resource_metadata="%s"', $resourceMetadataUrl))
             ->withBody($body);
+    }
+
+    private function withCorsHeaders(ResponseInterface $response): ResponseInterface
+    {
+        return $response
+            ->withHeader('Access-Control-Allow-Origin', '*')
+            ->withHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS')
+            ->withHeader(
+                'Access-Control-Allow-Headers',
+                'Accept, Authorization, Content-Type, Mcp-Session-Id, Mcp-Protocol-Version, Last-Event-ID',
+            )
+            ->withHeader('Access-Control-Expose-Headers', 'Mcp-Session-Id');
     }
 }
