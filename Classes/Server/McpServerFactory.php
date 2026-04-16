@@ -20,7 +20,9 @@ use MarekSkopal\MsMcpServer\Tool\Pages\PagesGetTool;
 use MarekSkopal\MsMcpServer\Tool\Pages\PagesListTool;
 use MarekSkopal\MsMcpServer\Tool\Pages\PagesUpdateTool;
 use Mcp\Server;
+use Mcp\Server\Session\FileSessionStore;
 use Psr\Container\ContainerInterface;
+use TYPO3\CMS\Core\Core\Environment;
 
 readonly class McpServerFactory
 {
@@ -48,9 +50,13 @@ readonly class McpServerFactory
 
     public function create(): Server
     {
+        $sessionDir = Environment::getVarPath() . '/mcp-sessions';
+        $sessionStore = new FileSessionStore($sessionDir);
+
         $builder = Server::builder()
             ->setServerInfo('TYPO3 MCP Server', '1.0.0')
-            ->setContainer($this->container);
+            ->setContainer($this->container)
+            ->setSession($sessionStore);
 
         foreach (self::TOOLS as [$class, $method, $name]) {
             $builder->addTool([$class, $method], $name);
