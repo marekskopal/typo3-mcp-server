@@ -86,9 +86,6 @@ final readonly class OAuthClientController
             'client_name' => $clientName,
             'redirect_uris' => json_encode($uriList, JSON_THROW_ON_ERROR),
             'be_user' => (int) ($body['be_user'] ?? 0),
-            'crdate' => time(),
-            'tstamp' => time(),
-            'pid' => 0,
         ]);
 
         $this->addFlashMessage(

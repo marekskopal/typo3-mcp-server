@@ -3,6 +3,8 @@ CREATE TABLE tx_msmcpserver_oauth_client (
     client_name varchar(255) DEFAULT '' NOT NULL,
     redirect_uris text,
     be_user int(11) unsigned DEFAULT '0' NOT NULL,
+    crdate int(11) unsigned DEFAULT '0' NOT NULL,
+    tstamp int(11) unsigned DEFAULT '0' NOT NULL,
 
     UNIQUE KEY client_id (client_id),
     KEY be_user (be_user)

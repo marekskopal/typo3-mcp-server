@@ -68,9 +68,6 @@ final readonly class ClientRepository
             'client_name' => $clientName,
             'redirect_uris' => json_encode($redirectUris, JSON_THROW_ON_ERROR),
             'be_user' => 0,
-            'crdate' => time(),
-            'tstamp' => time(),
-            'pid' => 0,
         ]);
 
         return [

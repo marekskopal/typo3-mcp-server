@@ -47,9 +47,6 @@ final readonly class AuthorizationService
             'code_challenge_method' => $codeChallengeMethod,
             'redirect_uri' => $redirectUri,
             'code_expires' => time() + self::CODE_LIFETIME,
-            'crdate' => time(),
-            'tstamp' => time(),
-            'pid' => 0,
         ]);
 
         return $code;
@@ -103,7 +100,6 @@ final readonly class AuthorizationService
         $connection->update(self::TABLE, [
             'authorization_code_hash' => '',
             'revoked' => 1,
-            'tstamp' => time(),
         ], ['uid' => (int) $row['uid']]);
 
         return $tokenPair;
@@ -146,7 +142,6 @@ final readonly class AuthorizationService
         $connection = $this->connectionPool->getConnectionForTable(self::TABLE);
         $connection->update(self::TABLE, [
             'revoked' => 1,
-            'tstamp' => time(),
         ], ['uid' => (int) $row['uid']]);
 
         return $this->issueTokenPair($clientId, (int) $row['be_user']);
@@ -197,9 +192,6 @@ final readonly class AuthorizationService
             'refresh_token_hash' => hash('sha256', $refreshToken),
             'access_token_expires' => time() + self::ACCESS_TOKEN_LIFETIME,
             'refresh_token_expires' => time() + self::REFRESH_TOKEN_LIFETIME,
-            'crdate' => time(),
-            'tstamp' => time(),
-            'pid' => 0,
         ]);
 
         return new OAuthTokenPair(accessToken: $accessToken, refreshToken: $refreshToken, expiresIn: self::ACCESS_TOKEN_LIFETIME);
