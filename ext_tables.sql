@@ -11,6 +11,8 @@ CREATE TABLE tx_msmcpserver_oauth_client (
 );
 
 CREATE TABLE tx_msmcpserver_oauth_authorization (
+    uid int(11) unsigned NOT NULL AUTO_INCREMENT,
+    pid int(11) unsigned DEFAULT '0' NOT NULL,
     client_id varchar(128) DEFAULT '' NOT NULL,
     be_user int(11) unsigned DEFAULT '0' NOT NULL,
     authorization_code_hash varchar(64) DEFAULT '' NOT NULL,
@@ -25,6 +27,7 @@ CREATE TABLE tx_msmcpserver_oauth_authorization (
     code_expires int(11) unsigned DEFAULT '0' NOT NULL,
     revoked tinyint(1) unsigned DEFAULT '0' NOT NULL,
 
+    PRIMARY KEY (uid),
     KEY authorization_code_hash (authorization_code_hash),
     KEY access_token_hash (access_token_hash),
     KEY refresh_token_hash (refresh_token_hash),
