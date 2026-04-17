@@ -8,6 +8,8 @@ use Mcp\Server;
 use MarekSkopal\MsMcpServer\Server\McpServerFactory;
 use MarekSkopal\MsMcpServer\Service\DataHandlerService;
 use MarekSkopal\MsMcpServer\Service\RecordService;
+use MarekSkopal\MsMcpServer\Service\TcaSchemaService;
+use MarekSkopal\MsMcpServer\Tool\Dynamic\DynamicToolRegistrar;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 use Psr\Container\ContainerInterface;
@@ -54,7 +56,9 @@ final class McpServerFactoryTest extends TestCase
             },
         );
 
-        $factory = new McpServerFactory($container);
+        $dynamicToolRegistrar = new DynamicToolRegistrar($recordService, $dataHandlerService, new TcaSchemaService(), $logger);
+
+        $factory = new McpServerFactory($container, $dynamicToolRegistrar);
         $server = $factory->create();
 
         self::assertInstanceOf(Server::class, $server);

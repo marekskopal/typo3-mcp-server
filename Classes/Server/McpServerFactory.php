@@ -9,11 +9,7 @@ use MarekSkopal\MsMcpServer\Tool\Content\ContentDeleteTool;
 use MarekSkopal\MsMcpServer\Tool\Content\ContentGetTool;
 use MarekSkopal\MsMcpServer\Tool\Content\ContentListTool;
 use MarekSkopal\MsMcpServer\Tool\Content\ContentUpdateTool;
-use MarekSkopal\MsMcpServer\Tool\News\NewsCreateTool;
-use MarekSkopal\MsMcpServer\Tool\News\NewsDeleteTool;
-use MarekSkopal\MsMcpServer\Tool\News\NewsGetTool;
-use MarekSkopal\MsMcpServer\Tool\News\NewsListTool;
-use MarekSkopal\MsMcpServer\Tool\News\NewsUpdateTool;
+use MarekSkopal\MsMcpServer\Tool\Dynamic\DynamicToolRegistrar;
 use MarekSkopal\MsMcpServer\Tool\Pages\PagesCreateTool;
 use MarekSkopal\MsMcpServer\Tool\Pages\PagesDeleteTool;
 use MarekSkopal\MsMcpServer\Tool\Pages\PagesGetTool;
@@ -37,14 +33,9 @@ readonly class McpServerFactory
         [ContentCreateTool::class, 'execute', 'content_create'],
         [ContentUpdateTool::class, 'execute', 'content_update'],
         [ContentDeleteTool::class, 'execute', 'content_delete'],
-        [NewsListTool::class, 'execute', 'news_list'],
-        [NewsGetTool::class, 'execute', 'news_get'],
-        [NewsCreateTool::class, 'execute', 'news_create'],
-        [NewsUpdateTool::class, 'execute', 'news_update'],
-        [NewsDeleteTool::class, 'execute', 'news_delete'],
     ];
 
-    public function __construct(private ContainerInterface $container)
+    public function __construct(private ContainerInterface $container, private DynamicToolRegistrar $dynamicToolRegistrar,)
     {
     }
 
@@ -61,6 +52,8 @@ readonly class McpServerFactory
         foreach (self::TOOLS as [$class, $method, $name]) {
             $builder->addTool([$class, $method], $name);
         }
+
+        $this->dynamicToolRegistrar->register($builder);
 
         return $builder->build();
     }
