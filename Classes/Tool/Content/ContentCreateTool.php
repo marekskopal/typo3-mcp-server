@@ -5,11 +5,13 @@ declare(strict_types=1);
 namespace MarekSkopal\MsMcpServer\Tool\Content;
 
 use MarekSkopal\MsMcpServer\Service\DataHandlerService;
+use Mcp\Exception\ToolCallException;
+use Psr\Log\LoggerInterface;
 use const JSON_THROW_ON_ERROR;
 
 final readonly class ContentCreateTool
 {
-    public function __construct(private DataHandlerService $dataHandlerService)
+    public function __construct(private DataHandlerService $dataHandlerService, private LoggerInterface $logger,)
     {
     }
 
@@ -32,7 +34,13 @@ final readonly class ContentCreateTool
             'sys_language_uid' => $sysLanguageUid,
         ];
 
-        $uid = $this->dataHandlerService->createRecord('tt_content', $pid, $fields);
+        try {
+            $uid = $this->dataHandlerService->createRecord('tt_content', $pid, $fields);
+        } catch (\Throwable $e) {
+            $this->logger->error('content_create tool failed', ['exception' => $e]);
+
+            throw new ToolCallException($e->getMessage(), (int) $e->getCode(), $e);
+        }
 
         return json_encode(['uid' => $uid, 'CType' => $cType, 'header' => $header], JSON_THROW_ON_ERROR);
     }

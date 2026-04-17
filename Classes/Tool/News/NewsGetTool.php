@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace MarekSkopal\MsMcpServer\Tool\News;
 
 use MarekSkopal\MsMcpServer\Service\RecordService;
+use Mcp\Exception\ToolCallException;
+use Psr\Log\LoggerInterface;
 use const JSON_THROW_ON_ERROR;
 
 final readonly class NewsGetTool
@@ -28,14 +30,21 @@ final readonly class NewsGetTool
         'description',
     ];
 
-    public function __construct(private RecordService $recordService)
+    public function __construct(private RecordService $recordService, private LoggerInterface $logger,)
     {
     }
 
     /** Get a single news record by its uid. */
     public function execute(int $uid): string
     {
-        $record = $this->recordService->findByUid(self::TABLE, $uid, self::FIELDS);
+        try {
+            $record = $this->recordService->findByUid(self::TABLE, $uid, self::FIELDS);
+        } catch (\Throwable $e) {
+            $this->logger->error('news_get tool failed', ['exception' => $e]);
+
+            throw new ToolCallException($e->getMessage(), (int) $e->getCode(), $e);
+        }
+
         if ($record === null) {
             return json_encode(['error' => 'News record not found'], JSON_THROW_ON_ERROR);
         }

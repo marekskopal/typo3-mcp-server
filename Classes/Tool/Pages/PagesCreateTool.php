@@ -5,11 +5,13 @@ declare(strict_types=1);
 namespace MarekSkopal\MsMcpServer\Tool\Pages;
 
 use MarekSkopal\MsMcpServer\Service\DataHandlerService;
+use Mcp\Exception\ToolCallException;
+use Psr\Log\LoggerInterface;
 use const JSON_THROW_ON_ERROR;
 
 final readonly class PagesCreateTool
 {
-    public function __construct(private DataHandlerService $dataHandlerService)
+    public function __construct(private DataHandlerService $dataHandlerService, private LoggerInterface $logger,)
     {
     }
 
@@ -46,7 +48,13 @@ final readonly class PagesCreateTool
             $fields['abstract'] = $abstract;
         }
 
-        $uid = $this->dataHandlerService->createRecord('pages', $pid, $fields);
+        try {
+            $uid = $this->dataHandlerService->createRecord('pages', $pid, $fields);
+        } catch (\Throwable $e) {
+            $this->logger->error('pages_create tool failed', ['exception' => $e]);
+
+            throw new ToolCallException($e->getMessage(), (int) $e->getCode(), $e);
+        }
 
         return json_encode(['uid' => $uid, 'title' => $title], JSON_THROW_ON_ERROR);
     }
