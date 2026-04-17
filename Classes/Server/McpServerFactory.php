@@ -15,6 +15,7 @@ use MarekSkopal\MsMcpServer\Tool\File\DirectoryDeleteTool;
 use MarekSkopal\MsMcpServer\Tool\File\FileDeleteTool;
 use MarekSkopal\MsMcpServer\Tool\File\FileGetInfoTool;
 use MarekSkopal\MsMcpServer\Tool\File\FileListTool;
+use MarekSkopal\MsMcpServer\Tool\File\FileReferenceAddTool;
 use MarekSkopal\MsMcpServer\Tool\File\FileUploadTool;
 use MarekSkopal\MsMcpServer\Tool\Pages\PagesCreateTool;
 use MarekSkopal\MsMcpServer\Tool\Pages\PagesDeleteTool;
@@ -45,6 +46,7 @@ readonly class McpServerFactory
         [FileDeleteTool::class, 'execute', 'file_delete'],
         [DirectoryCreateTool::class, 'execute', 'directory_create'],
         [DirectoryDeleteTool::class, 'execute', 'directory_delete'],
+        [FileReferenceAddTool::class, 'execute', 'file_reference_add'],
     ];
 
     public function __construct(private ContainerInterface $container, private DynamicToolRegistrar $dynamicToolRegistrar,)

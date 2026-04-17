@@ -47,14 +47,17 @@ final class McpServerFactoryTest extends TestCase
         $fileService = new FileService($storageRepository);
         $logger = new NullLogger();
 
+        $tcaSchemaService = new TcaSchemaService();
+
         $container = $this->createMock(ContainerInterface::class);
         $container->method('has')->willReturn(true);
         $container->method('get')->willReturnCallback(
-            static function (string $id) use ($recordService, $dataHandlerService, $fileService, $logger): object {
+            static function (string $id) use ($recordService, $dataHandlerService, $fileService, $tcaSchemaService, $logger): object {
                 return match (true) {
                     str_contains($id, 'RecordService') => $recordService,
                     str_contains($id, 'DataHandlerService') => $dataHandlerService,
                     str_contains($id, 'FileService') => $fileService,
+                    str_contains($id, 'TcaSchemaService') => $tcaSchemaService,
                     str_contains($id, 'LoggerInterface') || str_contains($id, 'Logger') => $logger,
                     default => new ($id)($recordService, $logger),
                 };

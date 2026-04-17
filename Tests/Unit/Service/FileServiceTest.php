@@ -56,6 +56,7 @@ final class FileServiceTest extends TestCase
     public function testGetFileInfoReturnsFileMetadata(): void
     {
         $file = $this->createMock(File::class);
+        $file->method('getUid')->willReturn(10);
         $file->method('getName')->willReturn('image.png');
         $file->method('getIdentifier')->willReturn('/images/image.png');
         $file->method('getSize')->willReturn(2048);
@@ -98,6 +99,7 @@ final class FileServiceTest extends TestCase
     public function testUploadFileCreatesFileWithContent(): void
     {
         $file = $this->createMock(File::class);
+        $file->method('getUid')->willReturn(42);
         $file->method('getName')->willReturn('upload.txt');
         $file->method('getIdentifier')->willReturn('/upload.txt');
         $file->method('getSize')->willReturn(13);
@@ -114,6 +116,7 @@ final class FileServiceTest extends TestCase
         $service = new FileService($storageRepository);
         $result = $service->uploadFile(1, '/', 'upload.txt', base64_encode('Hello, World!'));
 
+        self::assertSame(42, $result['uid']);
         self::assertSame('upload.txt', $result['name']);
         self::assertSame(13, $result['size']);
     }

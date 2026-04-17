@@ -18,6 +18,7 @@ final class FileUploadToolTest extends TestCase
     public function testExecuteUploadsFileAndReturnsResult(): void
     {
         $expectedResult = [
+            'uid' => 42,
             'name' => 'upload.txt',
             'identifier' => '/upload.txt',
             'size' => 13,
@@ -35,6 +36,7 @@ final class FileUploadToolTest extends TestCase
         $tool = new FileUploadTool($fileService, new NullLogger());
         $result = json_decode($tool->execute('upload.txt', $base64), true, 512, JSON_THROW_ON_ERROR);
 
+        self::assertSame(42, $result['uid']);
         self::assertSame('upload.txt', $result['name']);
         self::assertSame(13, $result['size']);
     }
@@ -45,7 +47,7 @@ final class FileUploadToolTest extends TestCase
         $fileService->expects(self::once())
             ->method('uploadFile')
             ->with(2, '/uploads/', 'file.pdf', 'YWJj')
-            ->willReturn(['name' => 'file.pdf', 'identifier' => '/uploads/file.pdf', 'size' => 3, 'mimeType' => 'application/pdf']);
+            ->willReturn(['uid' => 50, 'name' => 'file.pdf', 'identifier' => '/uploads/file.pdf', 'size' => 3, 'mimeType' => 'application/pdf']);
 
         $tool = new FileUploadTool($fileService, new NullLogger());
         $tool->execute('file.pdf', 'YWJj', '/uploads/', 2);

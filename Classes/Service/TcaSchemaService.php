@@ -136,6 +136,60 @@ final readonly class TcaSchemaService
         return $fields;
     }
 
+    /** @return list<string> Field names that are file reference fields (TCA type 'file' or inline with sys_file_reference). */
+    public function getFileFields(string $tableName): array
+    {
+        $tca = $this->getTca($tableName);
+        if ($tca === null) {
+            return [];
+        }
+
+        $columns = $tca['columns'] ?? [];
+        if (!is_array($columns)) {
+            return [];
+        }
+
+        $fields = [];
+
+        foreach ($columns as $fieldName => $columnConfig) {
+            if (!is_string($fieldName) || !is_array($columnConfig)) {
+                continue;
+            }
+
+            if ($this->isFileField($columnConfig)) {
+                $fields[] = $fieldName;
+            }
+        }
+
+        return $fields;
+    }
+
+    /** @param array<mixed> $columnConfig */
+    private function isFileField(array $columnConfig): bool
+    {
+        $config = $columnConfig['config'] ?? [];
+        if (!is_array($config)) {
+            return false;
+        }
+
+        $type = $config['type'] ?? null;
+        if (!is_string($type)) {
+            return false;
+        }
+
+        if ($type === 'file') {
+            return true;
+        }
+
+        if ($type === 'inline') {
+            $foreignTable = $config['foreign_table'] ?? null;
+
+            return $foreignTable === 'sys_file_reference';
+        }
+
+        return false;
+    }
+
     /** @param array<mixed> $columnConfig */
     private function isReadableField(array $columnConfig): bool
     {

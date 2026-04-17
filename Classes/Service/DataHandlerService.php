@@ -53,6 +53,51 @@ readonly class DataHandlerService
         $this->checkErrors($dataHandler);
     }
 
+    /**
+     * @param list<int> $fileUids sys_file UIDs to attach
+     * @return list<int> UIDs of the created sys_file_reference records
+     */
+    public function createFileReferences(string $table, int $recordUid, string $fieldName, array $fileUids): array
+    {
+        $newIds = [];
+        $datamap = [];
+
+        foreach ($fileUids as $index => $fileUid) {
+            $newId = 'NEW_ref_' . bin2hex(random_bytes(4));
+            $newIds[] = $newId;
+
+            $datamap['sys_file_reference'][$newId] = [
+                'uid_local' => $fileUid,
+                'uid_foreign' => $recordUid,
+                'tablenames' => $table,
+                'fieldname' => $fieldName,
+                'sorting_foreign' => $index + 1,
+                'pid' => 0,
+            ];
+        }
+
+        $datamap[$table][$recordUid] = [
+            $fieldName => implode(',', $newIds),
+        ];
+
+        $dataHandler = GeneralUtility::makeInstance(DataHandler::class);
+        $dataHandler->start($datamap, []);
+        $dataHandler->process_datamap();
+
+        $this->checkErrors($dataHandler);
+
+        $referenceUids = [];
+        foreach ($newIds as $newId) {
+            /** @var int|string|null $uid */
+            $uid = $dataHandler->substNEWwithIDs[$newId] ?? null;
+            if ($uid !== null) {
+                $referenceUids[] = (int) $uid;
+            }
+        }
+
+        return $referenceUids;
+    }
+
     private function checkErrors(DataHandler $dataHandler): void
     {
         // @phpstan-ignore property.internal

@@ -42,7 +42,7 @@ readonly class FileService
         ];
     }
 
-    /** @return array{name: string, identifier: string, size: int, mimeType: string, extension: string, modificationTime: int, publicUrl: string|null} */
+    /** @return array{uid: int, name: string, identifier: string, size: int, mimeType: string, extension: string, modificationTime: int, publicUrl: string|null} */
     public function getFileInfo(int $storageUid, string $fileIdentifier): array
     {
         $storage = $this->getStorage($storageUid);
@@ -53,6 +53,7 @@ readonly class FileService
         }
 
         return [
+            'uid' => $file->getUid(),
             'name' => $file->getName(),
             'identifier' => $file->getIdentifier(),
             'size' => $file->getSize(),
@@ -63,7 +64,7 @@ readonly class FileService
         ];
     }
 
-    /** @return array{name: string, identifier: string, size: int, mimeType: string} */
+    /** @return array{uid: int, name: string, identifier: string, size: int, mimeType: string} */
     public function uploadFile(int $storageUid, string $directoryPath, string $fileName, string $base64Content): array
     {
         $content = base64_decode($base64Content, true);
@@ -89,6 +90,7 @@ readonly class FileService
         }
 
         return [
+            'uid' => $file->getUid(),
             'name' => $file->getName(),
             'identifier' => $file->getIdentifier(),
             'size' => $file->getSize(),

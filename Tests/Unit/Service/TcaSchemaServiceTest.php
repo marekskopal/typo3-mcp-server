@@ -272,4 +272,58 @@ final class TcaSchemaServiceTest extends TestCase
     {
         self::assertSame(['uid', 'pid'], $this->service->getReadFields('nonexistent_table'));
     }
+
+    public function testGetFileFieldsReturnsFileTypeFields(): void
+    {
+        $GLOBALS['TCA']['tx_test'] = [
+            'ctrl' => [],
+            'columns' => [
+                'title' => ['config' => ['type' => 'input']],
+                'image' => ['config' => ['type' => 'file']],
+                'media' => ['config' => ['type' => 'file', 'allowed' => 'common-image-types']],
+            ],
+        ];
+
+        $fields = $this->service->getFileFields('tx_test');
+
+        self::assertContains('image', $fields);
+        self::assertContains('media', $fields);
+        self::assertNotContains('title', $fields);
+    }
+
+    public function testGetFileFieldsReturnsLegacyInlineFileReferenceFields(): void
+    {
+        $GLOBALS['TCA']['tx_test'] = [
+            'ctrl' => [],
+            'columns' => [
+                'image' => ['config' => ['type' => 'inline', 'foreign_table' => 'sys_file_reference']],
+                'children' => ['config' => ['type' => 'inline', 'foreign_table' => 'tx_test_child']],
+            ],
+        ];
+
+        $fields = $this->service->getFileFields('tx_test');
+
+        self::assertContains('image', $fields);
+        self::assertNotContains('children', $fields);
+    }
+
+    public function testGetFileFieldsExcludesNonFileFields(): void
+    {
+        $GLOBALS['TCA']['tx_test'] = [
+            'ctrl' => [],
+            'columns' => [
+                'title' => ['config' => ['type' => 'input']],
+                'body' => ['config' => ['type' => 'text']],
+                'category' => ['config' => ['type' => 'category']],
+                'tags' => ['config' => ['type' => 'select', 'foreign_table' => 'tx_test_tag']],
+            ],
+        ];
+
+        self::assertSame([], $this->service->getFileFields('tx_test'));
+    }
+
+    public function testGetFileFieldsReturnsEmptyForMissingTable(): void
+    {
+        self::assertSame([], $this->service->getFileFields('nonexistent_table'));
+    }
 }
