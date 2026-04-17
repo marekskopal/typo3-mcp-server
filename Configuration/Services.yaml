@@ -6,3 +6,7 @@ services:
 
   MarekSkopal\MsMcpServer\:
     resource: '../Classes/*'
+
+  MarekSkopal\MsMcpServer\Tool\:
+    resource: '../Classes/Tool/*'
+    public: true
