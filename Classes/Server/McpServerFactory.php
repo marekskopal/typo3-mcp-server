@@ -23,7 +23,7 @@ readonly class McpServerFactory
         $builder = Server::builder()
             ->setServerInfo('TYPO3 MCP Server', '1.0.0')
             ->setContainer($this->container)
-            ->setSession($sessionStore)
+            ->setSession($sessionStore, new InitializedSessionFactory())
             ->setDiscovery(dirname(__DIR__, 2), ['Classes/Tool']);
 
         return $builder->build();
