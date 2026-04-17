@@ -5,18 +5,26 @@ declare(strict_types=1);
 namespace MarekSkopal\MsMcpServer\Tool\Pages;
 
 use MarekSkopal\MsMcpServer\Service\DataHandlerService;
+use Mcp\Exception\ToolCallException;
+use Psr\Log\LoggerInterface;
 use const JSON_THROW_ON_ERROR;
 
 final readonly class PagesDeleteTool
 {
-    public function __construct(private DataHandlerService $dataHandlerService)
+    public function __construct(private DataHandlerService $dataHandlerService, private LoggerInterface $logger,)
     {
     }
 
     /** Delete a page by its uid. */
     public function execute(int $uid): string
     {
-        $this->dataHandlerService->deleteRecord('pages', $uid);
+        try {
+            $this->dataHandlerService->deleteRecord('pages', $uid);
+        } catch (\Throwable $e) {
+            $this->logger->error('pages_delete tool failed', ['exception' => $e]);
+
+            throw new ToolCallException($e->getMessage(), (int) $e->getCode(), $e);
+        }
 
         return json_encode(['uid' => $uid, 'deleted' => true], JSON_THROW_ON_ERROR);
     }

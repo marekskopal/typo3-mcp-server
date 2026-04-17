@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace MarekSkopal\MsMcpServer\Tool\Content;
 
 use MarekSkopal\MsMcpServer\Service\DataHandlerService;
+use Mcp\Exception\ToolCallException;
+use Psr\Log\LoggerInterface;
 use const JSON_THROW_ON_ERROR;
 
 final readonly class ContentUpdateTool
@@ -21,7 +23,7 @@ final readonly class ContentUpdateTool
         'subheader',
     ];
 
-    public function __construct(private DataHandlerService $dataHandlerService)
+    public function __construct(private DataHandlerService $dataHandlerService, private LoggerInterface $logger,)
     {
     }
 
@@ -36,7 +38,13 @@ final readonly class ContentUpdateTool
             return json_encode(['error' => 'No valid fields provided'], JSON_THROW_ON_ERROR);
         }
 
-        $this->dataHandlerService->updateRecord('tt_content', $uid, $filteredData);
+        try {
+            $this->dataHandlerService->updateRecord('tt_content', $uid, $filteredData);
+        } catch (\Throwable $e) {
+            $this->logger->error('content_update tool failed', ['exception' => $e]);
+
+            throw new ToolCallException($e->getMessage(), (int) $e->getCode(), $e);
+        }
 
         return json_encode(['uid' => $uid, 'updated' => array_keys($filteredData)], JSON_THROW_ON_ERROR);
     }
