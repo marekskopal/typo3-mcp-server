@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace MarekSkopal\MsMcpServer\Tool\Pages;
 
 use MarekSkopal\MsMcpServer\Service\RecordService;
+use Mcp\Capability\Attribute\McpTool;
 use Mcp\Exception\ToolCallException;
 use Psr\Log\LoggerInterface;
 use const JSON_THROW_ON_ERROR;
@@ -17,7 +18,7 @@ final readonly class PagesListTool
     {
     }
 
-    /** List pages by parent page ID with pagination. */
+    #[McpTool(name: 'pages_list', description: 'List pages by parent page ID with pagination.')]
     public function execute(int $pid = 0, int $limit = 20, int $offset = 0): string
     {
         try {

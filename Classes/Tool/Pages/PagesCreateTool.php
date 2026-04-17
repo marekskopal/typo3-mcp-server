@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace MarekSkopal\MsMcpServer\Tool\Pages;
 
 use MarekSkopal\MsMcpServer\Service\DataHandlerService;
+use Mcp\Capability\Attribute\McpTool;
 use Mcp\Exception\ToolCallException;
 use Psr\Log\LoggerInterface;
 use const JSON_THROW_ON_ERROR;
@@ -15,7 +16,7 @@ final readonly class PagesCreateTool
     {
     }
 
-    /** Create a new page in the TYPO3 page tree. */
+    #[McpTool(name: 'pages_create', description: 'Create a new page in the TYPO3 page tree.')]
     public function execute(
         string $title,
         int $pid = 0,

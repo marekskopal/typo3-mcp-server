@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace MarekSkopal\MsMcpServer\Tool\Pages;
 
 use MarekSkopal\MsMcpServer\Service\RecordService;
+use Mcp\Capability\Attribute\McpTool;
 use Mcp\Exception\ToolCallException;
 use Psr\Log\LoggerInterface;
 use const JSON_THROW_ON_ERROR;
@@ -33,7 +34,7 @@ final readonly class PagesGetTool
     {
     }
 
-    /** Get a single page by its uid. */
+    #[McpTool(name: 'pages_get', description: 'Get a single page by its uid.')]
     public function execute(int $uid): string
     {
         try {

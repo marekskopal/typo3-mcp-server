@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace MarekSkopal\MsMcpServer\Tool\Content;
 
 use MarekSkopal\MsMcpServer\Service\RecordService;
+use Mcp\Capability\Attribute\McpTool;
 use Mcp\Exception\ToolCallException;
 use Psr\Log\LoggerInterface;
 use const JSON_THROW_ON_ERROR;
@@ -32,7 +33,7 @@ final readonly class ContentGetTool
     {
     }
 
-    /** Get a single content element by its uid. */
+    #[McpTool(name: 'content_get', description: 'Get a single content element by its uid.')]
     public function execute(int $uid): string
     {
         try {

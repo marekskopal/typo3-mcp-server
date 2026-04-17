@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace MarekSkopal\MsMcpServer\Tool\Pages;
 
 use MarekSkopal\MsMcpServer\Service\DataHandlerService;
+use Mcp\Capability\Attribute\McpTool;
 use Mcp\Exception\ToolCallException;
 use Psr\Log\LoggerInterface;
 use const JSON_THROW_ON_ERROR;
@@ -15,7 +16,7 @@ final readonly class PagesDeleteTool
     {
     }
 
-    /** Delete a page by its uid. */
+    #[McpTool(name: 'pages_delete', description: 'Delete a page by its uid.')]
     public function execute(int $uid): string
     {
         try {
