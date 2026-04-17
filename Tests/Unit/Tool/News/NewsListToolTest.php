@@ -8,6 +8,7 @@ use MarekSkopal\MsMcpServer\Service\RecordService;
 use MarekSkopal\MsMcpServer\Tool\News\NewsListTool;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\NullLogger;
 
 #[CoversClass(NewsListTool::class)]
 final class NewsListToolTest extends TestCase
@@ -31,7 +32,7 @@ final class NewsListToolTest extends TestCase
             )
             ->willReturn($expectedResult);
 
-        $tool = new NewsListTool($recordService);
+        $tool = new NewsListTool($recordService, new NullLogger());
         $result = json_decode($tool->execute(10), true, 512, JSON_THROW_ON_ERROR);
 
         self::assertSame(1, $result['total']);
@@ -52,7 +53,7 @@ final class NewsListToolTest extends TestCase
             )
             ->willReturn(['records' => [], 'total' => 0]);
 
-        $tool = new NewsListTool($recordService);
+        $tool = new NewsListTool($recordService, new NullLogger());
         $tool->execute(5, 10, 30);
     }
 }

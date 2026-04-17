@@ -8,6 +8,7 @@ use MarekSkopal\MsMcpServer\Service\DataHandlerService;
 use MarekSkopal\MsMcpServer\Tool\Pages\PagesCreateTool;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\NullLogger;
 
 #[CoversClass(PagesCreateTool::class)]
 final class PagesCreateToolTest extends TestCase
@@ -28,7 +29,7 @@ final class PagesCreateToolTest extends TestCase
             )
             ->willReturn(123);
 
-        $tool = new PagesCreateTool($dataHandlerService);
+        $tool = new PagesCreateTool($dataHandlerService, new NullLogger());
         $result = json_decode($tool->execute('New Page', 5), true, 512, JSON_THROW_ON_ERROR);
 
         self::assertSame(123, $result['uid']);
@@ -51,7 +52,7 @@ final class PagesCreateToolTest extends TestCase
             )
             ->willReturn(456);
 
-        $tool = new PagesCreateTool($dataHandlerService);
+        $tool = new PagesCreateTool($dataHandlerService, new NullLogger());
         $result = json_decode($tool->execute('Hidden Page', 0, 1, true), true, 512, JSON_THROW_ON_ERROR);
 
         self::assertSame(456, $result['uid']);
@@ -77,7 +78,7 @@ final class PagesCreateToolTest extends TestCase
             )
             ->willReturn(789);
 
-        $tool = new PagesCreateTool($dataHandlerService);
+        $tool = new PagesCreateTool($dataHandlerService, new NullLogger());
         $result = json_decode(
             $tool->execute('Full Page', 1, 1, false, '/full-page', 'Nav Title', 'Subtitle', 'Abstract text'),
             true,

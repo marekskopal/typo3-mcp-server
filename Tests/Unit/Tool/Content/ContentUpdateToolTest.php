@@ -1,0 +1,89 @@
+<?php
+
+declare(strict_types=1);
+
+namespace MarekSkopal\MsMcpServer\Tests\Unit\Tool\Content;
+
+use MarekSkopal\MsMcpServer\Service\DataHandlerService;
+use MarekSkopal\MsMcpServer\Tool\Content\ContentUpdateTool;
+use Mcp\Exception\ToolCallException;
+use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\TestCase;
+use Psr\Log\NullLogger;
+use const JSON_THROW_ON_ERROR;
+
+#[CoversClass(ContentUpdateTool::class)]
+final class ContentUpdateToolTest extends TestCase
+{
+    public function testExecuteUpdatesWithValidFields(): void
+    {
+        $dataHandlerService = $this->createMock(DataHandlerService::class);
+        $dataHandlerService->expects(self::once())
+            ->method('updateRecord')
+            ->with(
+                'tt_content',
+                42,
+                [
+                    'header' => 'Updated Header',
+                    'bodytext' => 'Updated Body',
+                ],
+            );
+
+        $tool = new ContentUpdateTool($dataHandlerService, new NullLogger());
+        $fields = json_encode(['header' => 'Updated Header', 'bodytext' => 'Updated Body'], JSON_THROW_ON_ERROR);
+        $result = json_decode($tool->execute(42, $fields), true, 512, JSON_THROW_ON_ERROR);
+
+        self::assertSame(42, $result['uid']);
+        self::assertSame(['header', 'bodytext'], $result['updated']);
+    }
+
+    public function testExecuteFiltersInvalidFields(): void
+    {
+        $dataHandlerService = $this->createMock(DataHandlerService::class);
+        $dataHandlerService->expects(self::once())
+            ->method('updateRecord')
+            ->with(
+                'tt_content',
+                10,
+                [
+                    'header' => 'Valid',
+                ],
+            );
+
+        $tool = new ContentUpdateTool($dataHandlerService, new NullLogger());
+        $fields = json_encode(['header' => 'Valid', 'invalid_field' => 'Ignored', 'uid' => 999], JSON_THROW_ON_ERROR);
+        $result = json_decode($tool->execute(10, $fields), true, 512, JSON_THROW_ON_ERROR);
+
+        self::assertSame(10, $result['uid']);
+        self::assertSame(['header'], $result['updated']);
+    }
+
+    public function testExecuteReturnsErrorWhenNoValidFields(): void
+    {
+        $dataHandlerService = $this->createMock(DataHandlerService::class);
+        $dataHandlerService->expects(self::never())
+            ->method('updateRecord');
+
+        $tool = new ContentUpdateTool($dataHandlerService, new NullLogger());
+        $fields = json_encode(['invalid_field' => 'value', 'another_bad' => 'value'], JSON_THROW_ON_ERROR);
+        $result = json_decode($tool->execute(10, $fields), true, 512, JSON_THROW_ON_ERROR);
+
+        self::assertSame('No valid fields provided', $result['error']);
+    }
+
+    public function testExecuteThrowsToolCallExceptionOnError(): void
+    {
+        $dataHandlerService = $this->createMock(DataHandlerService::class);
+        $dataHandlerService->expects(self::once())
+            ->method('updateRecord')
+            ->willThrowException(new \RuntimeException('DataHandler error'));
+
+        $tool = new ContentUpdateTool($dataHandlerService, new NullLogger());
+
+        $this->expectException(ToolCallException::class);
+        $this->expectExceptionMessage('DataHandler error');
+
+        $fields = json_encode(['header' => 'Test'], JSON_THROW_ON_ERROR);
+        $tool->execute(1, $fields);
+    }
+}
