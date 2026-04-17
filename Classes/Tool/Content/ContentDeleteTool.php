@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace MarekSkopal\MsMcpServer\Tool\Content;
 
 use MarekSkopal\MsMcpServer\Service\DataHandlerService;
+use Mcp\Capability\Attribute\McpTool;
 use Mcp\Exception\ToolCallException;
 use Psr\Log\LoggerInterface;
 use const JSON_THROW_ON_ERROR;
@@ -15,7 +16,7 @@ final readonly class ContentDeleteTool
     {
     }
 
-    /** Delete a content element by its uid. */
+    #[McpTool(name: 'content_delete', description: 'Delete a content element by its uid.')]
     public function execute(int $uid): string
     {
         try {

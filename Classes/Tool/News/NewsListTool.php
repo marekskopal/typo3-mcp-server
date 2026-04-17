@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace MarekSkopal\MsMcpServer\Tool\News;
 
 use MarekSkopal\MsMcpServer\Service\RecordService;
+use Mcp\Capability\Attribute\McpTool;
 use Mcp\Exception\ToolCallException;
 use Psr\Log\LoggerInterface;
 use const JSON_THROW_ON_ERROR;
@@ -19,7 +20,7 @@ final readonly class NewsListTool
     {
     }
 
-    /** List news records by page ID with pagination. */
+    #[McpTool(name: 'news_list', description: 'List news records by page ID with pagination.')]
     public function execute(int $pid, int $limit = 20, int $offset = 0): string
     {
         try {

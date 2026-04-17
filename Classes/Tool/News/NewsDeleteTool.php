@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace MarekSkopal\MsMcpServer\Tool\News;
 
 use MarekSkopal\MsMcpServer\Service\DataHandlerService;
+use Mcp\Capability\Attribute\McpTool;
 use Mcp\Exception\ToolCallException;
 use Psr\Log\LoggerInterface;
 use const JSON_THROW_ON_ERROR;
@@ -17,7 +18,7 @@ final readonly class NewsDeleteTool
     {
     }
 
-    /** Delete a news record by its uid. */
+    #[McpTool(name: 'news_delete', description: 'Delete a news record by its uid.')]
     public function execute(int $uid): string
     {
         try {

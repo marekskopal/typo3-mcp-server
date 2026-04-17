@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace MarekSkopal\MsMcpServer\Tool\Pages;
 
 use MarekSkopal\MsMcpServer\Service\DataHandlerService;
+use Mcp\Capability\Attribute\McpTool;
 use Mcp\Exception\ToolCallException;
 use Psr\Log\LoggerInterface;
 use const JSON_THROW_ON_ERROR;
@@ -30,7 +31,10 @@ final readonly class PagesUpdateTool
     {
     }
 
-    /** Update an existing page. Pass fields as a JSON object string with field names and their new values. */
+    #[McpTool(
+        name: 'pages_update',
+        description: 'Update an existing page. Pass fields as a JSON object string with field names and their new values.',
+    )]
     public function execute(int $uid, string $fields): string
     {
         /** @var array<string, mixed> $data */

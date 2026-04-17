@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace MarekSkopal\MsMcpServer\Tool\News;
 
 use MarekSkopal\MsMcpServer\Service\DataHandlerService;
+use Mcp\Capability\Attribute\McpTool;
 use Mcp\Exception\ToolCallException;
 use Psr\Log\LoggerInterface;
 use const JSON_THROW_ON_ERROR;
@@ -17,7 +18,7 @@ final readonly class NewsCreateTool
     {
     }
 
-    /** Create a new news record. */
+    #[McpTool(name: 'news_create', description: 'Create a new news record.')]
     public function execute(
         int $pid,
         string $title,
