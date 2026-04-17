@@ -8,7 +8,7 @@ TYPO3 CMS extension that implements an [MCP (Model Context Protocol)](https://mo
 
 - PHP 8.3+
 - TYPO3 v13.4 or v14.x
-- [mcp/sdk](https://github.com/modelcontextprotocol/php-sdk) (installed via Composer)
+- [mcp/sdk](https://github.com/php-mcp/sdk) (installed via Composer)
 
 ## Installation
 
@@ -19,17 +19,36 @@ composer require marekskopal/typo3-mcp-server
 ## Setup
 
 1. Install and activate the extension
-2. Run database migrations to create the `tx_msmcpserver_token` table
-3. Go to **System > MCP Server Tokens** in the TYPO3 backend
-4. Create a new token and select the backend user it should act as
-5. Copy the generated token — it is shown only once
+2. Run database migrations to create the required tables
+3. Go to **System > MCP Server** in the TYPO3 backend
+4. Register an OAuth client for your MCP client application
+
+## Authentication
+
+The extension uses **OAuth 2.1 with PKCE** (S256) for authentication. It supports:
+
+- **Authorization Code flow with PKCE** — standard OAuth 2.1 for MCP clients
+- **Dynamic Client Registration** ([RFC 7591](https://datatracker.ietf.org/doc/html/rfc7591)) — clients can self-register
+- **Protected Resource Metadata** ([RFC 9728](https://datatracker.ietf.org/doc/html/rfc9728)) — auto-discovery of auth requirements
+
+### OAuth Endpoints
+
+| Endpoint | Description |
+|----------|-------------|
+| `/.well-known/oauth-authorization-server` | Authorization server metadata |
+| `/.well-known/oauth-protected-resource` | Protected resource metadata |
+| `/mcp/oauth/authorize` | Authorization endpoint |
+| `/mcp/oauth/token` | Token endpoint |
+| `/mcp/oauth/register` | Dynamic client registration |
+
+Each OAuth token is linked to a specific backend user. The MCP server acts as that user — all operations respect the user's TYPO3 permissions (page access, table access, field access).
 
 ## Usage
 
-The MCP server is available at `/mcp` on your TYPO3 instance. Authenticate with a Bearer token:
+The MCP server is available at `/mcp` on your TYPO3 instance. Authenticate with a Bearer token obtained via the OAuth flow:
 
 ```
-Authorization: Bearer <your-token>
+Authorization: Bearer <access-token>
 ```
 
 The server uses the [Streamable HTTP transport](https://modelcontextprotocol.io/specification/2025-03-26/basic/transports#streamable-http) (MCP protocol version 2025-03-26).
@@ -63,13 +82,14 @@ The server uses the [Streamable HTTP transport](https://modelcontextprotocol.io/
 | `news_update` | Update news record fields |
 | `news_delete` | Delete a news record |
 
-## Authentication & Permissions
-
-Each token is linked to a specific backend user. The MCP server acts as that user — all operations respect the user's TYPO3 permissions (page access, table access, field access). Tokens are stored as SHA-256 hashes and can be disabled or set to expire.
-
 ## Adding Support for Other Extensions
 
-The news tools follow the same pattern as pages and content. To add CRUD tools for another extension's records (e.g. `tx_blog_domain_model_post`), create 5 tool classes in `Classes/Tool/Blog/` following the same structure as the News tools — define the table name, field lists, and register them in `McpServerFactory`.
+The news tools follow the same pattern as pages and content. To add CRUD tools for another extension's records (e.g. `tx_blog_domain_model_post`):
+
+1. Create 5 tool classes in `Classes/Tool/Blog/` following the same structure as the News tools
+2. Define the table name, field lists, and use `#[McpTool]` attributes for name and description
+3. Register them in `McpServerFactory`
+4. Add a public DI entry in `Configuration/Services.yaml` for the new tool namespace
 
 ## Development
 
@@ -83,7 +103,7 @@ vendor/bin/phpstan analyse
 vendor/bin/phpcs
 vendor/bin/phpcbf
 
-# Tests
+# Tests (74 tests, 270 assertions)
 vendor/bin/phpunit
 ```
 
