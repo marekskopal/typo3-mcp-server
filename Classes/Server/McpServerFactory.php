@@ -10,6 +10,12 @@ use MarekSkopal\MsMcpServer\Tool\Content\ContentGetTool;
 use MarekSkopal\MsMcpServer\Tool\Content\ContentListTool;
 use MarekSkopal\MsMcpServer\Tool\Content\ContentUpdateTool;
 use MarekSkopal\MsMcpServer\Tool\Dynamic\DynamicToolRegistrar;
+use MarekSkopal\MsMcpServer\Tool\File\DirectoryCreateTool;
+use MarekSkopal\MsMcpServer\Tool\File\DirectoryDeleteTool;
+use MarekSkopal\MsMcpServer\Tool\File\FileDeleteTool;
+use MarekSkopal\MsMcpServer\Tool\File\FileGetInfoTool;
+use MarekSkopal\MsMcpServer\Tool\File\FileListTool;
+use MarekSkopal\MsMcpServer\Tool\File\FileUploadTool;
 use MarekSkopal\MsMcpServer\Tool\Pages\PagesCreateTool;
 use MarekSkopal\MsMcpServer\Tool\Pages\PagesDeleteTool;
 use MarekSkopal\MsMcpServer\Tool\Pages\PagesGetTool;
@@ -33,6 +39,12 @@ readonly class McpServerFactory
         [ContentCreateTool::class, 'execute', 'content_create'],
         [ContentUpdateTool::class, 'execute', 'content_update'],
         [ContentDeleteTool::class, 'execute', 'content_delete'],
+        [FileListTool::class, 'execute', 'file_list'],
+        [FileGetInfoTool::class, 'execute', 'file_get_info'],
+        [FileUploadTool::class, 'execute', 'file_upload'],
+        [FileDeleteTool::class, 'execute', 'file_delete'],
+        [DirectoryCreateTool::class, 'execute', 'directory_create'],
+        [DirectoryDeleteTool::class, 'execute', 'directory_delete'],
     ];
 
     public function __construct(private ContainerInterface $container, private DynamicToolRegistrar $dynamicToolRegistrar,)
