@@ -188,10 +188,56 @@ final class AuthorizationServiceTest extends TestCase
         $service->refreshToken('some-refresh-token', 'wrong-client');
     }
 
+    public function testRevokeTokenRevokesExistingToken(): void
+    {
+        $row = ['uid' => 5];
+
+        $connection = $this->createMock(Connection::class);
+        $connection->expects(self::once())->method('update')->with(
+            'tx_msmcpserver_oauth_authorization',
+            ['revoked' => 1],
+            ['uid' => 5],
+        );
+
+        $connectionPool = $this->createConnectionPoolWithQueryAndConnection($row, $connection);
+
+        $service = new AuthorizationService(
+            $connectionPool,
+            new PkceVerifier(),
+            new ClientRepository($this->createStub(ConnectionPool::class)),
+        );
+
+        $service->revokeToken('some-token');
+    }
+
+    public function testRevokeTokenDoesNothingForUnknownToken(): void
+    {
+        $connectionPool = $this->createConnectionPoolWithQueryResult(false);
+
+        $service = new AuthorizationService(
+            $connectionPool,
+            new PkceVerifier(),
+            new ClientRepository($this->createStub(ConnectionPool::class)),
+        );
+
+        $service->revokeToken('unknown-token');
+
+        // No exception thrown = success (RFC 7009: always return OK for unknown tokens)
+        self::assertTrue(true);
+    }
+
     /**
      * @param array<string, mixed>|false $row
      */
     private function createConnectionPoolWithQueryResult(array|false $row): ConnectionPool
+    {
+        return $this->createConnectionPoolWithQueryAndConnection($row, $this->createStub(Connection::class));
+    }
+
+    /**
+     * @param array<string, mixed>|false $row
+     */
+    private function createConnectionPoolWithQueryAndConnection(array|false $row, Connection $connection): ConnectionPool
     {
         $result = $this->createStub(Result::class);
         $result->method('fetchAssociative')->willReturn($row);
@@ -208,8 +254,6 @@ final class AuthorizationServiceTest extends TestCase
         $queryBuilder->method('createNamedParameter')->willReturn("'dummy'");
         $queryBuilder->method('executeQuery')->willReturn($result);
         $queryBuilder->method('getRestrictions')->willReturn($restrictions);
-
-        $connection = $this->createStub(Connection::class);
 
         $connectionPool = $this->createStub(ConnectionPool::class);
         $connectionPool->method('getQueryBuilderForTable')->willReturn($queryBuilder);

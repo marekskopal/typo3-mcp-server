@@ -179,6 +179,42 @@ final readonly class AuthorizationService
         return (int) $row['be_user'];
     }
 
+    public function revokeToken(string $token): void
+    {
+        $tokenHash = hash('sha256', $token);
+
+        $queryBuilder = $this->connectionPool->getQueryBuilderForTable(self::TABLE);
+        $queryBuilder->getRestrictions()->removeAll();
+
+        /** @var array{uid: int|string}|false $row */
+        $row = $queryBuilder
+            ->select('uid')
+            ->from(self::TABLE)
+            ->where(
+                $queryBuilder->expr()->or(
+                    $queryBuilder->expr()->eq(
+                        'access_token_hash',
+                        $queryBuilder->createNamedParameter($tokenHash),
+                    ),
+                    $queryBuilder->expr()->eq(
+                        'refresh_token_hash',
+                        $queryBuilder->createNamedParameter($tokenHash),
+                    ),
+                ),
+            )
+            ->executeQuery()
+            ->fetchAssociative();
+
+        if ($row === false) {
+            return;
+        }
+
+        $connection = $this->connectionPool->getConnectionForTable(self::TABLE);
+        $connection->update(self::TABLE, [
+            'revoked' => 1,
+        ], ['uid' => (int) $row['uid']]);
+    }
+
     private function issueTokenPair(string $clientId, int $beUserUid): OAuthTokenPair
     {
         $accessToken = bin2hex(random_bytes(32));

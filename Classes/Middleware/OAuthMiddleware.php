@@ -28,6 +28,8 @@ final readonly class OAuthMiddleware implements MiddlewareInterface
 
     private const string REGISTER_PATH = '/mcp/oauth/register';
 
+    private const string REVOKE_PATH = '/mcp/oauth/revoke';
+
     private const string RESOURCE_METADATA_PATH = '/.well-known/oauth-protected-resource';
 
     public function __construct(
@@ -52,6 +54,7 @@ final readonly class OAuthMiddleware implements MiddlewareInterface
             $path === self::AUTHORIZE_PATH && $method === 'POST' => $this->handleAuthorizePost($request),
             $path === self::TOKEN_PATH && $method === 'POST' => $this->handleToken($request),
             $path === self::REGISTER_PATH && $method === 'POST' => $this->handleRegister($request),
+            $path === self::REVOKE_PATH && $method === 'POST' => $this->handleRevoke($request),
             default => $handler->handle($request),
         };
     }
@@ -69,6 +72,7 @@ final readonly class OAuthMiddleware implements MiddlewareInterface
             'authorization_endpoint' => $baseUrl . self::AUTHORIZE_PATH,
             'token_endpoint' => $baseUrl . self::TOKEN_PATH,
             'registration_endpoint' => $baseUrl . self::REGISTER_PATH,
+            'revocation_endpoint' => $baseUrl . self::REVOKE_PATH,
             'response_types_supported' => ['code'],
             'grant_types_supported' => ['authorization_code', 'refresh_token'],
             'code_challenge_methods_supported' => ['S256'],
@@ -259,6 +263,25 @@ final readonly class OAuthMiddleware implements MiddlewareInterface
             'redirect_uris' => $client['redirect_uris'],
             'token_endpoint_auth_method' => 'none',
         ]);
+    }
+
+    private function handleRevoke(ServerRequestInterface $request): ResponseInterface
+    {
+        /** @var array<string, string> $body */
+        $body = $request->getParsedBody() ?? [];
+        $token = (string) ($body['token'] ?? '');
+
+        if ($token === '') {
+            return $this->createJsonResponse(
+                400,
+                ['error' => 'invalid_request', 'error_description' => 'token parameter is required'],
+            );
+        }
+
+        $this->authorizationService->revokeToken($token);
+
+        // RFC 7009: always return 200 OK regardless of whether the token was found
+        return $this->createJsonResponse(200, []);
     }
 
     /** @param array<string, mixed> $params */
