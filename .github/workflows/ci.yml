@@ -1,0 +1,58 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  phpstan:
+    name: PHPStan
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        php: ['8.3', '8.4']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          coverage: none
+      - run: composer install --no-progress
+      - run: vendor/bin/phpstan analyse
+
+  phpcs:
+    name: PHPCS
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          coverage: none
+      - run: composer install --no-progress
+      - run: vendor/bin/phpcs
+
+  tests:
+    name: Tests (PHP ${{ matrix.php }}, TYPO3 ${{ matrix.typo3 }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - php: '8.3'
+            typo3: '^13.4'
+          - php: '8.4'
+            typo3: '^13.4'
+          - php: '8.4'
+            typo3: '^14.1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          coverage: none
+      - run: composer require --no-update typo3/cms-core:${{ matrix.typo3 }}
+      - run: composer install --no-progress
+      - run: vendor/bin/phpunit
