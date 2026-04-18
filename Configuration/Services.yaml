@@ -10,3 +10,9 @@ services:
   MarekSkopal\MsMcpServer\Tool\:
     resource: '../Classes/Tool/*'
     public: true
+
+  MarekSkopal\MsMcpServer\Command\CleanupExpiredTokensCommand:
+    tags:
+      - name: 'console.command'
+        command: 'mcp:cleanup'
+        description: 'Remove expired and revoked OAuth authorizations and stale MCP session files'
