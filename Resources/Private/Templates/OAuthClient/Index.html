@@ -62,6 +62,7 @@
                                 </f:if>
                             </td>
                             <td>
+                                <a href="{f:be.uri(route: 'msmcpserver_oauth_clients.edit', parameters: '{uid: client.uid}')}" class="btn btn-sm btn-default">Edit</a>
                                 <form method="post" action="{f:be.uri(route: 'msmcpserver_oauth_clients.delete')}" style="display:inline">
                                     <input type="hidden" name="uid" value="{client.uid}" />
                                     <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Delete this OAuth client?')">Delete</button>

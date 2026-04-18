@@ -19,8 +19,19 @@ return [
                 'target' => OAuthClientController::class . '::createAction',
                 'methods' => ['POST'],
             ],
+            'edit' => [
+                'target' => OAuthClientController::class . '::editAction',
+            ],
+            'update' => [
+                'target' => OAuthClientController::class . '::updateAction',
+                'methods' => ['POST'],
+            ],
             'delete' => [
                 'target' => OAuthClientController::class . '::deleteAction',
+                'methods' => ['POST'],
+            ],
+            'revoke_token' => [
+                'target' => OAuthClientController::class . '::revokeTokenAction',
                 'methods' => ['POST'],
             ],
         ],
