@@ -16,12 +16,14 @@ use MarekSkopal\MsMcpServer\Tool\File\FileDeleteTool;
 use MarekSkopal\MsMcpServer\Tool\File\FileGetInfoTool;
 use MarekSkopal\MsMcpServer\Tool\File\FileListTool;
 use MarekSkopal\MsMcpServer\Tool\File\FileReferenceAddTool;
+use MarekSkopal\MsMcpServer\Tool\File\FileUploadFromUrlTool;
 use MarekSkopal\MsMcpServer\Tool\File\FileUploadTool;
 use MarekSkopal\MsMcpServer\Tool\Pages\PagesCreateTool;
 use MarekSkopal\MsMcpServer\Tool\Pages\PagesDeleteTool;
 use MarekSkopal\MsMcpServer\Tool\Pages\PagesGetTool;
 use MarekSkopal\MsMcpServer\Tool\Pages\PagesListTool;
 use MarekSkopal\MsMcpServer\Tool\Pages\PagesUpdateTool;
+use MarekSkopal\MsMcpServer\Tool\Schema\TableSchemaTool;
 use Mcp\Server;
 use Mcp\Server\Session\FileSessionStore;
 use Psr\Container\ContainerInterface;
@@ -47,6 +49,8 @@ readonly class McpServerFactory
         [DirectoryCreateTool::class, 'execute', 'directory_create'],
         [DirectoryDeleteTool::class, 'execute', 'directory_delete'],
         [FileReferenceAddTool::class, 'execute', 'file_reference_add'],
+        [FileUploadFromUrlTool::class, 'execute', 'file_upload_from_url'],
+        [TableSchemaTool::class, 'execute', 'table_schema'],
     ];
 
     public function __construct(private ContainerInterface $container, private DynamicToolRegistrar $dynamicToolRegistrar,)

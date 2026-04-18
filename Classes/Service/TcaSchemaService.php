@@ -164,6 +164,248 @@ final readonly class TcaSchemaService
         return $fields;
     }
 
+    /**
+     * Returns detailed schema information for all readable fields of a table.
+     *
+     * @return array{table: string, fields: list<array<string, mixed>>}
+     */
+    public function getFieldsSchema(string $tableName): array
+    {
+        $tca = $this->getTca($tableName);
+        if ($tca === null) {
+            return ['table' => $tableName, 'fields' => []];
+        }
+
+        $columns = $tca['columns'] ?? [];
+        if (!is_array($columns)) {
+            return ['table' => $tableName, 'fields' => []];
+        }
+
+        $systemFields = $this->getSystemFields($tca);
+        $fields = [];
+
+        foreach ($columns as $fieldName => $columnConfig) {
+            if (!is_string($fieldName) || !is_array($columnConfig)) {
+                continue;
+            }
+
+            if (in_array($fieldName, $systemFields, true)) {
+                continue;
+            }
+
+            if (!$this->isReadableField($columnConfig)) {
+                continue;
+            }
+
+            $fields[] = $this->buildFieldSchema($fieldName, $columnConfig);
+        }
+
+        return ['table' => $tableName, 'fields' => $fields];
+    }
+
+    /**
+     * @param array<mixed> $columnConfig
+     * @return array<string, mixed>
+     */
+    private function buildFieldSchema(string $fieldName, array $columnConfig): array
+    {
+        $config = $columnConfig['config'] ?? [];
+        if (!is_array($config)) {
+            return ['name' => $fieldName, 'type' => 'unknown'];
+        }
+
+        $type = $config['type'] ?? 'unknown';
+        if (!is_string($type)) {
+            $type = 'unknown';
+        }
+
+        $schema = ['name' => $fieldName, 'type' => $type];
+
+        $label = $columnConfig['label'] ?? null;
+        if (is_string($label) && $label !== '') {
+            $schema['label'] = $label;
+        }
+
+        $description = $columnConfig['description'] ?? null;
+        if (is_string($description) && $description !== '') {
+            $schema['description'] = $description;
+        }
+
+        $readOnly = $config['readOnly'] ?? false;
+        if ($readOnly === true) {
+            $schema['readOnly'] = true;
+        }
+
+        $required = $config['required'] ?? false;
+        if ($required === true) {
+            $schema['required'] = true;
+        }
+
+        $this->addConstraints($schema, $config, $type);
+        $this->addItems($schema, $config, $type);
+
+        return $schema;
+    }
+
+    /**
+     * @param array<string, mixed> &$schema
+     * @param array<mixed> $config
+     */
+    private function addConstraints(array &$schema, array $config, string $type): void
+    {
+        $max = $config['max'] ?? null;
+        if (is_int($max) && $max > 0) {
+            $schema['max'] = $max;
+        }
+
+        $min = $config['min'] ?? null;
+        if (is_int($min)) {
+            $schema['min'] = $min;
+        }
+
+        $size = $config['size'] ?? null;
+        if (is_int($size) && $size > 0) {
+            $schema['size'] = $size;
+        }
+
+        $eval = $config['eval'] ?? null;
+        if (is_string($eval) && $eval !== '') {
+            $schema['eval'] = $eval;
+        }
+
+        $placeholder = $config['placeholder'] ?? null;
+        if (is_string($placeholder) && $placeholder !== '') {
+            $schema['placeholder'] = $placeholder;
+        }
+
+        $default = $config['default'] ?? null;
+        if ($default !== null && (is_string($default) || is_int($default) || is_bool($default))) {
+            $schema['default'] = $default;
+        }
+
+        if ($type === 'input' || $type === 'text' || $type === 'number') {
+            $range = $config['range'] ?? null;
+            if (is_array($range)) {
+                $rangeData = [];
+                $lower = $range['lower'] ?? null;
+                if (is_int($lower)) {
+                    $rangeData['lower'] = $lower;
+                }
+                $upper = $range['upper'] ?? null;
+                if (is_int($upper)) {
+                    $rangeData['upper'] = $upper;
+                }
+                if ($rangeData !== []) {
+                    $schema['range'] = $rangeData;
+                }
+            }
+        }
+
+        if ($type === 'slug') {
+            $generatorOptions = $config['generatorOptions'] ?? null;
+            if (is_array($generatorOptions)) {
+                $slugFields = $generatorOptions['fields'] ?? null;
+                if (is_array($slugFields)) {
+                    $schema['generatedFrom'] = $slugFields;
+                }
+            }
+        }
+
+        if ($type === 'check') {
+            $items = $config['items'] ?? null;
+            if (is_array($items) && $items !== []) {
+                $checkboxLabels = [];
+                foreach ($items as $item) {
+                    if (is_array($item)) {
+                        $itemLabel = $item['label'] ?? $item[0] ?? null;
+                        if (is_string($itemLabel)) {
+                            $checkboxLabels[] = $itemLabel;
+                        }
+                    }
+                }
+                if ($checkboxLabels !== []) {
+                    $schema['items'] = $checkboxLabels;
+                }
+            }
+        }
+
+        if ($type === 'datetime') {
+            $dbType = $config['dbType'] ?? null;
+            if (is_string($dbType) && $dbType !== '') {
+                $schema['dbType'] = $dbType;
+            }
+            $format = $config['format'] ?? null;
+            if (is_string($format) && $format !== '') {
+                $schema['format'] = $format;
+            }
+        }
+
+        if ($type !== 'link') {
+            return;
+        }
+
+        $allowedTypes = $config['allowedTypes'] ?? null;
+        if (is_array($allowedTypes) && $allowedTypes !== []) {
+            $schema['allowedTypes'] = array_values($allowedTypes);
+        }
+    }
+
+    /**
+     * @param array<string, mixed> &$schema
+     * @param array<mixed> $config
+     */
+    private function addItems(array &$schema, array $config, string $type): void
+    {
+        if ($type !== 'select' && $type !== 'radio') {
+            return;
+        }
+
+        $renderType = $config['renderType'] ?? null;
+        if (is_string($renderType) && $renderType !== '') {
+            $schema['renderType'] = $renderType;
+        }
+
+        $items = $config['items'] ?? null;
+        if (!is_array($items) || $items === []) {
+            $foreignTable = $config['foreign_table'] ?? null;
+            if (is_string($foreignTable) && $foreignTable !== '') {
+                $schema['foreignTable'] = $foreignTable;
+            }
+
+            return;
+        }
+
+        $parsedItems = [];
+        foreach ($items as $item) {
+            if (!is_array($item)) {
+                continue;
+            }
+
+            $itemLabel = $item['label'] ?? $item[0] ?? null;
+            $itemValue = $item['value'] ?? $item[1] ?? null;
+
+            if ($itemValue === null && $itemLabel === null) {
+                continue;
+            }
+
+            $entry = [];
+            if (is_string($itemValue) || is_int($itemValue)) {
+                $entry['value'] = $itemValue;
+            }
+            if (is_string($itemLabel) && $itemLabel !== '') {
+                $entry['label'] = $itemLabel;
+            }
+
+            if ($entry !== []) {
+                $parsedItems[] = $entry;
+            }
+        }
+
+        if ($parsedItems !== []) {
+            $schema['items'] = $parsedItems;
+        }
+    }
+
     /** @param array<mixed> $columnConfig */
     private function isFileField(array $columnConfig): bool
     {

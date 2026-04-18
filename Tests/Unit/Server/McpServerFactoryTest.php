@@ -60,6 +60,7 @@ final class McpServerFactoryTest extends TestCase
                     str_contains($id, 'FileService') => $fileService,
                     str_contains($id, 'TcaSchemaService') => $tcaSchemaService,
                     str_contains($id, 'LoggerInterface') || str_contains($id, 'Logger') => $logger,
+                    str_contains($id, 'TableSchemaTool') => new ($id)($tcaSchemaService, $logger),
                     default => new ($id)($recordService, $logger),
                 };
             },

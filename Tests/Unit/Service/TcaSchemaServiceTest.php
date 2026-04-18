@@ -326,4 +326,300 @@ final class TcaSchemaServiceTest extends TestCase
     {
         self::assertSame([], $this->service->getFileFields('nonexistent_table'));
     }
+
+    public function testGetFieldsSchemaReturnsEmptyForMissingTable(): void
+    {
+        $result = $this->service->getFieldsSchema('nonexistent_table');
+
+        self::assertSame('nonexistent_table', $result['table']);
+        self::assertSame([], $result['fields']);
+    }
+
+    public function testGetFieldsSchemaReturnsFieldTypeAndLabel(): void
+    {
+        $GLOBALS['TCA']['tx_test'] = [
+            'ctrl' => [],
+            'columns' => [
+                'title' => [
+                    'label' => 'Title',
+                    'config' => ['type' => 'input', 'required' => true, 'max' => 255],
+                ],
+            ],
+        ];
+
+        $result = $this->service->getFieldsSchema('tx_test');
+
+        self::assertSame('tx_test', $result['table']);
+        self::assertCount(1, $result['fields']);
+
+        $field = $result['fields'][0];
+        self::assertSame('title', $field['name']);
+        self::assertSame('input', $field['type']);
+        self::assertSame('Title', $field['label']);
+        self::assertTrue($field['required']);
+        self::assertSame(255, $field['max']);
+    }
+
+    public function testGetFieldsSchemaReturnsSelectItems(): void
+    {
+        $GLOBALS['TCA']['tx_test'] = [
+            'ctrl' => [],
+            'columns' => [
+                'status' => [
+                    'label' => 'Status',
+                    'config' => [
+                        'type' => 'select',
+                        'renderType' => 'selectSingle',
+                        'items' => [
+                            ['label' => 'Draft', 'value' => 0],
+                            ['label' => 'Published', 'value' => 1],
+                            ['label' => 'Archived', 'value' => 2],
+                        ],
+                    ],
+                ],
+            ],
+        ];
+
+        $result = $this->service->getFieldsSchema('tx_test');
+        $field = $result['fields'][0];
+
+        self::assertSame('select', $field['type']);
+        self::assertSame('selectSingle', $field['renderType']);
+        self::assertCount(3, $field['items']);
+        self::assertSame(0, $field['items'][0]['value']);
+        self::assertSame('Draft', $field['items'][0]['label']);
+        self::assertSame(1, $field['items'][1]['value']);
+        self::assertSame('Published', $field['items'][1]['label']);
+    }
+
+    public function testGetFieldsSchemaReturnsRadioItems(): void
+    {
+        $GLOBALS['TCA']['tx_test'] = [
+            'ctrl' => [],
+            'columns' => [
+                'layout' => [
+                    'label' => 'Layout',
+                    'config' => [
+                        'type' => 'radio',
+                        'items' => [
+                            ['label' => 'Default', 'value' => 0],
+                            ['label' => 'Sidebar', 'value' => 1],
+                        ],
+                    ],
+                ],
+            ],
+        ];
+
+        $result = $this->service->getFieldsSchema('tx_test');
+        $field = $result['fields'][0];
+
+        self::assertSame('radio', $field['type']);
+        self::assertCount(2, $field['items']);
+        self::assertSame('Default', $field['items'][0]['label']);
+    }
+
+    public function testGetFieldsSchemaReturnsConstraints(): void
+    {
+        $GLOBALS['TCA']['tx_test'] = [
+            'ctrl' => [],
+            'columns' => [
+                'price' => [
+                    'label' => 'Price',
+                    'config' => [
+                        'type' => 'number',
+                        'required' => true,
+                        'default' => 0,
+                        'range' => ['lower' => 0, 'upper' => 99999],
+                    ],
+                ],
+            ],
+        ];
+
+        $result = $this->service->getFieldsSchema('tx_test');
+        $field = $result['fields'][0];
+
+        self::assertSame('number', $field['type']);
+        self::assertTrue($field['required']);
+        self::assertSame(0, $field['default']);
+        self::assertSame(['lower' => 0, 'upper' => 99999], $field['range']);
+    }
+
+    public function testGetFieldsSchemaReturnsSlugGeneratorOptions(): void
+    {
+        $GLOBALS['TCA']['tx_test'] = [
+            'ctrl' => [],
+            'columns' => [
+                'slug' => [
+                    'label' => 'URL Segment',
+                    'config' => [
+                        'type' => 'slug',
+                        'generatorOptions' => [
+                            'fields' => ['title'],
+                        ],
+                    ],
+                ],
+            ],
+        ];
+
+        $result = $this->service->getFieldsSchema('tx_test');
+        $field = $result['fields'][0];
+
+        self::assertSame('slug', $field['type']);
+        self::assertSame(['title'], $field['generatedFrom']);
+    }
+
+    public function testGetFieldsSchemaReturnsReadOnlyFlag(): void
+    {
+        $GLOBALS['TCA']['tx_test'] = [
+            'ctrl' => [],
+            'columns' => [
+                'slug' => [
+                    'label' => 'Slug',
+                    'config' => ['type' => 'slug', 'readOnly' => true],
+                ],
+            ],
+        ];
+
+        $result = $this->service->getFieldsSchema('tx_test');
+        $field = $result['fields'][0];
+
+        self::assertTrue($field['readOnly']);
+    }
+
+    public function testGetFieldsSchemaReturnsSelectWithForeignTable(): void
+    {
+        $GLOBALS['TCA']['tx_test'] = [
+            'ctrl' => [],
+            'columns' => [
+                'category' => [
+                    'label' => 'Category',
+                    'config' => [
+                        'type' => 'select',
+                        'renderType' => 'selectSingle',
+                        'foreign_table' => 'sys_category',
+                    ],
+                ],
+            ],
+        ];
+
+        $result = $this->service->getFieldsSchema('tx_test');
+        $field = $result['fields'][0];
+
+        self::assertSame('select', $field['type']);
+        self::assertSame('sys_category', $field['foreignTable']);
+    }
+
+    public function testGetFieldsSchemaExcludesSystemFields(): void
+    {
+        $GLOBALS['TCA']['tx_test'] = [
+            'ctrl' => [
+                'tstamp' => 'tstamp',
+                'crdate' => 'crdate',
+            ],
+            'columns' => [
+                'title' => ['config' => ['type' => 'input']],
+                'tstamp' => ['config' => ['type' => 'number']],
+                'crdate' => ['config' => ['type' => 'number']],
+            ],
+        ];
+
+        $result = $this->service->getFieldsSchema('tx_test');
+
+        self::assertCount(1, $result['fields']);
+        self::assertSame('title', $result['fields'][0]['name']);
+    }
+
+    public function testGetFieldsSchemaReturnsEvalAndPlaceholder(): void
+    {
+        $GLOBALS['TCA']['tx_test'] = [
+            'ctrl' => [],
+            'columns' => [
+                'identifier' => [
+                    'label' => 'Identifier',
+                    'config' => [
+                        'type' => 'input',
+                        'eval' => 'trim,uniqueInPid',
+                        'placeholder' => 'Enter unique identifier',
+                    ],
+                ],
+            ],
+        ];
+
+        $result = $this->service->getFieldsSchema('tx_test');
+        $field = $result['fields'][0];
+
+        self::assertSame('trim,uniqueInPid', $field['eval']);
+        self::assertSame('Enter unique identifier', $field['placeholder']);
+    }
+
+    public function testGetFieldsSchemaReturnsCheckboxItems(): void
+    {
+        $GLOBALS['TCA']['tx_test'] = [
+            'ctrl' => [],
+            'columns' => [
+                'options' => [
+                    'label' => 'Options',
+                    'config' => [
+                        'type' => 'check',
+                        'items' => [
+                            ['label' => 'Option A'],
+                            ['label' => 'Option B'],
+                        ],
+                    ],
+                ],
+            ],
+        ];
+
+        $result = $this->service->getFieldsSchema('tx_test');
+        $field = $result['fields'][0];
+
+        self::assertSame('check', $field['type']);
+        self::assertSame(['Option A', 'Option B'], $field['items']);
+    }
+
+    public function testGetFieldsSchemaReturnsDatetimeFormat(): void
+    {
+        $GLOBALS['TCA']['tx_test'] = [
+            'ctrl' => [],
+            'columns' => [
+                'event_date' => [
+                    'label' => 'Event Date',
+                    'config' => [
+                        'type' => 'datetime',
+                        'format' => 'date',
+                        'dbType' => 'date',
+                    ],
+                ],
+            ],
+        ];
+
+        $result = $this->service->getFieldsSchema('tx_test');
+        $field = $result['fields'][0];
+
+        self::assertSame('datetime', $field['type']);
+        self::assertSame('date', $field['format']);
+        self::assertSame('date', $field['dbType']);
+    }
+
+    public function testGetFieldsSchemaReturnsLinkAllowedTypes(): void
+    {
+        $GLOBALS['TCA']['tx_test'] = [
+            'ctrl' => [],
+            'columns' => [
+                'url' => [
+                    'label' => 'URL',
+                    'config' => [
+                        'type' => 'link',
+                        'allowedTypes' => ['url', 'email', 'page'],
+                    ],
+                ],
+            ],
+        ];
+
+        $result = $this->service->getFieldsSchema('tx_test');
+        $field = $result['fields'][0];
+
+        self::assertSame('link', $field['type']);
+        self::assertSame(['url', 'email', 'page'], $field['allowedTypes']);
+    }
 }
