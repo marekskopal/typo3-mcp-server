@@ -37,6 +37,8 @@ readonly class RecordService
      */
     public function findByPid(string $table, int $pid, int $limit, int $offset, array $fields): array
     {
+        $limit = min(max($limit, 1), 500);
+
         $queryBuilder = $this->connectionPool->getQueryBuilderForTable($table);
 
         $countQueryBuilder = $this->connectionPool->getQueryBuilderForTable($table);

@@ -20,6 +20,8 @@ readonly class FileService
     /** @return array{files: list<array{name: string, identifier: string, size: int, mimeType: string, extension: string, modificationTime: int}>, directories: list<array{name: string, identifier: string, modificationTime: int}>, totalFiles: int, totalDirectories: int} */
     public function listDirectory(int $storageUid, string $directoryPath, int $limit, int $offset): array
     {
+        $limit = min(max($limit, 1), 500);
+
         $storage = $this->getStorage($storageUid);
         $folder = $storage->getFolder($directoryPath);
 
