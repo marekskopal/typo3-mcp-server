@@ -16,3 +16,9 @@ services:
       - name: 'console.command'
         command: 'mcp:cleanup'
         description: 'Remove expired and revoked OAuth authorizations and stale MCP session files'
+
+  MarekSkopal\MsMcpServer\Command\McpServerCommand:
+    tags:
+      - name: 'console.command'
+        command: 'mcp:server'
+        description: 'Start the MCP server using stdio transport for local AI tool integration'

@@ -23,6 +23,7 @@ use MarekSkopal\MsMcpServer\Tool\Pages\PagesDeleteTool;
 use MarekSkopal\MsMcpServer\Tool\Pages\PagesGetTool;
 use MarekSkopal\MsMcpServer\Tool\Pages\PagesListTool;
 use MarekSkopal\MsMcpServer\Tool\Pages\PagesUpdateTool;
+use MarekSkopal\MsMcpServer\Tool\Pages\PageTreeTool;
 use MarekSkopal\MsMcpServer\Tool\Schema\TableSchemaTool;
 use MarekSkopal\MsMcpServer\Tool\Translation\RecordTranslateTool;
 use MarekSkopal\MsMcpServer\Tool\Translation\SiteLanguagesTool;
@@ -39,6 +40,7 @@ readonly class McpServerFactory
         [PagesCreateTool::class, 'execute', 'pages_create'],
         [PagesUpdateTool::class, 'execute', 'pages_update'],
         [PagesDeleteTool::class, 'execute', 'pages_delete'],
+        [PageTreeTool::class, 'execute', 'pages_tree'],
         [ContentListTool::class, 'execute', 'content_list'],
         [ContentGetTool::class, 'execute', 'content_get'],
         [ContentCreateTool::class, 'execute', 'content_create'],
