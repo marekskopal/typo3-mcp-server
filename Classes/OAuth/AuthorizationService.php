@@ -4,23 +4,40 @@ declare(strict_types=1);
 
 namespace MarekSkopal\MsMcpServer\OAuth;
 
+use TYPO3\CMS\Core\Configuration\ExtensionConfiguration;
 use TYPO3\CMS\Core\Database\ConnectionPool;
 
 final readonly class AuthorizationService
 {
     private const string TABLE = 'tx_msmcpserver_oauth_authorization';
 
-    private const int ACCESS_TOKEN_LIFETIME = 3600;
+    private const int DEFAULT_ACCESS_TOKEN_LIFETIME = 3600;
 
-    private const int REFRESH_TOKEN_LIFETIME = 2592000;
+    private const int DEFAULT_REFRESH_TOKEN_LIFETIME = 2592000;
 
-    private const int CODE_LIFETIME = 60;
+    private const int DEFAULT_CODE_LIFETIME = 60;
+
+    private int $accessTokenLifetime;
+
+    private int $refreshTokenLifetime;
+
+    private int $codeLifetime;
 
     public function __construct(
         private ConnectionPool $connectionPool,
         private PkceVerifier $pkceVerifier,
         private ClientRepository $clientRepository,
+        ExtensionConfiguration $extensionConfiguration,
     ) {
+        $config = $extensionConfiguration->get('ms_mcp_server');
+        $accessTokenLifetime = is_array($config) ? ($config['accessTokenLifetime'] ?? null) : null;
+        $refreshTokenLifetime = is_array($config) ? ($config['refreshTokenLifetime'] ?? null) : null;
+        $codeLt = is_array($config) ? ($config['codeLifetime'] ?? null) : null;
+        $this->accessTokenLifetime = is_numeric($accessTokenLifetime) ? (int) $accessTokenLifetime : self::DEFAULT_ACCESS_TOKEN_LIFETIME;
+        $this->refreshTokenLifetime = is_numeric($refreshTokenLifetime)
+            ? (int) $refreshTokenLifetime
+            : self::DEFAULT_REFRESH_TOKEN_LIFETIME;
+        $this->codeLifetime = is_numeric($codeLt) ? (int) $codeLt : self::DEFAULT_CODE_LIFETIME;
     }
 
     public function createAuthorizationCode(
@@ -46,7 +63,7 @@ final readonly class AuthorizationService
             'code_challenge' => $codeChallenge,
             'code_challenge_method' => $codeChallengeMethod,
             'redirect_uri' => $redirectUri,
-            'code_expires' => time() + self::CODE_LIFETIME,
+            'code_expires' => time() + $this->codeLifetime,
         ]);
 
         return $code;
@@ -226,10 +243,10 @@ final readonly class AuthorizationService
             'be_user' => $beUserUid,
             'access_token_hash' => hash('sha256', $accessToken),
             'refresh_token_hash' => hash('sha256', $refreshToken),
-            'access_token_expires' => time() + self::ACCESS_TOKEN_LIFETIME,
-            'refresh_token_expires' => time() + self::REFRESH_TOKEN_LIFETIME,
+            'access_token_expires' => time() + $this->accessTokenLifetime,
+            'refresh_token_expires' => time() + $this->refreshTokenLifetime,
         ]);
 
-        return new OAuthTokenPair(accessToken: $accessToken, refreshToken: $refreshToken, expiresIn: self::ACCESS_TOKEN_LIFETIME);
+        return new OAuthTokenPair(accessToken: $accessToken, refreshToken: $refreshToken, expiresIn: $this->accessTokenLifetime);
     }
 }

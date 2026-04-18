@@ -1,0 +1,8 @@
+# cat=token/enable; type=int+; label=Access token lifetime (seconds)
+accessTokenLifetime = 3600
+
+# cat=token/enable; type=int+; label=Refresh token lifetime (seconds)
+refreshTokenLifetime = 2592000
+
+# cat=token/enable; type=int+; label=Authorization code lifetime (seconds)
+codeLifetime = 60

@@ -10,6 +10,7 @@ use MarekSkopal\MsMcpServer\OAuth\ClientRepository;
 use MarekSkopal\MsMcpServer\OAuth\PkceVerifier;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
+use TYPO3\CMS\Core\Configuration\ExtensionConfiguration;
 use TYPO3\CMS\Core\Database\Connection;
 use TYPO3\CMS\Core\Database\ConnectionPool;
 use TYPO3\CMS\Core\Database\Query\Expression\ExpressionBuilder;
@@ -35,6 +36,7 @@ final class AuthorizationServiceTest extends TestCase
             $connectionPool,
             new PkceVerifier(),
             new ClientRepository($this->createStub(ConnectionPool::class)),
+            $this->createStub(ExtensionConfiguration::class),
         );
 
         self::assertSame(42, $service->validateAccessToken($accessToken));
@@ -48,6 +50,7 @@ final class AuthorizationServiceTest extends TestCase
             $connectionPool,
             new PkceVerifier(),
             new ClientRepository($this->createStub(ConnectionPool::class)),
+            $this->createStub(ExtensionConfiguration::class),
         );
 
         $this->expectException(\RuntimeException::class);
@@ -70,6 +73,7 @@ final class AuthorizationServiceTest extends TestCase
             $connectionPool,
             new PkceVerifier(),
             new ClientRepository($this->createStub(ConnectionPool::class)),
+            $this->createStub(ExtensionConfiguration::class),
         );
 
         $this->expectException(\RuntimeException::class);
@@ -92,6 +96,7 @@ final class AuthorizationServiceTest extends TestCase
             $connectionPool,
             new PkceVerifier(),
             new ClientRepository($this->createStub(ConnectionPool::class)),
+            $this->createStub(ExtensionConfiguration::class),
         );
 
         $this->expectException(\RuntimeException::class);
@@ -108,6 +113,7 @@ final class AuthorizationServiceTest extends TestCase
             $connectionPool,
             new PkceVerifier(),
             new ClientRepository($this->createStub(ConnectionPool::class)),
+            $this->createStub(ExtensionConfiguration::class),
         );
 
         $this->expectException(\RuntimeException::class);
@@ -132,6 +138,7 @@ final class AuthorizationServiceTest extends TestCase
             $connectionPool,
             new PkceVerifier(),
             new ClientRepository($this->createStub(ConnectionPool::class)),
+            $this->createStub(ExtensionConfiguration::class),
         );
 
         $this->expectException(\RuntimeException::class);
@@ -156,6 +163,7 @@ final class AuthorizationServiceTest extends TestCase
             $connectionPool,
             new PkceVerifier(),
             new ClientRepository($this->createStub(ConnectionPool::class)),
+            $this->createStub(ExtensionConfiguration::class),
         );
 
         $this->expectException(\RuntimeException::class);
@@ -180,6 +188,7 @@ final class AuthorizationServiceTest extends TestCase
             $connectionPool,
             new PkceVerifier(),
             new ClientRepository($this->createStub(ConnectionPool::class)),
+            $this->createStub(ExtensionConfiguration::class),
         );
 
         $this->expectException(\RuntimeException::class);
@@ -205,6 +214,7 @@ final class AuthorizationServiceTest extends TestCase
             $connectionPool,
             new PkceVerifier(),
             new ClientRepository($this->createStub(ConnectionPool::class)),
+            $this->createStub(ExtensionConfiguration::class),
         );
 
         $service->revokeToken('some-token');
@@ -218,6 +228,7 @@ final class AuthorizationServiceTest extends TestCase
             $connectionPool,
             new PkceVerifier(),
             new ClientRepository($this->createStub(ConnectionPool::class)),
+            $this->createStub(ExtensionConfiguration::class),
         );
 
         $service->revokeToken('unknown-token');

@@ -20,6 +20,7 @@ use Psr\Http\Message\StreamFactoryInterface;
 use Psr\Http\Message\StreamInterface;
 use Psr\Http\Message\UriInterface;
 use Psr\Http\Server\RequestHandlerInterface;
+use TYPO3\CMS\Core\Configuration\ExtensionConfiguration;
 use TYPO3\CMS\Core\Database\ConnectionPool;
 use TYPO3\CMS\Core\Database\Query\Expression\ExpressionBuilder;
 use TYPO3\CMS\Core\Database\Query\QueryBuilder;
@@ -156,6 +157,7 @@ final class McpServerMiddlewareTest extends TestCase
             $connectionPool,
             new PkceVerifier(),
             new ClientRepository($connectionPool),
+            $this->createStub(ExtensionConfiguration::class),
         );
 
         $stream = $this->createStub(StreamInterface::class);
@@ -191,6 +193,7 @@ final class McpServerMiddlewareTest extends TestCase
             $connectionPool,
             new PkceVerifier(),
             new ClientRepository($connectionPool),
+            $this->createStub(ExtensionConfiguration::class),
         );
     }
 }
