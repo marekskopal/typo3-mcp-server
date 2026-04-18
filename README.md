@@ -4,6 +4,22 @@
 
 TYPO3 CMS extension that implements an [MCP (Model Context Protocol)](https://modelcontextprotocol.io/) server for TYPO3 administration. It exposes tools for managing pages, content elements, files, and custom extension records via the MCP protocol, allowing AI assistants to interact with your TYPO3 instance.
 
+**This extension is designed for fully autonomous AI operation — no workspaces, no approval queues.** Unlike workspace-based approaches that require human review before changes go live, this server lets AI agents manage your TYPO3 site directly. Changes take effect immediately. This is intentional: the goal is to enable AI agents to build, update, and maintain TYPO3 sites end-to-end without human intervention.
+
+### Example Prompts
+
+These are the kinds of tasks an AI agent can accomplish autonomously through this MCP server:
+
+- *"Create a new 'Services' page under the homepage with three subpages: Web Development, Consulting, and Support. Add introductory text content to each."*
+- *"Translate all pages and content elements under page 12 to German and French."*
+- *"Upload the product images from these URLs and attach them to the corresponding news records."*
+- *"Reorganize the page tree: move all blog posts from 2023 under a new '2023 Archive' page."*
+- *"Create a contact form page with a header, text element explaining our office hours, and an address content element."*
+- *"Review all pages under 'Products' and update their SEO meta descriptions based on their content."*
+- *"Set up the site structure for a new microsite: landing page, about, pricing with three tiers, FAQ, and contact — add placeholder content to each."*
+- *"Find all hidden pages in the site and list them with their paths so I can decide which to publish or delete."*
+- *"Add a news record for today's product launch, upload the press release PDF, and link it as a file reference."*
+
 ## Requirements
 
 - PHP 8.3+
@@ -58,6 +74,8 @@ Configurable via extension settings (defaults):
 
 ## Usage
 
+### HTTP Transport
+
 The MCP server is available at `/mcp` on your TYPO3 instance. Authenticate with a Bearer token obtained via the OAuth flow:
 
 ```
@@ -65,6 +83,36 @@ Authorization: Bearer <access-token>
 ```
 
 The server uses the [Streamable HTTP transport](https://modelcontextprotocol.io/specification/2025-03-26/basic/transports#streamable-http) (MCP protocol version 2025-03-26).
+
+### stdio Transport
+
+For local AI tools (Claude Desktop, Cursor, etc.), the server can run directly via stdin/stdout — no HTTP server or OAuth setup required:
+
+```bash
+vendor/bin/typo3 mcp:server
+```
+
+Use the `--user` option to specify which backend user to run as (defaults to `admin`):
+
+```bash
+vendor/bin/typo3 mcp:server --user editor
+```
+
+#### Claude Desktop Configuration
+
+Add to your Claude Desktop config (`claude_desktop_config.json`):
+
+```json
+{
+  "mcpServers": {
+    "typo3": {
+      "command": "php",
+      "args": ["vendor/bin/typo3", "mcp:server"],
+      "cwd": "/path/to/your/typo3/project"
+    }
+  }
+}
+```
 
 ### Available Tools
 
@@ -76,6 +124,7 @@ The server uses the [Streamable HTTP transport](https://modelcontextprotocol.io/
 | `pages_create` | Create a new page |
 | `pages_update` | Update page fields |
 | `pages_delete` | Delete a page |
+| `pages_tree` | Get page tree hierarchy with configurable depth |
 
 #### Content Elements (tt_content)
 | Tool | Description |
@@ -159,7 +208,7 @@ vendor/bin/phpstan analyse
 vendor/bin/phpcs
 vendor/bin/phpcbf
 
-# Tests (153 tests, 513 assertions)
+# Tests (182 tests, 642 assertions)
 vendor/bin/phpunit
 ```
 
