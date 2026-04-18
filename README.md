@@ -1,8 +1,8 @@
 # TYPO3 MCP Server
 
-> **Experimental** — This extension is under active development and not yet ready for production use. APIs and behavior may change without notice.
+> **Beta** — This extension is under active development. APIs and behavior may change between releases.
 
-TYPO3 CMS extension that implements an [MCP (Model Context Protocol)](https://modelcontextprotocol.io/) server for TYPO3 administration. It exposes tools for managing pages, content elements, and news records via the MCP protocol, allowing AI assistants to interact with your TYPO3 instance.
+TYPO3 CMS extension that implements an [MCP (Model Context Protocol)](https://modelcontextprotocol.io/) server for TYPO3 administration. It exposes tools for managing pages, content elements, files, and custom extension records via the MCP protocol, allowing AI assistants to interact with your TYPO3 instance.
 
 ## Requirements
 
@@ -22,6 +22,7 @@ composer require marekskopal/typo3-mcp-server
 2. Run database migrations to create the required tables
 3. Go to **System > MCP Server** in the TYPO3 backend
 4. Register an OAuth client for your MCP client application
+5. Optionally configure token lifetimes in **Settings > Extension Configuration > ms_mcp_server**
 
 ## Authentication
 
@@ -29,6 +30,7 @@ The extension uses **OAuth 2.1 with PKCE** (S256) for authentication. It support
 
 - **Authorization Code flow with PKCE** — standard OAuth 2.1 for MCP clients
 - **Dynamic Client Registration** ([RFC 7591](https://datatracker.ietf.org/doc/html/rfc7591)) — clients can self-register
+- **Token Revocation** ([RFC 7009](https://datatracker.ietf.org/doc/html/rfc7009)) — revoke access and refresh tokens
 - **Protected Resource Metadata** ([RFC 9728](https://datatracker.ietf.org/doc/html/rfc9728)) — auto-discovery of auth requirements
 
 ### OAuth Endpoints
@@ -39,9 +41,20 @@ The extension uses **OAuth 2.1 with PKCE** (S256) for authentication. It support
 | `/.well-known/oauth-protected-resource` | Protected resource metadata |
 | `/mcp/oauth/authorize` | Authorization endpoint |
 | `/mcp/oauth/token` | Token endpoint |
+| `/mcp/oauth/revoke` | Token revocation endpoint |
 | `/mcp/oauth/register` | Dynamic client registration |
 
 Each OAuth token is linked to a specific backend user. The MCP server acts as that user — all operations respect the user's TYPO3 permissions (page access, table access, field access).
+
+### Token Lifetimes
+
+Configurable via extension settings (defaults):
+
+| Token | Lifetime |
+|-------|----------|
+| Access token | 1 hour |
+| Refresh token | 30 days |
+| Authorization code | 60 seconds |
 
 ## Usage
 
@@ -73,7 +86,27 @@ The server uses the [Streamable HTTP transport](https://modelcontextprotocol.io/
 | `content_update` | Update content element fields |
 | `content_delete` | Delete a content element |
 
-#### News (tx_news)
+#### File Management (fileadmin)
+| Tool | Description |
+|------|-------------|
+| `file_list` | List files and directories with pagination |
+| `file_get_info` | Get file metadata (size, MIME type, public URL) |
+| `file_upload` | Upload a file from base64-encoded content |
+| `file_upload_from_url` | Download and upload a file from a URL |
+| `file_delete` | Delete a file |
+| `directory_create` | Create a directory |
+| `directory_delete` | Delete a directory |
+| `file_reference_add` | Attach a file to a record's image/media field |
+
+#### Schema Introspection
+| Tool | Description |
+|------|-------------|
+| `table_schema` | Get TCA field definitions for any table |
+
+#### Dynamic Extension Tools
+
+Additional CRUD tools are registered automatically for tables configured via `EXTCONF`. News is pre-configured:
+
 | Tool | Description |
 |------|-------------|
 | `news_list` | List news records by page ID |
@@ -82,14 +115,37 @@ The server uses the [Streamable HTTP transport](https://modelcontextprotocol.io/
 | `news_update` | Update news record fields |
 | `news_delete` | Delete a news record |
 
+### Backend Module
+
+The **System > MCP Server** backend module provides:
+
+- Register and manage OAuth clients
+- Edit client settings (name, redirect URIs, backend user)
+- View active tokens per client with status (active/refreshable/expired)
+- Revoke individual tokens
+
 ## Adding Support for Other Extensions
 
-The news tools follow the same pattern as pages and content. To add CRUD tools for another extension's records (e.g. `tx_blog_domain_model_post`):
+Register custom tables in your extension's `ext_localconf.php`:
 
-1. Create 5 tool classes in `Classes/Tool/Blog/` following the same structure as the News tools
-2. Define the table name, field lists, and use `#[McpTool]` attributes for name and description
-3. Register them in `McpServerFactory`
-4. Add a public DI entry in `Configuration/Services.yaml` for the new tool namespace
+```php
+$GLOBALS['TYPO3_CONF_VARS']['EXTCONF']['ms_mcp_server']['tables']['tx_blog_domain_model_post'] = [
+    'label' => 'Blog Post',
+    'prefix' => 'blog_post',
+];
+```
+
+This automatically creates 5 CRUD tools (`blog_post_list`, `blog_post_get`, `blog_post_create`, `blog_post_update`, `blog_post_delete`) with fields resolved from TCA. You can optionally specify `listFields`, `readFields`, and `writableFields` arrays to override the defaults.
+
+## Maintenance
+
+Clean up expired tokens and stale session files:
+
+```bash
+vendor/bin/typo3 mcp:cleanup
+```
+
+This can be run as a TYPO3 Scheduler task for automated cleanup.
 
 ## Development
 
@@ -103,7 +159,7 @@ vendor/bin/phpstan analyse
 vendor/bin/phpcs
 vendor/bin/phpcbf
 
-# Tests (74 tests, 270 assertions)
+# Tests (153 tests, 513 assertions)
 vendor/bin/phpunit
 ```
 
