@@ -8,6 +8,8 @@ use TYPO3\CMS\Core\Resource\File;
 use TYPO3\CMS\Core\Resource\Folder;
 use TYPO3\CMS\Core\Resource\ResourceStorage;
 use TYPO3\CMS\Core\Resource\StorageRepository;
+use const PHP_URL_PATH;
+use const PHP_URL_SCHEME;
 
 readonly class FileService
 {
@@ -76,6 +78,73 @@ readonly class FileService
         $folder = $storage->getFolder($directoryPath);
 
         $tempFile = tempnam(sys_get_temp_dir(), 'mcp_upload_');
+        if ($tempFile === false) {
+            throw new \RuntimeException('Failed to create temporary file', 1712002003);
+        }
+
+        try {
+            file_put_contents($tempFile, $content);
+            $file = $storage->addFile($tempFile, $folder, $fileName);
+        } finally {
+            if (file_exists($tempFile)) {
+                unlink($tempFile);
+            }
+        }
+
+        return [
+            'uid' => $file->getUid(),
+            'name' => $file->getName(),
+            'identifier' => $file->getIdentifier(),
+            'size' => $file->getSize(),
+            'mimeType' => $file->getMimeType(),
+        ];
+    }
+
+    /** @return array{uid: int, name: string, identifier: string, size: int, mimeType: string} */
+    public function uploadFileFromUrl(int $storageUid, string $directoryPath, string $url, string $fileName = ''): array
+    {
+        $scheme = parse_url($url, PHP_URL_SCHEME);
+        if (!is_string($scheme) || !in_array($scheme, ['http', 'https'], true)) {
+            throw new \RuntimeException('Only http and https URLs are allowed', 1712002010);
+        }
+
+        if ($fileName === '') {
+            $path = parse_url($url, PHP_URL_PATH);
+            $fileName = is_string($path) ? basename($path) : '';
+            if ($fileName === '' || $fileName === '.') {
+                $fileName = 'download_' . bin2hex(random_bytes(4));
+            }
+        }
+
+        $context = stream_context_create([
+            'http' => [
+                'timeout' => 30,
+                'max_redirects' => 5,
+                'follow_location' => 1,
+                'method' => 'GET',
+                'user_agent' => 'TYPO3-MCP-Server/1.0',
+            ],
+            'ssl' => [
+                'verify_peer' => true,
+                'verify_peer_name' => true,
+            ],
+        ]);
+
+        $content = @file_get_contents($url, false, $context);
+        if ($content === false) {
+            throw new \RuntimeException('Failed to download file from URL: ' . $url, 1712002011);
+        }
+
+        // 100 MB
+        $maxSize = 104857600;
+        if (strlen($content) > $maxSize) {
+            throw new \RuntimeException('Downloaded file exceeds maximum allowed size of 100 MB', 1712002012);
+        }
+
+        $storage = $this->getStorage($storageUid);
+        $folder = $storage->getFolder($directoryPath);
+
+        $tempFile = tempnam(sys_get_temp_dir(), 'mcp_url_upload_');
         if ($tempFile === false) {
             throw new \RuntimeException('Failed to create temporary file', 1712002003);
         }

@@ -25,6 +25,8 @@ final readonly class ContentCreateTool
         int $colPos = 0,
         bool $hidden = false,
         int $sysLanguageUid = 0,
+        string $listType = '',
+        string $piFlexform = '',
     ): string {
         $fields = [
             'CType' => $cType,
@@ -34,6 +36,14 @@ final readonly class ContentCreateTool
             'hidden' => $hidden ? 1 : 0,
             'sys_language_uid' => $sysLanguageUid,
         ];
+
+        if ($listType !== '') {
+            $fields['list_type'] = $listType;
+        }
+
+        if ($piFlexform !== '') {
+            $fields['pi_flexform'] = $piFlexform;
+        }
 
         try {
             $uid = $this->dataHandlerService->createRecord('tt_content', $pid, $fields);

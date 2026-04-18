@@ -44,7 +44,6 @@ final class PagesGetToolTest extends TestCase
                     'subtitle',
                     'abstract',
                     'description',
-                    'no_cache',
                     'fe_group',
                     'layout',
                     'backend_layout',

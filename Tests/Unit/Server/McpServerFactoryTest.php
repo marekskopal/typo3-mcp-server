@@ -19,6 +19,7 @@ use TYPO3\CMS\Core\Core\ApplicationContext;
 use TYPO3\CMS\Core\Core\Environment;
 use TYPO3\CMS\Core\Database\ConnectionPool;
 use TYPO3\CMS\Core\Resource\StorageRepository;
+use TYPO3\CMS\Core\Site\SiteFinder;
 
 #[CoversClass(McpServerFactory::class)]
 final class McpServerFactoryTest extends TestCase
@@ -43,7 +44,7 @@ final class McpServerFactoryTest extends TestCase
         $connectionPool = $this->createStub(ConnectionPool::class);
         $storageRepository = $this->createStub(StorageRepository::class);
         $recordService = new RecordService($connectionPool);
-        $dataHandlerService = new DataHandlerService();
+        $dataHandlerService = new DataHandlerService($this->createStub(SiteFinder::class));
         $fileService = new FileService($storageRepository);
         $logger = new NullLogger();
 

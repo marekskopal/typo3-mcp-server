@@ -30,7 +30,7 @@ final class ContentListToolTest extends TestCase
                 10,
                 20,
                 0,
-                ['uid', 'pid', 'CType', 'header', 'bodytext', 'hidden', 'sorting', 'colPos', 'sys_language_uid'],
+                ['uid', 'pid', 'CType', 'header', 'bodytext', 'hidden', 'sorting', 'colPos', 'sys_language_uid', 'list_type'],
             )
             ->willReturn($expectedResult);
 

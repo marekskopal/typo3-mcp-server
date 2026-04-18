@@ -7,13 +7,15 @@ namespace MarekSkopal\MsMcpServer\Tests\Unit\Service;
 use MarekSkopal\MsMcpServer\Service\DataHandlerService;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
+use TYPO3\CMS\Core\Site\SiteFinder;
 
 #[CoversClass(DataHandlerService::class)]
 final class DataHandlerServiceTest extends TestCase
 {
     public function testCreateRecordBuildsCorrectDatamap(): void
     {
-        $service = new DataHandlerService();
+        $siteFinder = $this->createMock(SiteFinder::class);
+        $service = new DataHandlerService($siteFinder);
 
         // We cannot easily mock GeneralUtility::makeInstance(DataHandler::class)
         // in a pure unit test without TYPO3 bootstrap, so we verify the service

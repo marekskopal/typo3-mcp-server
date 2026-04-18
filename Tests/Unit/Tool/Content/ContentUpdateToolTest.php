@@ -71,6 +71,31 @@ final class ContentUpdateToolTest extends TestCase
         self::assertSame('No valid fields provided', $result['error']);
     }
 
+    public function testExecuteUpdatesPluginFields(): void
+    {
+        $dataHandlerService = $this->createMock(DataHandlerService::class);
+        $dataHandlerService->expects(self::once())
+            ->method('updateRecord')
+            ->with(
+                'tt_content',
+                42,
+                [
+                    'list_type' => 'news_pi1',
+                    'pi_flexform' => '<xml>config</xml>',
+                ],
+            );
+
+        $tool = new ContentUpdateTool($dataHandlerService, new NullLogger());
+        $fields = json_encode(
+            ['list_type' => 'news_pi1', 'pi_flexform' => '<xml>config</xml>'],
+            JSON_THROW_ON_ERROR,
+        );
+        $result = json_decode($tool->execute(42, $fields), true, 512, JSON_THROW_ON_ERROR);
+
+        self::assertSame(42, $result['uid']);
+        self::assertSame(['list_type', 'pi_flexform'], $result['updated']);
+    }
+
     public function testExecuteThrowsToolCallExceptionOnError(): void
     {
         $dataHandlerService = $this->createMock(DataHandlerService::class);

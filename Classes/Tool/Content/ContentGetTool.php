@@ -27,6 +27,8 @@ final readonly class ContentGetTool
         'subheader',
         'image',
         'media',
+        'list_type',
+        'pi_flexform',
     ];
 
     public function __construct(private RecordService $recordService, private LoggerInterface $logger,)

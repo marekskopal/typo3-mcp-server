@@ -46,6 +46,8 @@ final class ContentGetToolTest extends TestCase
                     'subheader',
                     'image',
                     'media',
+                    'list_type',
+                    'pi_flexform',
                 ],
             )
             ->willReturn($expectedRecord);

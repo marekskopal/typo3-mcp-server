@@ -74,6 +74,39 @@ final class ContentCreateToolTest extends TestCase
         self::assertSame('My Header', $result['header']);
     }
 
+    public function testExecuteCreatesPluginContent(): void
+    {
+        $dataHandlerService = $this->createMock(DataHandlerService::class);
+        $dataHandlerService->expects(self::once())
+            ->method('createRecord')
+            ->with(
+                'tt_content',
+                10,
+                [
+                    'CType' => 'list',
+                    'header' => 'News Plugin',
+                    'bodytext' => '',
+                    'colPos' => 0,
+                    'hidden' => 0,
+                    'sys_language_uid' => 0,
+                    'list_type' => 'news_pi1',
+                    'pi_flexform' => '<xml>config</xml>',
+                ],
+            )
+            ->willReturn(300);
+
+        $tool = new ContentCreateTool($dataHandlerService, new NullLogger());
+        $result = json_decode(
+            $tool->execute(10, 'list', 'News Plugin', '', 0, false, 0, 'news_pi1', '<xml>config</xml>'),
+            true,
+            512,
+            JSON_THROW_ON_ERROR,
+        );
+
+        self::assertSame(300, $result['uid']);
+        self::assertSame('list', $result['CType']);
+    }
+
     public function testExecuteThrowsToolCallExceptionOnError(): void
     {
         $dataHandlerService = $this->createMock(DataHandlerService::class);

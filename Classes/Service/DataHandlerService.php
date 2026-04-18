@@ -4,12 +4,19 @@ declare(strict_types=1);
 
 namespace MarekSkopal\MsMcpServer\Service;
 
+use Psr\Http\Message\ServerRequestInterface;
 use TYPO3\CMS\Core\DataHandling\DataHandler;
+use TYPO3\CMS\Core\Exception\SiteNotFoundException;
+use TYPO3\CMS\Core\Site\SiteFinder;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
 use const JSON_THROW_ON_ERROR;
 
 readonly class DataHandlerService
 {
+    public function __construct(private SiteFinder $siteFinder)
+    {
+    }
+
     /**
      * @param array<string, mixed> $fields
      * @return int The uid of the created record
@@ -19,29 +26,45 @@ readonly class DataHandlerService
         $newId = 'NEW' . bin2hex(random_bytes(8));
         $fields['pid'] = $pid;
 
-        $dataHandler = GeneralUtility::makeInstance(DataHandler::class);
-        $dataHandler->start([$table => [$newId => $fields]], []);
-        $dataHandler->process_datamap();
+        $originalRequest = $table === 'pages' ? $this->ensureSiteContext($pid) : null;
 
-        $this->checkErrors($dataHandler);
+        try {
+            $dataHandler = GeneralUtility::makeInstance(DataHandler::class);
+            $dataHandler->start([$table => [$newId => $fields]], []);
+            $dataHandler->process_datamap();
 
-        /** @var int|string|null $uid */
-        $uid = $dataHandler->substNEWwithIDs[$newId] ?? null;
-        if ($uid === null) {
-            throw new \RuntimeException('Failed to create record: no uid returned', 1712000020);
+            $this->checkErrors($dataHandler);
+
+            /** @var int|string|null $uid */
+            $uid = $dataHandler->substNEWwithIDs[$newId] ?? null;
+            if ($uid === null) {
+                throw new \RuntimeException('Failed to create record: no uid returned', 1712000020);
+            }
+
+            return (int) $uid;
+        } finally {
+            if ($originalRequest !== null) {
+                $GLOBALS['TYPO3_REQUEST'] = $originalRequest;
+            }
         }
-
-        return (int) $uid;
     }
 
     /** @param array<string, mixed> $fields */
     public function updateRecord(string $table, int $uid, array $fields): void
     {
-        $dataHandler = GeneralUtility::makeInstance(DataHandler::class);
-        $dataHandler->start([$table => [$uid => $fields]], []);
-        $dataHandler->process_datamap();
+        $originalRequest = $table === 'pages' ? $this->ensureSiteContext($uid) : null;
 
-        $this->checkErrors($dataHandler);
+        try {
+            $dataHandler = GeneralUtility::makeInstance(DataHandler::class);
+            $dataHandler->start([$table => [$uid => $fields]], []);
+            $dataHandler->process_datamap();
+
+            $this->checkErrors($dataHandler);
+        } finally {
+            if ($originalRequest !== null) {
+                $GLOBALS['TYPO3_REQUEST'] = $originalRequest;
+            }
+        }
     }
 
     public function deleteRecord(string $table, int $uid): void
@@ -96,6 +119,25 @@ readonly class DataHandlerService
         }
 
         return $referenceUids;
+    }
+
+    private function ensureSiteContext(int $pageId): ?ServerRequestInterface
+    {
+        if (!isset($GLOBALS['TYPO3_REQUEST'])) {
+            return null;
+        }
+
+        /** @var ServerRequestInterface $originalRequest */
+        $originalRequest = $GLOBALS['TYPO3_REQUEST'];
+
+        try {
+            $site = $this->siteFinder->getSiteByPageId($pageId);
+            $GLOBALS['TYPO3_REQUEST'] = $originalRequest->withAttribute('site', $site);
+        } catch (SiteNotFoundException) {
+            // No site found for this page — leave request unchanged
+        }
+
+        return $originalRequest;
     }
 
     private function checkErrors(DataHandler $dataHandler): void

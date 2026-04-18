@@ -12,7 +12,7 @@ use const JSON_THROW_ON_ERROR;
 
 final readonly class ContentListTool
 {
-    private const array FIELDS = ['uid', 'pid', 'CType', 'header', 'bodytext', 'hidden', 'sorting', 'colPos', 'sys_language_uid'];
+    private const array FIELDS = ['uid', 'pid', 'CType', 'header', 'bodytext', 'hidden', 'sorting', 'colPos', 'sys_language_uid', 'list_type'];
 
     public function __construct(private RecordService $recordService, private LoggerInterface $logger,)
     {

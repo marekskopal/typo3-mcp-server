@@ -22,6 +22,8 @@ final readonly class ContentUpdateTool
         'sys_language_uid',
         'fe_group',
         'subheader',
+        'list_type',
+        'pi_flexform',
     ];
 
     public function __construct(private DataHandlerService $dataHandlerService, private LoggerInterface $logger,)

@@ -202,6 +202,28 @@ final class FileServiceTest extends TestCase
         $service->deleteDirectory(1, '/old/', true);
     }
 
+    public function testUploadFileFromUrlRejectsNonHttpScheme(): void
+    {
+        $storageRepository = $this->createMock(StorageRepository::class);
+        $service = new FileService($storageRepository);
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionCode(1712002010);
+
+        $service->uploadFileFromUrl(1, '/', 'ftp://example.com/file.txt');
+    }
+
+    public function testUploadFileFromUrlRejectsInvalidUrl(): void
+    {
+        $storageRepository = $this->createMock(StorageRepository::class);
+        $service = new FileService($storageRepository);
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionCode(1712002010);
+
+        $service->uploadFileFromUrl(1, '/', 'not-a-url');
+    }
+
     public function testGetStorageThrowsWhenNotFound(): void
     {
         $storageRepository = $this->createMock(StorageRepository::class);
