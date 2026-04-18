@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FF8700"/>
+      <stop offset="100%" stop-color="#F49700"/>
+    </linearGradient>
+  </defs>
+  <!-- Background -->
+  <rect width="128" height="128" rx="16" fill="url(#bg)"/>
+  <!-- Server/node top -->
+  <rect x="34" y="22" width="60" height="24" rx="4" fill="#fff" opacity="0.95"/>
+  <circle cx="50" cy="34" r="4" fill="#FF8700"/>
+  <circle cx="62" cy="34" r="4" fill="#FF8700"/>
+  <circle cx="74" cy="34" r="4" fill="#FF8700"/>
+  <!-- Connection lines -->
+  <line x1="64" y1="46" x2="64" y2="58" stroke="#fff" stroke-width="3" stroke-linecap="round" opacity="0.8"/>
+  <line x1="64" y1="70" x2="42" y2="82" stroke="#fff" stroke-width="3" stroke-linecap="round" opacity="0.8"/>
+  <line x1="64" y1="70" x2="86" y2="82" stroke="#fff" stroke-width="3" stroke-linecap="round" opacity="0.8"/>
+  <!-- MCP hub circle -->
+  <circle cx="64" cy="64" r="10" fill="#fff" opacity="0.95"/>
+  <circle cx="64" cy="64" r="5" fill="#FF8700"/>
+  <!-- Tool nodes -->
+  <rect x="26" y="82" width="32" height="22" rx="4" fill="#fff" opacity="0.95"/>
+  <rect x="32" y="89" width="8" height="3" rx="1" fill="#FF8700"/>
+  <rect x="43" y="89" width="8" height="3" rx="1" fill="#FF8700"/>
+  <rect x="32" y="94" width="12" height="3" rx="1" fill="#FF8700" opacity="0.5"/>
+  <rect x="70" y="82" width="32" height="22" rx="4" fill="#fff" opacity="0.95"/>
+  <rect x="76" y="89" width="8" height="3" rx="1" fill="#FF8700"/>
+  <rect x="87" y="89" width="8" height="3" rx="1" fill="#FF8700"/>
+  <rect x="76" y="94" width="12" height="3" rx="1" fill="#FF8700" opacity="0.5"/>
+</svg>
