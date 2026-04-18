@@ -23,6 +23,7 @@ final readonly class ContentGetTool
         'sorting',
         'colPos',
         'sys_language_uid',
+        'l18n_parent',
         'fe_group',
         'subheader',
         'image',
@@ -48,6 +49,11 @@ final readonly class ContentGetTool
 
         if ($record === null) {
             return json_encode(['error' => 'Content element not found'], JSON_THROW_ON_ERROR);
+        }
+
+        $sysLanguageUid = $record['sys_language_uid'] ?? -1;
+        if ((is_int($sysLanguageUid) || is_string($sysLanguageUid)) && (int) $sysLanguageUid === 0) {
+            $record['translations'] = $this->recordService->findTranslations('tt_content', $uid, 'sys_language_uid', 'l18n_parent');
         }
 
         return json_encode($record, JSON_THROW_ON_ERROR);

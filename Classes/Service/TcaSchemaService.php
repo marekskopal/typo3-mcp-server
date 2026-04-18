@@ -29,6 +29,26 @@ final readonly class TcaSchemaService
         'group',
     ];
 
+    /** @return array{languageField: string|null, transOrigPointerField: string|null, translationSource: string|null} */
+    public function getTranslationConfig(string $tableName): array
+    {
+        $tca = $this->getTca($tableName);
+        $ctrl = is_array($tca) ? ($tca['ctrl'] ?? []) : [];
+        if (!is_array($ctrl)) {
+            $ctrl = [];
+        }
+
+        $languageField = $ctrl['languageField'] ?? null;
+        $transOrigPointerField = $ctrl['transOrigPointerField'] ?? null;
+        $translationSource = $ctrl['translationSource'] ?? null;
+
+        return [
+            'languageField' => is_string($languageField) && $languageField !== '' ? $languageField : null,
+            'transOrigPointerField' => is_string($transOrigPointerField) && $transOrigPointerField !== '' ? $transOrigPointerField : null,
+            'translationSource' => is_string($translationSource) && $translationSource !== '' ? $translationSource : null,
+        ];
+    }
+
     /** @return list<string> Fields suitable for list views (uid, pid, label fields, enablecolumns.disabled). */
     public function getListFields(string $tableName): array
     {

@@ -9,6 +9,7 @@ use MarekSkopal\MsMcpServer\Server\McpServerFactory;
 use MarekSkopal\MsMcpServer\Service\DataHandlerService;
 use MarekSkopal\MsMcpServer\Service\FileService;
 use MarekSkopal\MsMcpServer\Service\RecordService;
+use MarekSkopal\MsMcpServer\Service\SiteLanguageService;
 use MarekSkopal\MsMcpServer\Service\TcaSchemaService;
 use MarekSkopal\MsMcpServer\Tool\Dynamic\DynamicToolRegistrar;
 use PHPUnit\Framework\Attributes\CoversClass;
@@ -50,17 +51,22 @@ final class McpServerFactoryTest extends TestCase
 
         $tcaSchemaService = new TcaSchemaService();
 
+        $siteLanguageService = new SiteLanguageService($this->createStub(SiteFinder::class));
+
         $container = $this->createStub(ContainerInterface::class);
         $container->method('has')->willReturn(true);
         $container->method('get')->willReturnCallback(
-            static function (string $id) use ($recordService, $dataHandlerService, $fileService, $tcaSchemaService, $logger): object {
+            static function (string $id) use ($recordService, $dataHandlerService, $fileService, $tcaSchemaService, $siteLanguageService, $logger): object {
                 return match (true) {
                     str_contains($id, 'RecordService') => $recordService,
                     str_contains($id, 'DataHandlerService') => $dataHandlerService,
                     str_contains($id, 'FileService') => $fileService,
                     str_contains($id, 'TcaSchemaService') => $tcaSchemaService,
+                    str_contains($id, 'SiteLanguageService') => $siteLanguageService,
                     str_contains($id, 'LoggerInterface') || str_contains($id, 'Logger') => $logger,
                     str_contains($id, 'TableSchemaTool') => new ($id)($tcaSchemaService, $logger),
+                    str_contains($id, 'RecordTranslateTool') => new ($id)($dataHandlerService, $tcaSchemaService, $logger),
+                    str_contains($id, 'SiteLanguagesTool') => new ($id)($siteLanguageService, $logger),
                     default => new ($id)($recordService, $logger),
                 };
             },

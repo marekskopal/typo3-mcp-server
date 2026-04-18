@@ -44,16 +44,39 @@ final readonly class DynamicToolRegistrar
 
     /**
      * @param array{label: string, prefix: string, listFields?: list<string>, readFields?: list<string>, writableFields?: list<string>} $config
-     * @return array{label: string, prefix: string, listFields: list<string>, readFields: list<string>, writableFields: list<string>}
+     * @return array{label: string, prefix: string, listFields: list<string>, readFields: list<string>, writableFields: list<string>, translationConfig: array{languageField: string|null, transOrigPointerField: string|null, translationSource: string|null}}
      */
     private function resolveConfig(string $tableName, array $config): array
     {
+        $translationConfig = $this->tcaSchemaService->getTranslationConfig($tableName);
+        $listFields = $config['listFields'] ?? $this->tcaSchemaService->getListFields($tableName);
+        $readFields = $config['readFields'] ?? $this->tcaSchemaService->getReadFields($tableName);
+
+        // Ensure language fields are included in list/read fields for translation-aware tables
+        if ($translationConfig['languageField'] !== null) {
+            if (!in_array($translationConfig['languageField'], $listFields, true)) {
+                $listFields[] = $translationConfig['languageField'];
+            }
+            if (!in_array($translationConfig['languageField'], $readFields, true)) {
+                $readFields[] = $translationConfig['languageField'];
+            }
+        }
+        if ($translationConfig['transOrigPointerField'] !== null) {
+            if (!in_array($translationConfig['transOrigPointerField'], $listFields, true)) {
+                $listFields[] = $translationConfig['transOrigPointerField'];
+            }
+            if (!in_array($translationConfig['transOrigPointerField'], $readFields, true)) {
+                $readFields[] = $translationConfig['transOrigPointerField'];
+            }
+        }
+
         return [
             'label' => $config['label'],
             'prefix' => $config['prefix'],
-            'listFields' => $config['listFields'] ?? $this->tcaSchemaService->getListFields($tableName),
-            'readFields' => $config['readFields'] ?? $this->tcaSchemaService->getReadFields($tableName),
+            'listFields' => $listFields,
+            'readFields' => $readFields,
             'writableFields' => $config['writableFields'] ?? $this->tcaSchemaService->getWritableFields($tableName),
+            'translationConfig' => $translationConfig,
         ];
     }
 
@@ -80,49 +103,90 @@ final readonly class DynamicToolRegistrar
         return is_array($tables) ? $tables : [];
     }
 
-    /** @param array{label: string, prefix: string, listFields: list<string>, readFields: list<string>, writableFields: list<string>} $config */
+    /** @param array{label: string, prefix: string, listFields: list<string>, readFields: list<string>, writableFields: list<string>, translationConfig: array{languageField: string|null, transOrigPointerField: string|null, translationSource: string|null}} $config */
     private function registerListTool(Builder $builder, string $tableName, array $config): void
     {
         $recordService = $this->recordService;
         $logger = $this->logger;
         $fields = $config['listFields'];
+        $languageField = $config['translationConfig']['languageField'];
 
-        $builder->addTool(
-            handler: static function (
-                int $pid = 0,
-                int $limit = 20,
-                int $offset = 0,
-            ) use (
-                $recordService,
-                $logger,
-                $tableName,
-                $fields,
-            ): string {
-                try {
-                    $result = $recordService->findByPid($tableName, $pid, $limit, $offset, $fields);
-                } catch (\Throwable $e) {
-                    $logger->error($tableName . ' list tool failed', ['exception' => $e]);
+        if ($languageField !== null) {
+            $builder->addTool(
+                handler: static function (
+                    int $pid = 0,
+                    int $limit = 20,
+                    int $offset = 0,
+                    int $sysLanguageUid = -1,
+                ) use (
+                    $recordService,
+                    $logger,
+                    $tableName,
+                    $fields,
+                    $languageField,
+                ): string {
+                    try {
+                        $result = $recordService->findByPid(
+                            $tableName,
+                            $pid,
+                            $limit,
+                            $offset,
+                            $fields,
+                            $sysLanguageUid >= 0 ? $sysLanguageUid : null,
+                            $sysLanguageUid >= 0 ? $languageField : null,
+                        );
+                    } catch (\Throwable $e) {
+                        $logger->error($tableName . ' list tool failed', ['exception' => $e]);
 
-                    throw new ToolCallException($e->getMessage(), (int) $e->getCode(), $e);
-                }
+                        throw new ToolCallException($e->getMessage(), (int) $e->getCode(), $e);
+                    }
 
-                return json_encode($result, JSON_THROW_ON_ERROR);
-            },
-            name: $config['prefix'] . '_list',
-            description: 'List ' . $config['label'] . ' records by parent page ID with pagination.',
-        );
+                    return json_encode($result, JSON_THROW_ON_ERROR);
+                },
+                name: $config['prefix'] . '_list',
+                description: 'List ' . $config['label'] . ' records by parent page ID with pagination.'
+                    . ' Use sysLanguageUid to filter by language (0 = default, -1 = all).',
+            );
+        } else {
+            $builder->addTool(
+                handler: static function (
+                    int $pid = 0,
+                    int $limit = 20,
+                    int $offset = 0,
+                ) use (
+                    $recordService,
+                    $logger,
+                    $tableName,
+                    $fields,
+                ): string {
+                    try {
+                        $result = $recordService->findByPid($tableName, $pid, $limit, $offset, $fields);
+                    } catch (\Throwable $e) {
+                        $logger->error($tableName . ' list tool failed', ['exception' => $e]);
+
+                        throw new ToolCallException($e->getMessage(), (int) $e->getCode(), $e);
+                    }
+
+                    return json_encode($result, JSON_THROW_ON_ERROR);
+                },
+                name: $config['prefix'] . '_list',
+                description: 'List ' . $config['label'] . ' records by parent page ID with pagination.',
+            );
+        }
     }
 
-    /** @param array{label: string, prefix: string, listFields: list<string>, readFields: list<string>, writableFields: list<string>} $config */
+    /** @param array{label: string, prefix: string, listFields: list<string>, readFields: list<string>, writableFields: list<string>, translationConfig: array{languageField: string|null, transOrigPointerField: string|null, translationSource: string|null}} $config */
     private function registerGetTool(Builder $builder, string $tableName, array $config): void
     {
         $recordService = $this->recordService;
         $logger = $this->logger;
         $fields = $config['readFields'];
         $label = $config['label'];
+        $languageField = $config['translationConfig']['languageField'];
+        $transOrigPointerField = $config['translationConfig']['transOrigPointerField'];
 
         $builder->addTool(
-            handler: static function (int $uid) use ($recordService, $logger, $tableName, $fields, $label): string {
+            handler: static function (int $uid) use ($recordService, $logger, $tableName, $fields, $label, $languageField, $transOrigPointerField): string {
                 try {
                     $record = $recordService->findByUid($tableName, $uid, $fields);
                 } catch (\Throwable $e) {
@@ -135,6 +199,21 @@ final readonly class DynamicToolRegistrar
                     return json_encode(['error' => $label . ' record not found'], JSON_THROW_ON_ERROR);
                 }
 
+                $langValue = $record[$languageField ?? ''] ?? -1;
+                if (
+                    $languageField !== null
+                    && $transOrigPointerField !== null
+                    && (
+                        is_int($langValue)
+                        || is_string(
+                            $langValue,
+                        )
+                    )
+                    && (int) $langValue === 0
+                ) {
+                    $record['translations'] = $recordService->findTranslations($tableName, $uid, $languageField, $transOrigPointerField);
+                }
+
                 return json_encode($record, JSON_THROW_ON_ERROR);
             },
             name: $config['prefix'] . '_get',
@@ -142,7 +221,7 @@ final readonly class DynamicToolRegistrar
         );
     }
 
-    /** @param array{label: string, prefix: string, listFields: list<string>, readFields: list<string>, writableFields: list<string>} $config */
+    /** @param array{label: string, prefix: string, listFields: list<string>, readFields: list<string>, writableFields: list<string>, translationConfig: array{languageField: string|null, transOrigPointerField: string|null, translationSource: string|null}} $config */
     private function registerCreateTool(Builder $builder, string $tableName, array $config): void
     {
         $dataHandlerService = $this->dataHandlerService;
@@ -183,7 +262,7 @@ final readonly class DynamicToolRegistrar
         );
     }
 
-    /** @param array{label: string, prefix: string, listFields: list<string>, readFields: list<string>, writableFields: list<string>} $config */
+    /** @param array{label: string, prefix: string, listFields: list<string>, readFields: list<string>, writableFields: list<string>, translationConfig: array{languageField: string|null, transOrigPointerField: string|null, translationSource: string|null}} $config */
     private function registerUpdateTool(Builder $builder, string $tableName, array $config): void
     {
         $dataHandlerService = $this->dataHandlerService;
@@ -225,7 +304,7 @@ final readonly class DynamicToolRegistrar
         );
     }
 
-    /** @param array{label: string, prefix: string, listFields: list<string>, readFields: list<string>, writableFields: list<string>} $config */
+    /** @param array{label: string, prefix: string, listFields: list<string>, readFields: list<string>, writableFields: list<string>, translationConfig: array{languageField: string|null, transOrigPointerField: string|null, translationSource: string|null}} $config */
     private function registerDeleteTool(Builder $builder, string $tableName, array $config): void
     {
         $dataHandlerService = $this->dataHandlerService;

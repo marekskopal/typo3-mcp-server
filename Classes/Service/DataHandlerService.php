@@ -77,6 +77,36 @@ readonly class DataHandlerService
     }
 
     /**
+     * Create a translation of an existing record using TYPO3 localize command (connected mode).
+     *
+     * @return int The uid of the new translated record
+     */
+    public function localizeRecord(string $table, int $uid, int $targetLanguageId): int
+    {
+        $originalRequest = $table === 'pages' ? $this->ensureSiteContext($uid) : null;
+
+        try {
+            $dataHandler = GeneralUtility::makeInstance(DataHandler::class);
+            $dataHandler->start([], [$table => [$uid => ['localize' => $targetLanguageId]]]);
+            $dataHandler->process_cmdmap();
+
+            $this->checkErrors($dataHandler);
+
+            // @phpstan-ignore property.internal
+            $newUid = $dataHandler->copyMappingArray[$table][$uid] ?? null;
+            if (!is_int($newUid) && !is_string($newUid)) {
+                throw new \RuntimeException('Localize command did not return a new record uid', 1712000030);
+            }
+
+            return (int) $newUid;
+        } finally {
+            if ($originalRequest !== null) {
+                $GLOBALS['TYPO3_REQUEST'] = $originalRequest;
+            }
+        }
+    }
+
+    /**
      * @param list<int> $fileUids sys_file UIDs to attach
      * @return list<int> UIDs of the created sys_file_reference records
      */

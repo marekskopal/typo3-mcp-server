@@ -78,6 +78,47 @@ final class TcaSchemaServiceTest extends TestCase
         self::assertSame(['uid', 'pid', 'title'], $this->service->getListFields('tx_test'));
     }
 
+    public function testGetTranslationConfigReturnsFieldNames(): void
+    {
+        $GLOBALS['TCA']['tx_test'] = [
+            'ctrl' => [
+                'languageField' => 'sys_language_uid',
+                'transOrigPointerField' => 'l10n_parent',
+                'translationSource' => 'l10n_source',
+            ],
+            'columns' => [],
+        ];
+
+        $result = $this->service->getTranslationConfig('tx_test');
+
+        self::assertSame('sys_language_uid', $result['languageField']);
+        self::assertSame('l10n_parent', $result['transOrigPointerField']);
+        self::assertSame('l10n_source', $result['translationSource']);
+    }
+
+    public function testGetTranslationConfigReturnsNullsForNonTranslatableTable(): void
+    {
+        $GLOBALS['TCA']['tx_test'] = [
+            'ctrl' => [],
+            'columns' => [],
+        ];
+
+        $result = $this->service->getTranslationConfig('tx_test');
+
+        self::assertNull($result['languageField']);
+        self::assertNull($result['transOrigPointerField']);
+        self::assertNull($result['translationSource']);
+    }
+
+    public function testGetTranslationConfigReturnsNullsForMissingTable(): void
+    {
+        $result = $this->service->getTranslationConfig('nonexistent_table');
+
+        self::assertNull($result['languageField']);
+        self::assertNull($result['transOrigPointerField']);
+        self::assertNull($result['translationSource']);
+    }
+
     public function testGetReadFieldsIncludesValueTypes(): void
     {
         $GLOBALS['TCA']['tx_test'] = [

@@ -114,4 +114,87 @@ final class RecordServiceTest extends TestCase
         self::assertSame($expectedRecords, $result['records']);
         self::assertSame(5, $result['total']);
     }
+
+    public function testFindByPidAcceptsOptionalLanguageFilter(): void
+    {
+        $expectedRecords = [['uid' => 1, 'title' => 'Page 1']];
+
+        $countResult = $this->createStub(Result::class);
+        $countResult->method('fetchOne')->willReturn(1);
+
+        $listResult = $this->createStub(Result::class);
+        $listResult->method('fetchAllAssociative')->willReturn($expectedRecords);
+
+        $expressionBuilder = $this->createStub(ExpressionBuilder::class);
+
+        $countQueryBuilder = $this->createStub(QueryBuilder::class);
+        $countQueryBuilder->method('count')->willReturnSelf();
+        $countQueryBuilder->method('from')->willReturnSelf();
+        $countQueryBuilder->method('where')->willReturnSelf();
+        $countQueryBuilder->method('andWhere')->willReturnSelf();
+        $countQueryBuilder->method('expr')->willReturn($expressionBuilder);
+        $countQueryBuilder->method('createNamedParameter')->willReturn("'0'");
+        $countQueryBuilder->method('executeQuery')->willReturn($countResult);
+
+        $listQueryBuilder = $this->createStub(QueryBuilder::class);
+        $listQueryBuilder->method('select')->willReturnSelf();
+        $listQueryBuilder->method('from')->willReturnSelf();
+        $listQueryBuilder->method('where')->willReturnSelf();
+        $listQueryBuilder->method('andWhere')->willReturnSelf();
+        $listQueryBuilder->method('setMaxResults')->willReturnSelf();
+        $listQueryBuilder->method('setFirstResult')->willReturnSelf();
+        $listQueryBuilder->method('orderBy')->willReturnSelf();
+        $listQueryBuilder->method('expr')->willReturn($expressionBuilder);
+        $listQueryBuilder->method('createNamedParameter')->willReturn("'0'");
+        $listQueryBuilder->method('executeQuery')->willReturn($listResult);
+
+        $callCount = 0;
+        $connectionPool = $this->createStub(ConnectionPool::class);
+        $connectionPool->method('getQueryBuilderForTable')
+            ->willReturnCallback(function () use (&$callCount, $listQueryBuilder, $countQueryBuilder): QueryBuilder {
+                $callCount++;
+
+                return $callCount === 1 ? $listQueryBuilder : $countQueryBuilder;
+            });
+
+        $service = new RecordService($connectionPool);
+        $result = $service->findByPid('pages', 0, 20, 0, ['uid', 'title'], 0, 'sys_language_uid');
+
+        self::assertSame($expectedRecords, $result['records']);
+        self::assertSame(1, $result['total']);
+    }
+
+    public function testFindTranslationsReturnsTranslationRecords(): void
+    {
+        $expectedRows = [
+            ['uid' => 87, 'sys_language_uid' => 1],
+            ['uid' => 88, 'sys_language_uid' => 2],
+        ];
+
+        $result = $this->createStub(Result::class);
+        $result->method('fetchAllAssociative')->willReturn($expectedRows);
+
+        $expressionBuilder = $this->createStub(ExpressionBuilder::class);
+
+        $queryBuilder = $this->createStub(QueryBuilder::class);
+        $queryBuilder->method('select')->willReturnSelf();
+        $queryBuilder->method('from')->willReturnSelf();
+        $queryBuilder->method('where')->willReturnSelf();
+        $queryBuilder->method('orderBy')->willReturnSelf();
+        $queryBuilder->method('expr')->willReturn($expressionBuilder);
+        $queryBuilder->method('createNamedParameter')->willReturn("'42'");
+        $queryBuilder->method('executeQuery')->willReturn($result);
+
+        $connectionPool = $this->createStub(ConnectionPool::class);
+        $connectionPool->method('getQueryBuilderForTable')->willReturn($queryBuilder);
+
+        $service = new RecordService($connectionPool);
+        $translations = $service->findTranslations('pages', 42, 'sys_language_uid', 'l10n_parent');
+
+        self::assertCount(2, $translations);
+        self::assertSame(87, $translations[0]['uid']);
+        self::assertSame(1, $translations[0]['sys_language_uid']);
+        self::assertSame(88, $translations[1]['uid']);
+        self::assertSame(2, $translations[1]['sys_language_uid']);
+    }
 }

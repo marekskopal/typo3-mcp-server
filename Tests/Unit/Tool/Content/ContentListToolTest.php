@@ -30,7 +30,7 @@ final class ContentListToolTest extends TestCase
                 10,
                 20,
                 0,
-                ['uid', 'pid', 'CType', 'header', 'bodytext', 'hidden', 'sorting', 'colPos', 'sys_language_uid', 'list_type'],
+                ['uid', 'pid', 'CType', 'header', 'bodytext', 'hidden', 'sorting', 'colPos', 'sys_language_uid', 'l18n_parent', 'list_type'],
             )
             ->willReturn($expectedResult);
 
@@ -57,6 +57,46 @@ final class ContentListToolTest extends TestCase
 
         $tool = new ContentListTool($recordService, new NullLogger());
         $tool->execute(5, 10, 30);
+    }
+
+    public function testExecutePassesLanguageFilter(): void
+    {
+        $recordService = $this->createMock(RecordService::class);
+        $recordService->expects(self::once())
+            ->method('findByPid')
+            ->with(
+                'tt_content',
+                10,
+                20,
+                0,
+                self::anything(),
+                0,
+                'sys_language_uid',
+            )
+            ->willReturn(['records' => [], 'total' => 0]);
+
+        $tool = new ContentListTool($recordService, new NullLogger());
+        $tool->execute(10, 20, 0, 0);
+    }
+
+    public function testExecuteSkipsLanguageFilterWhenMinusOne(): void
+    {
+        $recordService = $this->createMock(RecordService::class);
+        $recordService->expects(self::once())
+            ->method('findByPid')
+            ->with(
+                'tt_content',
+                10,
+                20,
+                0,
+                self::anything(),
+                null,
+                null,
+            )
+            ->willReturn(['records' => [], 'total' => 0]);
+
+        $tool = new ContentListTool($recordService, new NullLogger());
+        $tool->execute(10, 20, 0, -1);
     }
 
     public function testExecuteThrowsToolCallExceptionOnError(): void

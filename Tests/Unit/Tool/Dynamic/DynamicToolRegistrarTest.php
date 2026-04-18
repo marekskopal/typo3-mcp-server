@@ -370,6 +370,128 @@ final class DynamicToolRegistrarTest extends TestCase
         $closure(5);
     }
 
+    public function testListToolPassesLanguageFilterForTranslatableTable(): void
+    {
+        $GLOBALS['TCA'][self::TABLE] = [
+            'ctrl' => [
+                'label' => 'title',
+                'languageField' => 'sys_language_uid',
+                'transOrigPointerField' => 'l10n_parent',
+            ],
+            'columns' => [
+                'title' => ['config' => ['type' => 'input']],
+                'description' => ['config' => ['type' => 'text']],
+            ],
+        ];
+
+        $GLOBALS['TYPO3_CONF_VARS']['EXTCONF']['ms_mcp_server']['tables'] = [
+            self::TABLE => [
+                'label' => 'Item',
+                'prefix' => 'item',
+            ],
+        ];
+
+        $recordService = $this->createMock(RecordService::class);
+        $recordService->expects(self::once())
+            ->method('findByPid')
+            ->with(
+                self::TABLE,
+                10,
+                20,
+                0,
+                self::anything(),
+                0,
+                'sys_language_uid',
+            )
+            ->willReturn(['records' => [], 'total' => 0]);
+
+        $registrar = new DynamicToolRegistrar(
+            $recordService,
+            $this->createStub(DataHandlerService::class),
+            new TcaSchemaService(),
+            new NullLogger(),
+        );
+
+        $builder = Server::builder();
+        $registrar->register($builder);
+
+        $tools = $this->getRegisteredTools($builder);
+        $listTool = null;
+        foreach ($tools as $tool) {
+            if (($tool['name'] ?? null) === 'item_list') {
+                /** @var \Closure $listTool */
+                $listTool = $tool['handler'];
+
+                break;
+            }
+        }
+        self::assertNotNull($listTool);
+        $listTool(10, 20, 0, 0);
+
+        unset($GLOBALS['TCA'][self::TABLE]);
+    }
+
+    public function testGetToolIncludesTranslationsForTranslatableTable(): void
+    {
+        $GLOBALS['TCA'][self::TABLE] = [
+            'ctrl' => [
+                'label' => 'title',
+                'languageField' => 'sys_language_uid',
+                'transOrigPointerField' => 'l10n_parent',
+            ],
+            'columns' => [
+                'title' => ['config' => ['type' => 'input']],
+            ],
+        ];
+
+        $GLOBALS['TYPO3_CONF_VARS']['EXTCONF']['ms_mcp_server']['tables'] = [
+            self::TABLE => [
+                'label' => 'Item',
+                'prefix' => 'item',
+            ],
+        ];
+
+        $recordService = $this->createMock(RecordService::class);
+        $recordService->method('findByUid')->willReturn([
+            'uid' => 1,
+            'pid' => 10,
+            'title' => 'Test',
+            'sys_language_uid' => 0,
+            'l10n_parent' => 0,
+        ]);
+        $recordService->expects(self::once())
+            ->method('findTranslations')
+            ->with(self::TABLE, 1, 'sys_language_uid', 'l10n_parent')
+            ->willReturn([['uid' => 2, 'sys_language_uid' => 1]]);
+
+        $registrar = new DynamicToolRegistrar(
+            $recordService,
+            $this->createStub(DataHandlerService::class),
+            new TcaSchemaService(),
+            new NullLogger(),
+        );
+
+        $builder = Server::builder();
+        $registrar->register($builder);
+
+        $tools = $this->getRegisteredTools($builder);
+        $getTool = null;
+        foreach ($tools as $tool) {
+            if (($tool['name'] ?? null) === 'item_get') {
+                /** @var \Closure $getTool */
+                $getTool = $tool['handler'];
+
+                break;
+            }
+        }
+        self::assertNotNull($getTool);
+        $result = json_decode($getTool(1), true, 512, JSON_THROW_ON_ERROR);
+
+        self::assertSame([['uid' => 2, 'sys_language_uid' => 1]], $result['translations']);
+
+        unset($GLOBALS['TCA'][self::TABLE]);
+    }
+
     private function createRegistrar(
         ?RecordService $recordService = null,
         ?DataHandlerService $dataHandlerService = null,

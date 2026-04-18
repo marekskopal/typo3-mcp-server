@@ -20,6 +20,8 @@ final readonly class PagesGetTool
         'doktype',
         'hidden',
         'sorting',
+        'sys_language_uid',
+        'l10n_parent',
         'nav_title',
         'subtitle',
         'abstract',
@@ -46,6 +48,11 @@ final readonly class PagesGetTool
 
         if ($record === null) {
             return json_encode(['error' => 'Page not found'], JSON_THROW_ON_ERROR);
+        }
+
+        $sysLanguageUid = $record['sys_language_uid'] ?? -1;
+        if ((is_int($sysLanguageUid) || is_string($sysLanguageUid)) && (int) $sysLanguageUid === 0) {
+            $record['translations'] = $this->recordService->findTranslations('pages', $uid, 'sys_language_uid', 'l10n_parent');
         }
 
         return json_encode($record, JSON_THROW_ON_ERROR);

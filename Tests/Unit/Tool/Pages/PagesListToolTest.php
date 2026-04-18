@@ -30,7 +30,7 @@ final class PagesListToolTest extends TestCase
                 0,
                 20,
                 0,
-                ['uid', 'pid', 'title', 'slug', 'doktype', 'hidden', 'sorting'],
+                ['uid', 'pid', 'title', 'slug', 'doktype', 'hidden', 'sorting', 'sys_language_uid', 'l10n_parent'],
             )
             ->willReturn($expectedResult);
 
@@ -57,6 +57,26 @@ final class PagesListToolTest extends TestCase
 
         $tool = new PagesListTool($recordService, new NullLogger());
         $tool->execute(5, 10, 30);
+    }
+
+    public function testExecutePassesLanguageFilter(): void
+    {
+        $recordService = $this->createMock(RecordService::class);
+        $recordService->expects(self::once())
+            ->method('findByPid')
+            ->with(
+                'pages',
+                0,
+                20,
+                0,
+                self::anything(),
+                0,
+                'sys_language_uid',
+            )
+            ->willReturn(['records' => [], 'total' => 0]);
+
+        $tool = new PagesListTool($recordService, new NullLogger());
+        $tool->execute(0, 20, 0, 0);
     }
 
     public function testExecuteThrowsToolCallExceptionOnError(): void

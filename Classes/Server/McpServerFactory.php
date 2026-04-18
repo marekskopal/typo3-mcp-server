@@ -24,6 +24,8 @@ use MarekSkopal\MsMcpServer\Tool\Pages\PagesGetTool;
 use MarekSkopal\MsMcpServer\Tool\Pages\PagesListTool;
 use MarekSkopal\MsMcpServer\Tool\Pages\PagesUpdateTool;
 use MarekSkopal\MsMcpServer\Tool\Schema\TableSchemaTool;
+use MarekSkopal\MsMcpServer\Tool\Translation\RecordTranslateTool;
+use MarekSkopal\MsMcpServer\Tool\Translation\SiteLanguagesTool;
 use Mcp\Server;
 use Mcp\Server\Session\FileSessionStore;
 use Psr\Container\ContainerInterface;
@@ -51,6 +53,8 @@ readonly class McpServerFactory
         [FileReferenceAddTool::class, 'execute', 'file_reference_add'],
         [FileUploadFromUrlTool::class, 'execute', 'file_upload_from_url'],
         [TableSchemaTool::class, 'execute', 'table_schema'],
+        [SiteLanguagesTool::class, 'execute', 'site_languages'],
+        [RecordTranslateTool::class, 'execute', 'record_translate'],
     ];
 
     public function __construct(private ContainerInterface $container, private DynamicToolRegistrar $dynamicToolRegistrar,)

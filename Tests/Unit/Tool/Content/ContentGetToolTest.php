@@ -42,6 +42,7 @@ final class ContentGetToolTest extends TestCase
                     'sorting',
                     'colPos',
                     'sys_language_uid',
+                    'l18n_parent',
                     'fe_group',
                     'subheader',
                     'image',
@@ -57,6 +58,54 @@ final class ContentGetToolTest extends TestCase
 
         self::assertSame(42, $result['uid']);
         self::assertSame('Test Header', $result['header']);
+    }
+
+    public function testExecuteIncludesTranslationsForDefaultLanguageRecord(): void
+    {
+        $record = [
+            'uid' => 42,
+            'pid' => 10,
+            'CType' => 'text',
+            'header' => 'Test',
+            'sys_language_uid' => 0,
+        ];
+
+        $translations = [
+            ['uid' => 87, 'sys_language_uid' => 1],
+        ];
+
+        $recordService = $this->createMock(RecordService::class);
+        $recordService->method('findByUid')->willReturn($record);
+        $recordService->expects(self::once())
+            ->method('findTranslations')
+            ->with('tt_content', 42, 'sys_language_uid', 'l18n_parent')
+            ->willReturn($translations);
+
+        $tool = new ContentGetTool($recordService, new NullLogger());
+        $result = json_decode($tool->execute(42), true, 512, JSON_THROW_ON_ERROR);
+
+        self::assertSame($translations, $result['translations']);
+    }
+
+    public function testExecuteDoesNotIncludeTranslationsForTranslatedRecord(): void
+    {
+        $record = [
+            'uid' => 87,
+            'pid' => 10,
+            'CType' => 'text',
+            'header' => 'Test DE',
+            'sys_language_uid' => 1,
+            'l18n_parent' => 42,
+        ];
+
+        $recordService = $this->createMock(RecordService::class);
+        $recordService->method('findByUid')->willReturn($record);
+        $recordService->expects(self::never())->method('findTranslations');
+
+        $tool = new ContentGetTool($recordService, new NullLogger());
+        $result = json_decode($tool->execute(87), true, 512, JSON_THROW_ON_ERROR);
+
+        self::assertArrayNotHasKey('translations', $result);
     }
 
     public function testExecuteReturnsErrorWhenNotFound(): void
