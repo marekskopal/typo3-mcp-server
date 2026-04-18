@@ -69,7 +69,7 @@ readonly class McpServerFactory
         $sessionStore = new FileSessionStore($sessionDir);
 
         $builder = Server::builder()
-            ->setServerInfo('TYPO3 MCP Server', '1.0.0')
+            ->setServerInfo('TYPO3 MCP Server', '0.1.0')
             ->setContainer($this->container)
             ->setSession($sessionStore, new InitializedSessionFactory());
 
