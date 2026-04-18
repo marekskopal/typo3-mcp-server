@@ -42,7 +42,7 @@ final class DirectoryDeleteToolTest extends TestCase
 
     public function testExecuteThrowsToolCallExceptionOnError(): void
     {
-        $fileService = $this->createMock(FileService::class);
+        $fileService = $this->createStub(FileService::class);
         $fileService->method('deleteDirectory')
             ->willThrowException(new \RuntimeException('Folder not empty'));
 

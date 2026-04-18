@@ -44,7 +44,7 @@ final class DirectoryCreateToolTest extends TestCase
 
     public function testExecuteThrowsToolCallExceptionOnError(): void
     {
-        $fileService = $this->createMock(FileService::class);
+        $fileService = $this->createStub(FileService::class);
         $fileService->method('createDirectory')
             ->willThrowException(new \RuntimeException('Folder already exists'));
 

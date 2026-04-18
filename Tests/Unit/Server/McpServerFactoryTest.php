@@ -50,7 +50,7 @@ final class McpServerFactoryTest extends TestCase
 
         $tcaSchemaService = new TcaSchemaService();
 
-        $container = $this->createMock(ContainerInterface::class);
+        $container = $this->createStub(ContainerInterface::class);
         $container->method('has')->willReturn(true);
         $container->method('get')->willReturnCallback(
             static function (string $id) use ($recordService, $dataHandlerService, $fileService, $tcaSchemaService, $logger): object {

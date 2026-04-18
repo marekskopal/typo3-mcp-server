@@ -85,7 +85,7 @@ final class DynamicToolRegistrarTest extends TestCase
 
         $registrar = new DynamicToolRegistrar(
             $recordService,
-            $this->createMock(DataHandlerService::class),
+            $this->createStub(DataHandlerService::class),
             new TcaSchemaService(),
             new NullLogger(),
         );
@@ -141,7 +141,7 @@ final class DynamicToolRegistrarTest extends TestCase
             ->with(self::TABLE, 10, 20, 0, ['uid', 'pid', 'title'])
             ->willReturn($expectedResult);
 
-        $closure = $this->getRegisteredClosure($recordService, $this->createMock(DataHandlerService::class), 'list');
+        $closure = $this->getRegisteredClosure($recordService, $this->createStub(DataHandlerService::class),'list');
         $result = json_decode($closure(10), true, 512, JSON_THROW_ON_ERROR);
 
         self::assertSame(1, $result['total']);
@@ -150,11 +150,11 @@ final class DynamicToolRegistrarTest extends TestCase
 
     public function testListToolThrowsToolCallExceptionOnError(): void
     {
-        $recordService = $this->createMock(RecordService::class);
+        $recordService = $this->createStub(RecordService::class);
         $recordService->method('findByPid')
             ->willThrowException(new \RuntimeException('DB error'));
 
-        $closure = $this->getRegisteredClosure($recordService, $this->createMock(DataHandlerService::class), 'list');
+        $closure = $this->getRegisteredClosure($recordService, $this->createStub(DataHandlerService::class),'list');
 
         $this->expectException(ToolCallException::class);
         $this->expectExceptionMessage('DB error');
@@ -172,7 +172,7 @@ final class DynamicToolRegistrarTest extends TestCase
             ->with(self::TABLE, 1, ['uid', 'pid', 'title', 'description'])
             ->willReturn($record);
 
-        $closure = $this->getRegisteredClosure($recordService, $this->createMock(DataHandlerService::class), 'get');
+        $closure = $this->getRegisteredClosure($recordService, $this->createStub(DataHandlerService::class),'get');
         $result = json_decode($closure(1), true, 512, JSON_THROW_ON_ERROR);
 
         self::assertSame(1, $result['uid']);
@@ -181,10 +181,10 @@ final class DynamicToolRegistrarTest extends TestCase
 
     public function testGetToolReturnsErrorWhenNotFound(): void
     {
-        $recordService = $this->createMock(RecordService::class);
+        $recordService = $this->createStub(RecordService::class);
         $recordService->method('findByUid')->willReturn(null);
 
-        $closure = $this->getRegisteredClosure($recordService, $this->createMock(DataHandlerService::class), 'get');
+        $closure = $this->getRegisteredClosure($recordService, $this->createStub(DataHandlerService::class),'get');
         $result = json_decode($closure(999), true, 512, JSON_THROW_ON_ERROR);
 
         self::assertSame('Item record not found', $result['error']);
@@ -192,11 +192,11 @@ final class DynamicToolRegistrarTest extends TestCase
 
     public function testGetToolThrowsToolCallExceptionOnError(): void
     {
-        $recordService = $this->createMock(RecordService::class);
+        $recordService = $this->createStub(RecordService::class);
         $recordService->method('findByUid')
             ->willThrowException(new \RuntimeException('DB error'));
 
-        $closure = $this->getRegisteredClosure($recordService, $this->createMock(DataHandlerService::class), 'get');
+        $closure = $this->getRegisteredClosure($recordService, $this->createStub(DataHandlerService::class),'get');
 
         $this->expectException(ToolCallException::class);
         $closure(1);
@@ -211,7 +211,7 @@ final class DynamicToolRegistrarTest extends TestCase
             ->willReturn(42);
 
         $closure = $this->getRegisteredClosure(
-            $this->createMock(RecordService::class),
+            $this->createStub(RecordService::class),
             $dataHandlerService,
             'create',
         );
@@ -234,7 +234,7 @@ final class DynamicToolRegistrarTest extends TestCase
             ->willReturn(42);
 
         $closure = $this->getRegisteredClosure(
-            $this->createMock(RecordService::class),
+            $this->createStub(RecordService::class),
             $dataHandlerService,
             'create',
         );
@@ -247,7 +247,7 @@ final class DynamicToolRegistrarTest extends TestCase
         $dataHandlerService->expects(self::never())->method('createRecord');
 
         $closure = $this->getRegisteredClosure(
-            $this->createMock(RecordService::class),
+            $this->createStub(RecordService::class),
             $dataHandlerService,
             'create',
         );
@@ -263,12 +263,12 @@ final class DynamicToolRegistrarTest extends TestCase
 
     public function testCreateToolThrowsToolCallExceptionOnError(): void
     {
-        $dataHandlerService = $this->createMock(DataHandlerService::class);
+        $dataHandlerService = $this->createStub(DataHandlerService::class);
         $dataHandlerService->method('createRecord')
             ->willThrowException(new \RuntimeException('DataHandler error'));
 
         $closure = $this->getRegisteredClosure(
-            $this->createMock(RecordService::class),
+            $this->createStub(RecordService::class),
             $dataHandlerService,
             'create',
         );
@@ -285,7 +285,7 @@ final class DynamicToolRegistrarTest extends TestCase
             ->with(self::TABLE, 1, ['title' => 'Updated']);
 
         $closure = $this->getRegisteredClosure(
-            $this->createMock(RecordService::class),
+            $this->createStub(RecordService::class),
             $dataHandlerService,
             'update',
         );
@@ -306,7 +306,7 @@ final class DynamicToolRegistrarTest extends TestCase
         $dataHandlerService->expects(self::never())->method('updateRecord');
 
         $closure = $this->getRegisteredClosure(
-            $this->createMock(RecordService::class),
+            $this->createStub(RecordService::class),
             $dataHandlerService,
             'update',
         );
@@ -322,12 +322,12 @@ final class DynamicToolRegistrarTest extends TestCase
 
     public function testUpdateToolThrowsToolCallExceptionOnError(): void
     {
-        $dataHandlerService = $this->createMock(DataHandlerService::class);
+        $dataHandlerService = $this->createStub(DataHandlerService::class);
         $dataHandlerService->method('updateRecord')
             ->willThrowException(new \RuntimeException('DataHandler error'));
 
         $closure = $this->getRegisteredClosure(
-            $this->createMock(RecordService::class),
+            $this->createStub(RecordService::class),
             $dataHandlerService,
             'update',
         );
@@ -344,7 +344,7 @@ final class DynamicToolRegistrarTest extends TestCase
             ->with(self::TABLE, 5);
 
         $closure = $this->getRegisteredClosure(
-            $this->createMock(RecordService::class),
+            $this->createStub(RecordService::class),
             $dataHandlerService,
             'delete',
         );
@@ -356,12 +356,12 @@ final class DynamicToolRegistrarTest extends TestCase
 
     public function testDeleteToolThrowsToolCallExceptionOnError(): void
     {
-        $dataHandlerService = $this->createMock(DataHandlerService::class);
+        $dataHandlerService = $this->createStub(DataHandlerService::class);
         $dataHandlerService->method('deleteRecord')
             ->willThrowException(new \RuntimeException('Delete failed'));
 
         $closure = $this->getRegisteredClosure(
-            $this->createMock(RecordService::class),
+            $this->createStub(RecordService::class),
             $dataHandlerService,
             'delete',
         );
@@ -375,8 +375,8 @@ final class DynamicToolRegistrarTest extends TestCase
         ?DataHandlerService $dataHandlerService = null,
     ): DynamicToolRegistrar {
         return new DynamicToolRegistrar(
-            $recordService ?? $this->createMock(RecordService::class),
-            $dataHandlerService ?? $this->createMock(DataHandlerService::class),
+            $recordService ?? $this->createStub(RecordService::class),
+            $dataHandlerService ?? $this->createStub(DataHandlerService::class),
             new TcaSchemaService(),
             new NullLogger(),
         );

@@ -37,7 +37,7 @@ final class CleanupExpiredTokensCommandTest extends TestCase
 
     public function testExecuteDeletesExpiredAuthorizations(): void
     {
-        $queryBuilder = $this->createMock(QueryBuilder::class);
+        $queryBuilder = $this->createStub(QueryBuilder::class);
         $restrictions = $this->createStub(QueryRestrictionContainerInterface::class);
         $restrictions->method('removeAll')->willReturn($restrictions);
         $queryBuilder->method('getRestrictions')->willReturn($restrictions);

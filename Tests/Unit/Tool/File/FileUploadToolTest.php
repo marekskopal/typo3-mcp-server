@@ -55,7 +55,7 @@ final class FileUploadToolTest extends TestCase
 
     public function testExecuteThrowsToolCallExceptionOnError(): void
     {
-        $fileService = $this->createMock(FileService::class);
+        $fileService = $this->createStub(FileService::class);
         $fileService->method('uploadFile')
             ->willThrowException(new \RuntimeException('Invalid base64 content'));
 

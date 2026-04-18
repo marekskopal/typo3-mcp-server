@@ -59,7 +59,7 @@ final class FileUploadFromUrlToolTest extends TestCase
 
     public function testExecuteThrowsToolCallExceptionOnError(): void
     {
-        $fileService = $this->createMock(FileService::class);
+        $fileService = $this->createStub(FileService::class);
         $fileService->method('uploadFileFromUrl')
             ->willThrowException(new \RuntimeException('Failed to download file from URL: https://example.com/missing.txt'));
 

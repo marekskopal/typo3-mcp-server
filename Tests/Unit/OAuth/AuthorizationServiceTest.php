@@ -257,7 +257,7 @@ final class AuthorizationServiceTest extends TestCase
 
         $restrictions = $this->createStub(QueryRestrictionContainerInterface::class);
 
-        $queryBuilder = $this->createMock(QueryBuilder::class);
+        $queryBuilder = $this->createStub(QueryBuilder::class);
         $queryBuilder->method('select')->willReturnSelf();
         $queryBuilder->method('from')->willReturnSelf();
         $queryBuilder->method('where')->willReturnSelf();

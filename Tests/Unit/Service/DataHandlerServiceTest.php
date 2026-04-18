@@ -14,7 +14,7 @@ final class DataHandlerServiceTest extends TestCase
 {
     public function testCreateRecordBuildsCorrectDatamap(): void
     {
-        $siteFinder = $this->createMock(SiteFinder::class);
+        $siteFinder = $this->createStub(SiteFinder::class);
         $service = new DataHandlerService($siteFinder);
 
         // We cannot easily mock GeneralUtility::makeInstance(DataHandler::class)

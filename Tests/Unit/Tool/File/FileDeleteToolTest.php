@@ -31,7 +31,7 @@ final class FileDeleteToolTest extends TestCase
 
     public function testExecuteThrowsToolCallExceptionOnError(): void
     {
-        $fileService = $this->createMock(FileService::class);
+        $fileService = $this->createStub(FileService::class);
         $fileService->method('deleteFile')
             ->willThrowException(new \RuntimeException('File not found'));
 

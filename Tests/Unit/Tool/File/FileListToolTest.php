@@ -51,7 +51,7 @@ final class FileListToolTest extends TestCase
 
     public function testExecuteThrowsToolCallExceptionOnError(): void
     {
-        $fileService = $this->createMock(FileService::class);
+        $fileService = $this->createStub(FileService::class);
         $fileService->method('listDirectory')
             ->willThrowException(new \RuntimeException('Storage not found'));
 

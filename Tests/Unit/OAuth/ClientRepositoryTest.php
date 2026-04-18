@@ -124,7 +124,7 @@ final class ClientRepositoryTest extends TestCase
 
         $expressionBuilder = $this->createStub(ExpressionBuilder::class);
 
-        $queryBuilder = $this->createMock(QueryBuilder::class);
+        $queryBuilder = $this->createStub(QueryBuilder::class);
         $queryBuilder->method('select')->willReturnSelf();
         $queryBuilder->method('from')->willReturnSelf();
         $queryBuilder->method('where')->willReturnSelf();

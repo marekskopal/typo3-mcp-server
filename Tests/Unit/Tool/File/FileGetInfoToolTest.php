@@ -42,7 +42,7 @@ final class FileGetInfoToolTest extends TestCase
 
     public function testExecuteThrowsToolCallExceptionOnError(): void
     {
-        $fileService = $this->createMock(FileService::class);
+        $fileService = $this->createStub(FileService::class);
         $fileService->method('getFileInfo')
             ->willThrowException(new \RuntimeException('File not found'));
 

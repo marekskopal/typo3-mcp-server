@@ -85,7 +85,7 @@ final class FileReferenceAddToolTest extends TestCase
 
     public function testExecuteThrowsToolCallExceptionOnError(): void
     {
-        $dataHandlerService = $this->createMock(DataHandlerService::class);
+        $dataHandlerService = $this->createStub(DataHandlerService::class);
         $dataHandlerService->method('createFileReferences')
             ->willThrowException(new \RuntimeException('DataHandler error'));
 

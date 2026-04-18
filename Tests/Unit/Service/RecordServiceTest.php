@@ -24,7 +24,7 @@ final class RecordServiceTest extends TestCase
 
         $expressionBuilder = $this->createStub(ExpressionBuilder::class);
 
-        $queryBuilder = $this->createMock(QueryBuilder::class);
+        $queryBuilder = $this->createStub(QueryBuilder::class);
         $queryBuilder->method('select')->willReturnSelf();
         $queryBuilder->method('from')->willReturnSelf();
         $queryBuilder->method('where')->willReturnSelf();
@@ -48,7 +48,7 @@ final class RecordServiceTest extends TestCase
 
         $expressionBuilder = $this->createStub(ExpressionBuilder::class);
 
-        $queryBuilder = $this->createMock(QueryBuilder::class);
+        $queryBuilder = $this->createStub(QueryBuilder::class);
         $queryBuilder->method('select')->willReturnSelf();
         $queryBuilder->method('from')->willReturnSelf();
         $queryBuilder->method('where')->willReturnSelf();
@@ -80,7 +80,7 @@ final class RecordServiceTest extends TestCase
 
         $expressionBuilder = $this->createStub(ExpressionBuilder::class);
 
-        $countQueryBuilder = $this->createMock(QueryBuilder::class);
+        $countQueryBuilder = $this->createStub(QueryBuilder::class);
         $countQueryBuilder->method('count')->willReturnSelf();
         $countQueryBuilder->method('from')->willReturnSelf();
         $countQueryBuilder->method('where')->willReturnSelf();
@@ -88,7 +88,7 @@ final class RecordServiceTest extends TestCase
         $countQueryBuilder->method('createNamedParameter')->willReturn("'0'");
         $countQueryBuilder->method('executeQuery')->willReturn($countResult);
 
-        $listQueryBuilder = $this->createMock(QueryBuilder::class);
+        $listQueryBuilder = $this->createStub(QueryBuilder::class);
         $listQueryBuilder->method('select')->willReturnSelf();
         $listQueryBuilder->method('from')->willReturnSelf();
         $listQueryBuilder->method('where')->willReturnSelf();
@@ -100,7 +100,7 @@ final class RecordServiceTest extends TestCase
         $listQueryBuilder->method('executeQuery')->willReturn($listResult);
 
         $callCount = 0;
-        $connectionPool = $this->createMock(ConnectionPool::class);
+        $connectionPool = $this->createStub(ConnectionPool::class);
         $connectionPool->method('getQueryBuilderForTable')
             ->willReturnCallback(function () use (&$callCount, $listQueryBuilder, $countQueryBuilder): QueryBuilder {
                 $callCount++;

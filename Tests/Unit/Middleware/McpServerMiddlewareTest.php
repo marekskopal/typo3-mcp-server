@@ -62,11 +62,11 @@ final class McpServerMiddlewareTest extends TestCase
         $request->method('getUri')->willReturn($uri);
         $request->method('getMethod')->willReturn('OPTIONS');
 
-        $response = $this->createMock(ResponseInterface::class);
+        $response = $this->createStub(ResponseInterface::class);
         $response->method('withHeader')->willReturnSelf();
 
         $responseFactory = $this->createStub(ResponseFactoryInterface::class);
-        $responseFactory->method('createResponse')->with(204)->willReturn($response);
+        $responseFactory->method('createResponse')->willReturn($response);
 
         $handler = $this->createMock(RequestHandlerInterface::class);
         $handler->expects(self::never())->method('handle');
@@ -93,19 +93,19 @@ final class McpServerMiddlewareTest extends TestCase
         $request = $this->createStub(ServerRequestInterface::class);
         $request->method('getUri')->willReturn($uri);
         $request->method('getMethod')->willReturn('POST');
-        $request->method('getHeaderLine')->with('Authorization')->willReturn('');
+        $request->method('getHeaderLine')->willReturn('');
         $request->method('getServerParams')->willReturn([]);
 
         $stream = $this->createStub(StreamInterface::class);
         $streamFactory = $this->createStub(StreamFactoryInterface::class);
         $streamFactory->method('createStream')->willReturn($stream);
 
-        $response = $this->createMock(ResponseInterface::class);
+        $response = $this->createStub(ResponseInterface::class);
         $response->method('withHeader')->willReturnSelf();
         $response->method('withBody')->willReturnSelf();
 
         $responseFactory = $this->createStub(ResponseFactoryInterface::class);
-        $responseFactory->method('createResponse')->with(401)->willReturn($response);
+        $responseFactory->method('createResponse')->willReturn($response);
 
         $handler = $this->createMock(RequestHandlerInterface::class);
         $handler->expects(self::never())->method('handle');
@@ -132,7 +132,7 @@ final class McpServerMiddlewareTest extends TestCase
         $request = $this->createStub(ServerRequestInterface::class);
         $request->method('getUri')->willReturn($uri);
         $request->method('getMethod')->willReturn('POST');
-        $request->method('getHeaderLine')->with('Authorization')->willReturn('Bearer invalid-token');
+        $request->method('getHeaderLine')->willReturn('Bearer invalid-token');
 
         // AuthorizationService with no matching token in DB
         $result = $this->createStub(Result::class);
@@ -140,7 +140,7 @@ final class McpServerMiddlewareTest extends TestCase
 
         $expressionBuilder = $this->createStub(ExpressionBuilder::class);
 
-        $queryBuilder = $this->createMock(QueryBuilder::class);
+        $queryBuilder = $this->createStub(QueryBuilder::class);
         $queryBuilder->method('select')->willReturnSelf();
         $queryBuilder->method('from')->willReturnSelf();
         $queryBuilder->method('where')->willReturnSelf();
@@ -164,12 +164,12 @@ final class McpServerMiddlewareTest extends TestCase
         $streamFactory = $this->createStub(StreamFactoryInterface::class);
         $streamFactory->method('createStream')->willReturn($stream);
 
-        $response = $this->createMock(ResponseInterface::class);
+        $response = $this->createStub(ResponseInterface::class);
         $response->method('withHeader')->willReturnSelf();
         $response->method('withBody')->willReturnSelf();
 
         $responseFactory = $this->createStub(ResponseFactoryInterface::class);
-        $responseFactory->method('createResponse')->with(401)->willReturn($response);
+        $responseFactory->method('createResponse')->willReturn($response);
 
         $handler = $this->createMock(RequestHandlerInterface::class);
         $handler->expects(self::never())->method('handle');
