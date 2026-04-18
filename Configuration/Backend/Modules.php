@@ -10,7 +10,7 @@ return [
         'position' => [],
         'access' => 'admin',
         'iconIdentifier' => 'module-mcp-server',
-        'labels' => 'LLL:EXT:ms_mcp_server/Resources/Private/Language/locallang.xlf:module',
+        'labels' => 'LLL:EXT:ms_mcp_server/Resources/Private/Language/locallang_mod.xlf',
         'routes' => [
             '_default' => [
                 'target' => OAuthClientController::class . '::indexAction',

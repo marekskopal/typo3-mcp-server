@@ -1,22 +1,27 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <xliff version="1.2" xmlns="urn:oasis:names:tc:xliff:document:1.2">
-    <file source-language="en" datatype="plaintext" original="messages" date="2024-01-01T00:00:00Z" product-name="ms_mcp_server">
+    <file source-language="en" target-language="de" datatype="plaintext" original="messages" date="2024-01-01T00:00:00Z" product-name="ms_mcp_server">
         <header/>
         <body>
             <trans-unit id="tx_msmcpserver_oauth_client" resname="tx_msmcpserver_oauth_client">
                 <source>OAuth Client</source>
+                <target>OAuth-Client</target>
             </trans-unit>
             <trans-unit id="tx_msmcpserver_oauth_client.client_id" resname="tx_msmcpserver_oauth_client.client_id">
                 <source>Client ID</source>
+                <target>Client-ID</target>
             </trans-unit>
             <trans-unit id="tx_msmcpserver_oauth_client.client_name" resname="tx_msmcpserver_oauth_client.client_name">
                 <source>Client Name</source>
+                <target>Client-Name</target>
             </trans-unit>
             <trans-unit id="tx_msmcpserver_oauth_client.redirect_uris" resname="tx_msmcpserver_oauth_client.redirect_uris">
                 <source>Redirect URIs</source>
+                <target>Weiterleitungs-URIs</target>
             </trans-unit>
             <trans-unit id="tx_msmcpserver_oauth_client.be_user" resname="tx_msmcpserver_oauth_client.be_user">
                 <source>Backend User</source>
+                <target>Backend-Benutzer</target>
             </trans-unit>
         </body>
     </file>
