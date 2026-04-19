@@ -4,6 +4,18 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.2.0] - 2026-04-19
+
+### Changed
+- Page and content tools now load fields dynamically from TCA instead of static field lists, matching the dynamic tool pattern
+- Create tools (`pages_create`, `content_create`) now accept a JSON `fields` parameter instead of explicit typed parameters, consistent with dynamic tools and update tools
+- Translation field names (`sys_language_uid`, `l10n_parent`, `l18n_parent`) are resolved dynamically from TCA ctrl configuration
+- Removed `final` modifier from all classes — this is a library meant to be extended by other TYPO3 extensions
+
+### Fixed
+- Fixed locallang translation files
+- Fixed extension icon
+
 ## [0.1.0] - 2026-04-18
 
 ### Added

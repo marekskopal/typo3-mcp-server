@@ -81,7 +81,7 @@ vendor/bin/typo3 mcp:cleanup
 
 ## Testing
 
-153 unit tests covering:
+185 unit tests covering:
 - All 19 static MCP tools (Pages/Content/File/Schema CRUD + error handling)
 - Dynamic tool registration and execution (DynamicToolRegistrar)
 - OAuth classes (AuthorizationService incl. revocation, ClientRepository, PkceVerifier, OAuthTokenPair)
