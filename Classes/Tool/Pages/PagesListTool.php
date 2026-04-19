@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace MarekSkopal\MsMcpServer\Tool\Pages;
 
 use MarekSkopal\MsMcpServer\Service\RecordService;
+use MarekSkopal\MsMcpServer\Service\TcaSchemaService;
 use Mcp\Capability\Attribute\McpTool;
 use Mcp\Exception\ToolCallException;
 use Psr\Log\LoggerInterface;
@@ -12,10 +13,11 @@ use const JSON_THROW_ON_ERROR;
 
 final readonly class PagesListTool
 {
-    private const array FIELDS = ['uid', 'pid', 'title', 'slug', 'doktype', 'hidden', 'sorting', 'sys_language_uid', 'l10n_parent'];
-
-    public function __construct(private RecordService $recordService, private LoggerInterface $logger,)
-    {
+    public function __construct(
+        private RecordService $recordService,
+        private TcaSchemaService $tcaSchemaService,
+        private LoggerInterface $logger,
+    ) {
     }
 
     #[McpTool(
@@ -24,15 +26,28 @@ final readonly class PagesListTool
     )]
     public function execute(int $pid = 0, int $limit = 20, int $offset = 0, int $sysLanguageUid = -1): string
     {
+        $translationConfig = $this->tcaSchemaService->getTranslationConfig('pages');
+        $fields = $this->tcaSchemaService->getListFields('pages');
+
+        $languageField = $translationConfig['languageField'];
+        if ($languageField !== null && !in_array($languageField, $fields, true)) {
+            $fields[] = $languageField;
+        }
+
+        $transOrigPointerField = $translationConfig['transOrigPointerField'];
+        if ($transOrigPointerField !== null && !in_array($transOrigPointerField, $fields, true)) {
+            $fields[] = $transOrigPointerField;
+        }
+
         try {
             $result = $this->recordService->findByPid(
                 'pages',
                 $pid,
                 $limit,
                 $offset,
-                self::FIELDS,
-                $sysLanguageUid >= 0 ? $sysLanguageUid : null,
-                $sysLanguageUid >= 0 ? 'sys_language_uid' : null,
+                $fields,
+                $sysLanguageUid >= 0 && $languageField !== null ? $sysLanguageUid : null,
+                $sysLanguageUid >= 0 ? $languageField : null,
             );
         } catch (\Throwable $e) {
             $this->logger->error('pages_list tool failed', ['exception' => $e]);

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace MarekSkopal\MsMcpServer\Tool\Pages;
 
 use MarekSkopal\MsMcpServer\Service\DataHandlerService;
+use MarekSkopal\MsMcpServer\Service\TcaSchemaService;
 use Mcp\Capability\Attribute\McpTool;
 use Mcp\Exception\ToolCallException;
 use Psr\Log\LoggerInterface;
@@ -12,22 +13,11 @@ use const JSON_THROW_ON_ERROR;
 
 final readonly class PagesUpdateTool
 {
-    private const array ALLOWED_FIELDS = [
-        'title',
-        'slug',
-        'doktype',
-        'hidden',
-        'nav_title',
-        'subtitle',
-        'abstract',
-        'description',
-        'fe_group',
-        'layout',
-        'backend_layout',
-    ];
-
-    public function __construct(private DataHandlerService $dataHandlerService, private LoggerInterface $logger,)
-    {
+    public function __construct(
+        private DataHandlerService $dataHandlerService,
+        private TcaSchemaService $tcaSchemaService,
+        private LoggerInterface $logger,
+    ) {
     }
 
     #[McpTool(
@@ -39,7 +29,8 @@ final readonly class PagesUpdateTool
         /** @var array<string, mixed> $data */
         $data = json_decode($fields, true, 512, JSON_THROW_ON_ERROR);
 
-        $filteredData = array_intersect_key($data, array_flip(self::ALLOWED_FIELDS));
+        $writableFields = $this->tcaSchemaService->getWritableFields('pages');
+        $filteredData = array_intersect_key($data, array_flip($writableFields));
         if ($filteredData === []) {
             return json_encode(['error' => 'No valid fields provided'], JSON_THROW_ON_ERROR);
         }

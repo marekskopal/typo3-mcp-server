@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace MarekSkopal\MsMcpServer\Tool\Pages;
 
 use MarekSkopal\MsMcpServer\Service\DataHandlerService;
+use MarekSkopal\MsMcpServer\Service\TcaSchemaService;
 use Mcp\Capability\Attribute\McpTool;
 use Mcp\Exception\ToolCallException;
 use Psr\Log\LoggerInterface;
@@ -12,51 +13,33 @@ use const JSON_THROW_ON_ERROR;
 
 final readonly class PagesCreateTool
 {
-    public function __construct(private DataHandlerService $dataHandlerService, private LoggerInterface $logger,)
-    {
+    public function __construct(
+        private DataHandlerService $dataHandlerService,
+        private TcaSchemaService $tcaSchemaService,
+        private LoggerInterface $logger,
+    ) {
     }
 
-    #[McpTool(name: 'pages_create', description: 'Create a new page in the TYPO3 page tree.')]
-    public function execute(
-        string $title,
-        int $pid = 0,
-        int $doktype = 1,
-        bool $hidden = false,
-        string $slug = '',
-        string $navTitle = '',
-        string $subtitle = '',
-        string $abstract = '',
-    ): string {
-        $fields = [
-            'title' => $title,
-            'doktype' => $doktype,
-            'hidden' => $hidden ? 1 : 0,
-        ];
+    #[McpTool(name: 'pages_create', description: 'Create a new page in the TYPO3 page tree. Pass fields as a JSON object string.')]
+    public function execute(int $pid, string $fields): string
+    {
+        /** @var array<string, mixed> $data */
+        $data = json_decode($fields, true, 512, JSON_THROW_ON_ERROR);
 
-        if ($slug !== '') {
-            $fields['slug'] = $slug;
-        }
-
-        if ($navTitle !== '') {
-            $fields['nav_title'] = $navTitle;
-        }
-
-        if ($subtitle !== '') {
-            $fields['subtitle'] = $subtitle;
-        }
-
-        if ($abstract !== '') {
-            $fields['abstract'] = $abstract;
+        $writableFields = $this->tcaSchemaService->getWritableFields('pages');
+        $filteredData = array_intersect_key($data, array_flip($writableFields));
+        if ($filteredData === []) {
+            return json_encode(['error' => 'No valid fields provided'], JSON_THROW_ON_ERROR);
         }
 
         try {
-            $uid = $this->dataHandlerService->createRecord('pages', $pid, $fields);
+            $uid = $this->dataHandlerService->createRecord('pages', $pid, $filteredData);
         } catch (\Throwable $e) {
             $this->logger->error('pages_create tool failed', ['exception' => $e]);
 
             throw new ToolCallException($e->getMessage(), (int) $e->getCode(), $e);
         }
 
-        return json_encode(['uid' => $uid, 'title' => $title], JSON_THROW_ON_ERROR);
+        return json_encode(['uid' => $uid], JSON_THROW_ON_ERROR);
     }
 }

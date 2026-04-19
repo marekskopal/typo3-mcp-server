@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace MarekSkopal\MsMcpServer\Tests\Unit\Tool\Pages;
 
 use MarekSkopal\MsMcpServer\Service\RecordService;
+use MarekSkopal\MsMcpServer\Service\TcaSchemaService;
 use MarekSkopal\MsMcpServer\Tool\Pages\PagesListTool;
 use Mcp\Exception\ToolCallException;
 use PHPUnit\Framework\Attributes\CoversClass;
@@ -15,7 +16,30 @@ use const JSON_THROW_ON_ERROR;
 #[CoversClass(PagesListTool::class)]
 final class PagesListToolTest extends TestCase
 {
-    public function testExecuteCallsRecordServiceWithCorrectTableAndFields(): void
+    protected function setUp(): void
+    {
+        $GLOBALS['TCA']['pages'] = [
+            'ctrl' => [
+                'label' => 'title',
+                'languageField' => 'sys_language_uid',
+                'transOrigPointerField' => 'l10n_parent',
+                'enablecolumns' => ['disabled' => 'hidden'],
+            ],
+            'columns' => [
+                'title' => ['config' => ['type' => 'input']],
+                'slug' => ['config' => ['type' => 'slug']],
+                'doktype' => ['config' => ['type' => 'select']],
+                'hidden' => ['config' => ['type' => 'check']],
+            ],
+        ];
+    }
+
+    protected function tearDown(): void
+    {
+        unset($GLOBALS['TCA']['pages']);
+    }
+
+    public function testExecuteCallsRecordServiceWithTcaDerivedFields(): void
     {
         $expectedResult = [
             'records' => [['uid' => 1, 'title' => 'Root Page']],
@@ -30,11 +54,11 @@ final class PagesListToolTest extends TestCase
                 0,
                 20,
                 0,
-                ['uid', 'pid', 'title', 'slug', 'doktype', 'hidden', 'sorting', 'sys_language_uid', 'l10n_parent'],
+                ['uid', 'pid', 'title', 'hidden', 'sys_language_uid', 'l10n_parent'],
             )
             ->willReturn($expectedResult);
 
-        $tool = new PagesListTool($recordService, new NullLogger());
+        $tool = new PagesListTool($recordService, new TcaSchemaService(), new NullLogger());
         $result = json_decode($tool->execute(), true, 512, JSON_THROW_ON_ERROR);
 
         self::assertSame(1, $result['total']);
@@ -55,7 +79,7 @@ final class PagesListToolTest extends TestCase
             )
             ->willReturn(['records' => [], 'total' => 0]);
 
-        $tool = new PagesListTool($recordService, new NullLogger());
+        $tool = new PagesListTool($recordService, new TcaSchemaService(), new NullLogger());
         $tool->execute(5, 10, 30);
     }
 
@@ -75,7 +99,7 @@ final class PagesListToolTest extends TestCase
             )
             ->willReturn(['records' => [], 'total' => 0]);
 
-        $tool = new PagesListTool($recordService, new NullLogger());
+        $tool = new PagesListTool($recordService, new TcaSchemaService(), new NullLogger());
         $tool->execute(0, 20, 0, 0);
     }
 
@@ -86,7 +110,7 @@ final class PagesListToolTest extends TestCase
             ->method('findByPid')
             ->willThrowException(new \RuntimeException('Database error'));
 
-        $tool = new PagesListTool($recordService, new NullLogger());
+        $tool = new PagesListTool($recordService, new TcaSchemaService(), new NullLogger());
 
         $this->expectException(ToolCallException::class);
         $this->expectExceptionMessage('Database error');

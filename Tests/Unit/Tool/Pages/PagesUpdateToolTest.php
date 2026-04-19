@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace MarekSkopal\MsMcpServer\Tests\Unit\Tool\Pages;
 
 use MarekSkopal\MsMcpServer\Service\DataHandlerService;
+use MarekSkopal\MsMcpServer\Service\TcaSchemaService;
 use MarekSkopal\MsMcpServer\Tool\Pages\PagesUpdateTool;
 use Mcp\Exception\ToolCallException;
 use PHPUnit\Framework\Attributes\CoversClass;
@@ -15,6 +16,28 @@ use const JSON_THROW_ON_ERROR;
 #[CoversClass(PagesUpdateTool::class)]
 final class PagesUpdateToolTest extends TestCase
 {
+    protected function setUp(): void
+    {
+        $GLOBALS['TCA']['pages'] = [
+            'ctrl' => [
+                'label' => 'title',
+                'enablecolumns' => ['disabled' => 'hidden'],
+            ],
+            'columns' => [
+                'title' => ['config' => ['type' => 'input']],
+                'slug' => ['config' => ['type' => 'slug']],
+                'doktype' => ['config' => ['type' => 'select']],
+                'hidden' => ['config' => ['type' => 'check']],
+                'nav_title' => ['config' => ['type' => 'input']],
+            ],
+        ];
+    }
+
+    protected function tearDown(): void
+    {
+        unset($GLOBALS['TCA']['pages']);
+    }
+
     public function testExecuteUpdatesWithValidFields(): void
     {
         $dataHandlerService = $this->createMock(DataHandlerService::class);
@@ -26,7 +49,7 @@ final class PagesUpdateToolTest extends TestCase
                 ['title' => 'New Title', 'slug' => '/new'],
             );
 
-        $tool = new PagesUpdateTool($dataHandlerService, new NullLogger());
+        $tool = new PagesUpdateTool($dataHandlerService, new TcaSchemaService(), new NullLogger());
         $result = json_decode(
             $tool->execute(42, json_encode(['title' => 'New Title', 'slug' => '/new'], JSON_THROW_ON_ERROR)),
             true,
@@ -49,7 +72,7 @@ final class PagesUpdateToolTest extends TestCase
                 ['title' => 'T'],
             );
 
-        $tool = new PagesUpdateTool($dataHandlerService, new NullLogger());
+        $tool = new PagesUpdateTool($dataHandlerService, new TcaSchemaService(), new NullLogger());
         $result = json_decode(
             $tool->execute(10, json_encode(['title' => 'T', 'invalid_field' => 'x'], JSON_THROW_ON_ERROR)),
             true,
@@ -67,7 +90,7 @@ final class PagesUpdateToolTest extends TestCase
         $dataHandlerService->expects(self::never())
             ->method('updateRecord');
 
-        $tool = new PagesUpdateTool($dataHandlerService, new NullLogger());
+        $tool = new PagesUpdateTool($dataHandlerService, new TcaSchemaService(), new NullLogger());
         $result = json_decode(
             $tool->execute(1, json_encode(['bad_field' => 'x'], JSON_THROW_ON_ERROR)),
             true,
@@ -85,7 +108,7 @@ final class PagesUpdateToolTest extends TestCase
             ->method('updateRecord')
             ->willThrowException(new \RuntimeException('DataHandler error'));
 
-        $tool = new PagesUpdateTool($dataHandlerService, new NullLogger());
+        $tool = new PagesUpdateTool($dataHandlerService, new TcaSchemaService(), new NullLogger());
 
         $this->expectException(ToolCallException::class);
         $this->expectExceptionMessage('DataHandler error');

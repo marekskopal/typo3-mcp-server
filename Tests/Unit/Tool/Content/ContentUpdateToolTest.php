@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace MarekSkopal\MsMcpServer\Tests\Unit\Tool\Content;
 
 use MarekSkopal\MsMcpServer\Service\DataHandlerService;
+use MarekSkopal\MsMcpServer\Service\TcaSchemaService;
 use MarekSkopal\MsMcpServer\Tool\Content\ContentUpdateTool;
 use Mcp\Exception\ToolCallException;
 use PHPUnit\Framework\Attributes\CoversClass;
@@ -15,6 +16,33 @@ use const JSON_THROW_ON_ERROR;
 #[CoversClass(ContentUpdateTool::class)]
 final class ContentUpdateToolTest extends TestCase
 {
+    protected function setUp(): void
+    {
+        $GLOBALS['TCA']['tt_content'] = [
+            'ctrl' => [
+                'label' => 'header',
+                'enablecolumns' => ['disabled' => 'hidden'],
+            ],
+            'columns' => [
+                'header' => ['config' => ['type' => 'input']],
+                'header_layout' => ['config' => ['type' => 'select']],
+                'CType' => ['config' => ['type' => 'select']],
+                'bodytext' => ['config' => ['type' => 'text']],
+                'hidden' => ['config' => ['type' => 'check']],
+                'colPos' => ['config' => ['type' => 'select']],
+                'fe_group' => ['config' => ['type' => 'select']],
+                'subheader' => ['config' => ['type' => 'input']],
+                'list_type' => ['config' => ['type' => 'select']],
+                'pi_flexform' => ['config' => ['type' => 'text']],
+            ],
+        ];
+    }
+
+    protected function tearDown(): void
+    {
+        unset($GLOBALS['TCA']['tt_content']);
+    }
+
     public function testExecuteUpdatesWithValidFields(): void
     {
         $dataHandlerService = $this->createMock(DataHandlerService::class);
@@ -29,7 +57,7 @@ final class ContentUpdateToolTest extends TestCase
                 ],
             );
 
-        $tool = new ContentUpdateTool($dataHandlerService, new NullLogger());
+        $tool = new ContentUpdateTool($dataHandlerService, new TcaSchemaService(), new NullLogger());
         $fields = json_encode(['header' => 'Updated Header', 'bodytext' => 'Updated Body'], JSON_THROW_ON_ERROR);
         $result = json_decode($tool->execute(42, $fields), true, 512, JSON_THROW_ON_ERROR);
 
@@ -50,7 +78,7 @@ final class ContentUpdateToolTest extends TestCase
                 ],
             );
 
-        $tool = new ContentUpdateTool($dataHandlerService, new NullLogger());
+        $tool = new ContentUpdateTool($dataHandlerService, new TcaSchemaService(), new NullLogger());
         $fields = json_encode(['header' => 'Valid', 'invalid_field' => 'Ignored', 'uid' => 999], JSON_THROW_ON_ERROR);
         $result = json_decode($tool->execute(10, $fields), true, 512, JSON_THROW_ON_ERROR);
 
@@ -64,7 +92,7 @@ final class ContentUpdateToolTest extends TestCase
         $dataHandlerService->expects(self::never())
             ->method('updateRecord');
 
-        $tool = new ContentUpdateTool($dataHandlerService, new NullLogger());
+        $tool = new ContentUpdateTool($dataHandlerService, new TcaSchemaService(), new NullLogger());
         $fields = json_encode(['invalid_field' => 'value', 'another_bad' => 'value'], JSON_THROW_ON_ERROR);
         $result = json_decode($tool->execute(10, $fields), true, 512, JSON_THROW_ON_ERROR);
 
@@ -85,7 +113,7 @@ final class ContentUpdateToolTest extends TestCase
                 ],
             );
 
-        $tool = new ContentUpdateTool($dataHandlerService, new NullLogger());
+        $tool = new ContentUpdateTool($dataHandlerService, new TcaSchemaService(), new NullLogger());
         $fields = json_encode(
             ['list_type' => 'news_pi1', 'pi_flexform' => '<xml>config</xml>'],
             JSON_THROW_ON_ERROR,
@@ -103,7 +131,7 @@ final class ContentUpdateToolTest extends TestCase
             ->method('updateRecord')
             ->willThrowException(new \RuntimeException('DataHandler error'));
 
-        $tool = new ContentUpdateTool($dataHandlerService, new NullLogger());
+        $tool = new ContentUpdateTool($dataHandlerService, new TcaSchemaService(), new NullLogger());
 
         $this->expectException(ToolCallException::class);
         $this->expectExceptionMessage('DataHandler error');

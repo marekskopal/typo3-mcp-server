@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace MarekSkopal\MsMcpServer\Tool\Content;
 
 use MarekSkopal\MsMcpServer\Service\DataHandlerService;
+use MarekSkopal\MsMcpServer\Service\TcaSchemaService;
 use Mcp\Capability\Attribute\McpTool;
 use Mcp\Exception\ToolCallException;
 use Psr\Log\LoggerInterface;
@@ -12,47 +13,33 @@ use const JSON_THROW_ON_ERROR;
 
 final readonly class ContentCreateTool
 {
-    public function __construct(private DataHandlerService $dataHandlerService, private LoggerInterface $logger,)
-    {
+    public function __construct(
+        private DataHandlerService $dataHandlerService,
+        private TcaSchemaService $tcaSchemaService,
+        private LoggerInterface $logger,
+    ) {
     }
 
-    #[McpTool(name: 'content_create', description: 'Create a new content element on a page.')]
-    public function execute(
-        int $pid,
-        string $cType = 'text',
-        string $header = '',
-        string $bodytext = '',
-        int $colPos = 0,
-        bool $hidden = false,
-        int $sysLanguageUid = 0,
-        string $listType = '',
-        string $piFlexform = '',
-    ): string {
-        $fields = [
-            'CType' => $cType,
-            'header' => $header,
-            'bodytext' => $bodytext,
-            'colPos' => $colPos,
-            'hidden' => $hidden ? 1 : 0,
-            'sys_language_uid' => $sysLanguageUid,
-        ];
+    #[McpTool(name: 'content_create', description: 'Create a new content element on a page. Pass fields as a JSON object string.')]
+    public function execute(int $pid, string $fields): string
+    {
+        /** @var array<string, mixed> $data */
+        $data = json_decode($fields, true, 512, JSON_THROW_ON_ERROR);
 
-        if ($listType !== '') {
-            $fields['list_type'] = $listType;
-        }
-
-        if ($piFlexform !== '') {
-            $fields['pi_flexform'] = $piFlexform;
+        $writableFields = $this->tcaSchemaService->getWritableFields('tt_content');
+        $filteredData = array_intersect_key($data, array_flip($writableFields));
+        if ($filteredData === []) {
+            return json_encode(['error' => 'No valid fields provided'], JSON_THROW_ON_ERROR);
         }
 
         try {
-            $uid = $this->dataHandlerService->createRecord('tt_content', $pid, $fields);
+            $uid = $this->dataHandlerService->createRecord('tt_content', $pid, $filteredData);
         } catch (\Throwable $e) {
             $this->logger->error('content_create tool failed', ['exception' => $e]);
 
             throw new ToolCallException($e->getMessage(), (int) $e->getCode(), $e);
         }
 
-        return json_encode(['uid' => $uid, 'CType' => $cType, 'header' => $header], JSON_THROW_ON_ERROR);
+        return json_encode(['uid' => $uid], JSON_THROW_ON_ERROR);
     }
 }

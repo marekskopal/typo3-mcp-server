@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace MarekSkopal\MsMcpServer\Tool\Pages;
 
 use MarekSkopal\MsMcpServer\Service\RecordService;
+use MarekSkopal\MsMcpServer\Service\TcaSchemaService;
 use Mcp\Capability\Attribute\McpTool;
 use Mcp\Exception\ToolCallException;
 use Psr\Log\LoggerInterface;
@@ -12,14 +13,15 @@ use const JSON_THROW_ON_ERROR;
 
 final readonly class PageTreeTool
 {
-    private const array FIELDS = ['uid', 'pid', 'title', 'slug', 'doktype', 'hidden', 'sorting', 'sys_language_uid'];
-
     private const int MAX_DEPTH = 10;
 
     private const int MAX_NODES = 500;
 
-    public function __construct(private RecordService $recordService, private LoggerInterface $logger)
-    {
+    public function __construct(
+        private RecordService $recordService,
+        private TcaSchemaService $tcaSchemaService,
+        private LoggerInterface $logger,
+    ) {
     }
 
     #[McpTool(
@@ -30,9 +32,22 @@ final readonly class PageTreeTool
     {
         $depth = min(max($depth, 1), self::MAX_DEPTH);
 
+        $translationConfig = $this->tcaSchemaService->getTranslationConfig('pages');
+        $fields = $this->tcaSchemaService->getListFields('pages');
+
+        $languageField = $translationConfig['languageField'];
+        if ($languageField !== null && !in_array($languageField, $fields, true)) {
+            $fields[] = $languageField;
+        }
+
+        $transOrigPointerField = $translationConfig['transOrigPointerField'];
+        if ($transOrigPointerField !== null && !in_array($transOrigPointerField, $fields, true)) {
+            $fields[] = $transOrigPointerField;
+        }
+
         try {
             $nodeCount = 0;
-            $tree = $this->buildTree($pid, $depth, $nodeCount);
+            $tree = $this->buildTree($pid, $depth, $nodeCount, $fields);
         } catch (\Throwable $e) {
             $this->logger->error('pages_tree tool failed', ['exception' => $e]);
 
@@ -42,14 +57,17 @@ final readonly class PageTreeTool
         return json_encode(['tree' => $tree, 'totalNodes' => $nodeCount], JSON_THROW_ON_ERROR);
     }
 
-    /** @return list<array<string, mixed>> */
-    private function buildTree(int $pid, int $remainingDepth, int &$nodeCount): array
+    /**
+     * @param list<string> $fields
+     * @return list<array<string, mixed>>
+     */
+    private function buildTree(int $pid, int $remainingDepth, int &$nodeCount, array $fields): array
     {
         if ($remainingDepth <= 0 || $nodeCount >= self::MAX_NODES) {
             return [];
         }
 
-        $result = $this->recordService->findByPid('pages', $pid, self::MAX_NODES, 0, self::FIELDS);
+        $result = $this->recordService->findByPid('pages', $pid, self::MAX_NODES, 0, $fields);
 
         $tree = [];
         /** @var array<string, mixed> $page */
@@ -62,7 +80,7 @@ final readonly class PageTreeTool
 
             /** @var int $uid */
             $uid = $page['uid'];
-            $page['children'] = $this->buildTree($uid, $remainingDepth - 1, $nodeCount);
+            $page['children'] = $this->buildTree($uid, $remainingDepth - 1, $nodeCount, $fields);
             $tree[] = $page;
         }
 

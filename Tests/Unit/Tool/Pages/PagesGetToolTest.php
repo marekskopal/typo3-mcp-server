@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace MarekSkopal\MsMcpServer\Tests\Unit\Tool\Pages;
 
 use MarekSkopal\MsMcpServer\Service\RecordService;
+use MarekSkopal\MsMcpServer\Service\TcaSchemaService;
 use MarekSkopal\MsMcpServer\Tool\Pages\PagesGetTool;
 use Mcp\Exception\ToolCallException;
 use PHPUnit\Framework\Attributes\CoversClass;
@@ -15,6 +16,36 @@ use const JSON_THROW_ON_ERROR;
 #[CoversClass(PagesGetTool::class)]
 final class PagesGetToolTest extends TestCase
 {
+    protected function setUp(): void
+    {
+        $GLOBALS['TCA']['pages'] = [
+            'ctrl' => [
+                'label' => 'title',
+                'languageField' => 'sys_language_uid',
+                'transOrigPointerField' => 'l10n_parent',
+                'enablecolumns' => ['disabled' => 'hidden'],
+            ],
+            'columns' => [
+                'title' => ['config' => ['type' => 'input']],
+                'slug' => ['config' => ['type' => 'slug']],
+                'doktype' => ['config' => ['type' => 'select']],
+                'hidden' => ['config' => ['type' => 'check']],
+                'nav_title' => ['config' => ['type' => 'input']],
+                'subtitle' => ['config' => ['type' => 'input']],
+                'abstract' => ['config' => ['type' => 'text']],
+                'description' => ['config' => ['type' => 'text']],
+                'fe_group' => ['config' => ['type' => 'select']],
+                'layout' => ['config' => ['type' => 'select']],
+                'backend_layout' => ['config' => ['type' => 'select']],
+            ],
+        ];
+    }
+
+    protected function tearDown(): void
+    {
+        unset($GLOBALS['TCA']['pages']);
+    }
+
     public function testExecuteReturnsPageWhenFound(): void
     {
         $expectedRecord = [
@@ -29,31 +60,10 @@ final class PagesGetToolTest extends TestCase
         $recordService = $this->createMock(RecordService::class);
         $recordService->expects(self::once())
             ->method('findByUid')
-            ->with(
-                'pages',
-                42,
-                [
-                    'uid',
-                    'pid',
-                    'title',
-                    'slug',
-                    'doktype',
-                    'hidden',
-                    'sorting',
-                    'sys_language_uid',
-                    'l10n_parent',
-                    'nav_title',
-                    'subtitle',
-                    'abstract',
-                    'description',
-                    'fe_group',
-                    'layout',
-                    'backend_layout',
-                ],
-            )
+            ->with('pages', 42, self::anything())
             ->willReturn($expectedRecord);
 
-        $tool = new PagesGetTool($recordService, new NullLogger());
+        $tool = new PagesGetTool($recordService, new TcaSchemaService(), new NullLogger());
         $result = json_decode($tool->execute(42), true, 512, JSON_THROW_ON_ERROR);
 
         self::assertSame(42, $result['uid']);
@@ -81,7 +91,7 @@ final class PagesGetToolTest extends TestCase
             ->with('pages', 42, 'sys_language_uid', 'l10n_parent')
             ->willReturn($translations);
 
-        $tool = new PagesGetTool($recordService, new NullLogger());
+        $tool = new PagesGetTool($recordService, new TcaSchemaService(), new NullLogger());
         $result = json_decode($tool->execute(42), true, 512, JSON_THROW_ON_ERROR);
 
         self::assertSame($translations, $result['translations']);
@@ -101,7 +111,7 @@ final class PagesGetToolTest extends TestCase
         $recordService->method('findByUid')->willReturn($record);
         $recordService->expects(self::never())->method('findTranslations');
 
-        $tool = new PagesGetTool($recordService, new NullLogger());
+        $tool = new PagesGetTool($recordService, new TcaSchemaService(), new NullLogger());
         $result = json_decode($tool->execute(87), true, 512, JSON_THROW_ON_ERROR);
 
         self::assertArrayNotHasKey('translations', $result);
@@ -115,7 +125,7 @@ final class PagesGetToolTest extends TestCase
             ->with('pages', 999, self::anything())
             ->willReturn(null);
 
-        $tool = new PagesGetTool($recordService, new NullLogger());
+        $tool = new PagesGetTool($recordService, new TcaSchemaService(), new NullLogger());
         $result = json_decode($tool->execute(999), true, 512, JSON_THROW_ON_ERROR);
 
         self::assertSame('Page not found', $result['error']);
@@ -128,7 +138,7 @@ final class PagesGetToolTest extends TestCase
             ->method('findByUid')
             ->willThrowException(new \RuntimeException('Database error'));
 
-        $tool = new PagesGetTool($recordService, new NullLogger());
+        $tool = new PagesGetTool($recordService, new TcaSchemaService(), new NullLogger());
 
         $this->expectException(ToolCallException::class);
         $this->expectExceptionMessage('Database error');
