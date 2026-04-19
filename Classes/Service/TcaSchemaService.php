@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace MarekSkopal\MsMcpServer\Service;
 
-final readonly class TcaSchemaService
+readonly class TcaSchemaService
 {
     /** TCA types that store simple scalar values readable/writable via DataHandler. */
     private const array VALUE_TYPES = [

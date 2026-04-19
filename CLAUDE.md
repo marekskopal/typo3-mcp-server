@@ -73,7 +73,7 @@ vendor/bin/typo3 mcp:cleanup
 - PHP 8.3+ with `declare(strict_types=1)`
 - PHPStan at level **max** with bleeding edge, strict checks, and `checkImplicitMixed: true`
 - PHPCS with SlevomatCodingStandard (140 char line limit)
-- All classes are `final readonly` where possible
+- Classes are `readonly` where possible — do **not** use `final` (this is a library meant to be extended)
 - Supports TYPO3 v13.4 and v14.x
 - Tool descriptions use `#[McpTool]` attributes from MCP SDK
 - All tools wrap service calls in try/catch, log errors via `LoggerInterface`, and throw `ToolCallException`
@@ -89,4 +89,4 @@ vendor/bin/typo3 mcp:cleanup
 - Services (RecordService, DataHandlerService, FileService, TcaSchemaService)
 - CleanupExpiredTokensCommand
 
-Final classes cannot be mocked with PHPUnit — tests construct real instances with mocked dependencies. `RecordService` and `DataHandlerService` are `readonly` (not `final`) and can be mocked directly. Use `createStub()` (not `createMock()`) when no `expects()` is configured.
+Classes are not `final`, so they can be mocked with PHPUnit. Use `createStub()` (not `createMock()`) when no `expects()` is configured. `TcaSchemaService` is instantiated directly in tests with `$GLOBALS['TCA']` set up in `setUp()`.

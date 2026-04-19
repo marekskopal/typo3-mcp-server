@@ -23,7 +23,7 @@ use const JSON_THROW_ON_ERROR;
  *
  * This implementation uses a $loaded flag instead.
  */
-final class InitializedSession implements SessionInterface
+class InitializedSession implements SessionInterface
 {
     private bool $loaded = false;
 

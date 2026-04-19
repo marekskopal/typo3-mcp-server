@@ -16,7 +16,7 @@ use Psr\Http\Server\MiddlewareInterface;
 use Psr\Http\Server\RequestHandlerInterface;
 use const JSON_THROW_ON_ERROR;
 
-final readonly class McpServerMiddleware implements MiddlewareInterface
+readonly class McpServerMiddleware implements MiddlewareInterface
 {
     private const string MCP_PATH = '/mcp';
 

@@ -10,7 +10,7 @@ use Mcp\Exception\ToolCallException;
 use Psr\Log\LoggerInterface;
 use const JSON_THROW_ON_ERROR;
 
-final readonly class DirectoryDeleteTool
+readonly class DirectoryDeleteTool
 {
     public function __construct(private FileService $fileService, private LoggerInterface $logger)
     {

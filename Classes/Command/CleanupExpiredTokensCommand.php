@@ -15,7 +15,7 @@ use TYPO3\CMS\Core\Core\Environment;
 use TYPO3\CMS\Core\Database\ConnectionPool;
 
 #[AsCommand(name: 'mcp:cleanup', description: 'Remove expired and revoked OAuth authorizations and stale MCP session files')]
-final class CleanupExpiredTokensCommand extends Command
+class CleanupExpiredTokensCommand extends Command
 {
     private const string AUTHORIZATION_TABLE = 'tx_msmcpserver_oauth_authorization';
 

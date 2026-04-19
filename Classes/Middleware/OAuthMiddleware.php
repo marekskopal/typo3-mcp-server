@@ -18,7 +18,7 @@ use TYPO3\CMS\Core\Database\ConnectionPool;
 use const ENT_QUOTES;
 use const JSON_THROW_ON_ERROR;
 
-final readonly class OAuthMiddleware implements MiddlewareInterface
+readonly class OAuthMiddleware implements MiddlewareInterface
 {
     private const string METADATA_PATH = '/.well-known/oauth-authorization-server';
 

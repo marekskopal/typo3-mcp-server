@@ -11,7 +11,7 @@ use Mcp\Exception\ToolCallException;
 use Psr\Log\LoggerInterface;
 use const JSON_THROW_ON_ERROR;
 
-final readonly class ContentListTool
+readonly class ContentListTool
 {
     public function __construct(
         private RecordService $recordService,

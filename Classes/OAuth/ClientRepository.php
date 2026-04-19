@@ -8,7 +8,7 @@ use Doctrine\DBAL\ParameterType;
 use TYPO3\CMS\Core\Database\ConnectionPool;
 use const JSON_THROW_ON_ERROR;
 
-final readonly class ClientRepository
+readonly class ClientRepository
 {
     private const string TABLE = 'tx_msmcpserver_oauth_client';
 

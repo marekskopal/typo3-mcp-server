@@ -10,7 +10,7 @@ use Mcp\Exception\ToolCallException;
 use Psr\Log\LoggerInterface;
 use const JSON_THROW_ON_ERROR;
 
-final readonly class SiteLanguagesTool
+readonly class SiteLanguagesTool
 {
     public function __construct(private SiteLanguageService $siteLanguageService, private LoggerInterface $logger,)
     {

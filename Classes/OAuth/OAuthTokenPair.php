@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace MarekSkopal\MsMcpServer\OAuth;
 
-final readonly class OAuthTokenPair
+readonly class OAuthTokenPair
 {
     public function __construct(
         public string $accessToken,

@@ -19,7 +19,7 @@ use const STDIN;
 use const STDOUT;
 
 #[AsCommand(name: 'mcp:server', description: 'Start the MCP server using stdio transport for local AI tool integration')]
-final class McpServerCommand extends Command
+class McpServerCommand extends Command
 {
     public function __construct(
         private readonly ConnectionPool $connectionPool,

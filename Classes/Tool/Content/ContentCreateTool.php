@@ -11,7 +11,7 @@ use Mcp\Exception\ToolCallException;
 use Psr\Log\LoggerInterface;
 use const JSON_THROW_ON_ERROR;
 
-final readonly class ContentCreateTool
+readonly class ContentCreateTool
 {
     public function __construct(
         private DataHandlerService $dataHandlerService,

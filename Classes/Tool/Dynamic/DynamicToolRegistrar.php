@@ -12,7 +12,7 @@ use Mcp\Server\Builder;
 use Psr\Log\LoggerInterface;
 use const JSON_THROW_ON_ERROR;
 
-final readonly class DynamicToolRegistrar
+readonly class DynamicToolRegistrar
 {
     public function __construct(
         private RecordService $recordService,

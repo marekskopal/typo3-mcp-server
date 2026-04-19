@@ -7,7 +7,7 @@ namespace MarekSkopal\MsMcpServer\OAuth;
 use TYPO3\CMS\Core\Configuration\ExtensionConfiguration;
 use TYPO3\CMS\Core\Database\ConnectionPool;
 
-final readonly class AuthorizationService
+readonly class AuthorizationService
 {
     private const string TABLE = 'tx_msmcpserver_oauth_authorization';
 

@@ -7,7 +7,7 @@ namespace MarekSkopal\MsMcpServer\Service;
 use TYPO3\CMS\Core\Site\Entity\SiteLanguage;
 use TYPO3\CMS\Core\Site\SiteFinder;
 
-final readonly class SiteLanguageService
+readonly class SiteLanguageService
 {
     public function __construct(private SiteFinder $siteFinder)
     {

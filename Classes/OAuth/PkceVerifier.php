@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace MarekSkopal\MsMcpServer\OAuth;
 
-final readonly class PkceVerifier
+readonly class PkceVerifier
 {
     public function verify(string $codeVerifier, string $codeChallenge): bool
     {

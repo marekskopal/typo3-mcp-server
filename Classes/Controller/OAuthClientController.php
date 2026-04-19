@@ -18,7 +18,7 @@ use TYPO3\CMS\Core\Type\ContextualFeedbackSeverity;
 use const JSON_THROW_ON_ERROR;
 
 #[AsController]
-final readonly class OAuthClientController
+readonly class OAuthClientController
 {
     private const string TABLE = 'tx_msmcpserver_oauth_client';
 
