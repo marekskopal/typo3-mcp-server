@@ -535,14 +535,7 @@ readonly class TcaSchemaService
             }
         }
 
-        $enableColumns = $ctrl['enablecolumns'] ?? [];
-        if (is_array($enableColumns)) {
-            foreach ($enableColumns as $value) {
-                if (is_string($value) && $value !== '') {
-                    $systemFields[] = $value;
-                }
-            }
-        }
+        // enablecolumns (hidden, starttime, endtime, fe_group) are user-editable, not system fields
 
         // l10n_diffsource is always a system field
         $systemFields[] = 'l10n_diffsource';

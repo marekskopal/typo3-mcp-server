@@ -281,11 +281,39 @@ final class TcaSchemaServiceTest extends TestCase
         self::assertNotContains('sorting', $fields);
         self::assertNotContains('sys_language_uid', $fields);
         self::assertNotContains('l10n_parent', $fields);
-        self::assertNotContains('hidden', $fields);
-        self::assertNotContains('starttime', $fields);
-        self::assertNotContains('endtime', $fields);
-        self::assertNotContains('fe_group', $fields);
+        // enablecolumns are user-editable, not system fields
+        self::assertContains('hidden', $fields);
+        self::assertContains('starttime', $fields);
+        self::assertContains('endtime', $fields);
+        self::assertContains('fe_group', $fields);
+        // l10n_diffsource is passthrough type, excluded by type check
         self::assertNotContains('l10n_diffsource', $fields);
+    }
+
+    public function testGetWritableFieldsIncludesEnableColumns(): void
+    {
+        $GLOBALS['TCA']['tx_test'] = [
+            'ctrl' => [
+                'enablecolumns' => [
+                    'disabled' => 'hidden',
+                    'starttime' => 'starttime',
+                    'endtime' => 'endtime',
+                ],
+            ],
+            'columns' => [
+                'title' => ['config' => ['type' => 'input']],
+                'hidden' => ['config' => ['type' => 'check']],
+                'starttime' => ['config' => ['type' => 'datetime']],
+                'endtime' => ['config' => ['type' => 'datetime']],
+            ],
+        ];
+
+        $fields = $this->service->getWritableFields('tx_test');
+
+        self::assertContains('title', $fields);
+        self::assertContains('hidden', $fields);
+        self::assertContains('starttime', $fields);
+        self::assertContains('endtime', $fields);
     }
 
     public function testGetWritableFieldsExcludesReadOnlyFields(): void
