@@ -16,6 +16,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 - CORS headers missing on authenticated MCP responses — browser-based MCP clients now work correctly
 - OAuth client `crdate` always showing 1970-01-01 — both `ClientRepository` and `OAuthClientController` now set `crdate`/`tstamp` on insert
 - PHPUnit notices caused by using `createMock()` instead of `createStub()` where no expectations were configured
+- `pages_update` ignoring `hidden`, `starttime`, `endtime`, and `fe_group` fields — enablecolumns are no longer treated as system fields
+- Translated pages invisible to `pages_get`, `pages_list`, and other read operations — query restrictions now removed for backend-context queries
+
 
 ## [0.2.0] - 2026-04-19
 
