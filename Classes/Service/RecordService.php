@@ -20,6 +20,7 @@ readonly class RecordService
     public function findByUid(string $table, int $uid, array $fields): ?array
     {
         $queryBuilder = $this->connectionPool->getQueryBuilderForTable($table);
+        $queryBuilder->getRestrictions()->removeAll();
 
         $row = $queryBuilder
             ->select(...$fields)
@@ -47,8 +48,10 @@ readonly class RecordService
         $limit = min(max($limit, 1), 500);
 
         $queryBuilder = $this->connectionPool->getQueryBuilderForTable($table);
+        $queryBuilder->getRestrictions()->removeAll();
 
         $countQueryBuilder = $this->connectionPool->getQueryBuilderForTable($table);
+        $countQueryBuilder->getRestrictions()->removeAll();
         $countQueryBuilder
             ->count('uid')
             ->from($table)
@@ -97,7 +100,9 @@ readonly class RecordService
         $limit = min(max($limit, 1), 500);
 
         $queryBuilder = $this->connectionPool->getQueryBuilderForTable($table);
+        $queryBuilder->getRestrictions()->removeAll();
         $countQueryBuilder = $this->connectionPool->getQueryBuilderForTable($table);
+        $countQueryBuilder->getRestrictions()->removeAll();
 
         $queryBuilder->select(...$fields)->from($table);
         $countQueryBuilder->count('uid')->from($table);
@@ -144,6 +149,7 @@ readonly class RecordService
     public function findTranslations(string $table, int $uid, string $languageField, string $transOrigPointerField): array
     {
         $queryBuilder = $this->connectionPool->getQueryBuilderForTable($table);
+        $queryBuilder->getRestrictions()->removeAll();
 
         /** @var list<array{uid: int|string, sys_language_uid: int|string}> $rows */
         $rows = $queryBuilder

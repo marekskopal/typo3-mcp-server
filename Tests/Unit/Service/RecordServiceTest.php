@@ -11,6 +11,7 @@ use PHPUnit\Framework\TestCase;
 use TYPO3\CMS\Core\Database\ConnectionPool;
 use TYPO3\CMS\Core\Database\Query\Expression\ExpressionBuilder;
 use TYPO3\CMS\Core\Database\Query\QueryBuilder;
+use TYPO3\CMS\Core\Database\Query\Restriction\QueryRestrictionContainerInterface;
 
 #[CoversClass(RecordService::class)]
 final class RecordServiceTest extends TestCase
@@ -22,14 +23,10 @@ final class RecordServiceTest extends TestCase
         $result = $this->createStub(Result::class);
         $result->method('fetchAssociative')->willReturn($expectedRecord);
 
-        $expressionBuilder = $this->createStub(ExpressionBuilder::class);
-
-        $queryBuilder = $this->createStub(QueryBuilder::class);
+        $queryBuilder = $this->createQueryBuilderStub();
         $queryBuilder->method('select')->willReturnSelf();
         $queryBuilder->method('from')->willReturnSelf();
         $queryBuilder->method('where')->willReturnSelf();
-        $queryBuilder->method('expr')->willReturn($expressionBuilder);
-        $queryBuilder->method('createNamedParameter')->willReturn("'1'");
         $queryBuilder->method('executeQuery')->willReturn($result);
 
         $connectionPool = $this->createStub(ConnectionPool::class);
@@ -46,14 +43,10 @@ final class RecordServiceTest extends TestCase
         $result = $this->createStub(Result::class);
         $result->method('fetchAssociative')->willReturn(false);
 
-        $expressionBuilder = $this->createStub(ExpressionBuilder::class);
-
-        $queryBuilder = $this->createStub(QueryBuilder::class);
+        $queryBuilder = $this->createQueryBuilderStub();
         $queryBuilder->method('select')->willReturnSelf();
         $queryBuilder->method('from')->willReturnSelf();
         $queryBuilder->method('where')->willReturnSelf();
-        $queryBuilder->method('expr')->willReturn($expressionBuilder);
-        $queryBuilder->method('createNamedParameter')->willReturn("'999'");
         $queryBuilder->method('executeQuery')->willReturn($result);
 
         $connectionPool = $this->createStub(ConnectionPool::class);
@@ -78,25 +71,19 @@ final class RecordServiceTest extends TestCase
         $listResult = $this->createStub(Result::class);
         $listResult->method('fetchAllAssociative')->willReturn($expectedRecords);
 
-        $expressionBuilder = $this->createStub(ExpressionBuilder::class);
-
-        $countQueryBuilder = $this->createStub(QueryBuilder::class);
+        $countQueryBuilder = $this->createQueryBuilderStub();
         $countQueryBuilder->method('count')->willReturnSelf();
         $countQueryBuilder->method('from')->willReturnSelf();
         $countQueryBuilder->method('where')->willReturnSelf();
-        $countQueryBuilder->method('expr')->willReturn($expressionBuilder);
-        $countQueryBuilder->method('createNamedParameter')->willReturn("'0'");
         $countQueryBuilder->method('executeQuery')->willReturn($countResult);
 
-        $listQueryBuilder = $this->createStub(QueryBuilder::class);
+        $listQueryBuilder = $this->createQueryBuilderStub();
         $listQueryBuilder->method('select')->willReturnSelf();
         $listQueryBuilder->method('from')->willReturnSelf();
         $listQueryBuilder->method('where')->willReturnSelf();
         $listQueryBuilder->method('setMaxResults')->willReturnSelf();
         $listQueryBuilder->method('setFirstResult')->willReturnSelf();
         $listQueryBuilder->method('orderBy')->willReturnSelf();
-        $listQueryBuilder->method('expr')->willReturn($expressionBuilder);
-        $listQueryBuilder->method('createNamedParameter')->willReturn("'0'");
         $listQueryBuilder->method('executeQuery')->willReturn($listResult);
 
         $callCount = 0;
@@ -125,18 +112,14 @@ final class RecordServiceTest extends TestCase
         $listResult = $this->createStub(Result::class);
         $listResult->method('fetchAllAssociative')->willReturn($expectedRecords);
 
-        $expressionBuilder = $this->createStub(ExpressionBuilder::class);
-
-        $countQueryBuilder = $this->createStub(QueryBuilder::class);
+        $countQueryBuilder = $this->createQueryBuilderStub();
         $countQueryBuilder->method('count')->willReturnSelf();
         $countQueryBuilder->method('from')->willReturnSelf();
         $countQueryBuilder->method('where')->willReturnSelf();
         $countQueryBuilder->method('andWhere')->willReturnSelf();
-        $countQueryBuilder->method('expr')->willReturn($expressionBuilder);
-        $countQueryBuilder->method('createNamedParameter')->willReturn("'0'");
         $countQueryBuilder->method('executeQuery')->willReturn($countResult);
 
-        $listQueryBuilder = $this->createStub(QueryBuilder::class);
+        $listQueryBuilder = $this->createQueryBuilderStub();
         $listQueryBuilder->method('select')->willReturnSelf();
         $listQueryBuilder->method('from')->willReturnSelf();
         $listQueryBuilder->method('where')->willReturnSelf();
@@ -144,8 +127,6 @@ final class RecordServiceTest extends TestCase
         $listQueryBuilder->method('setMaxResults')->willReturnSelf();
         $listQueryBuilder->method('setFirstResult')->willReturnSelf();
         $listQueryBuilder->method('orderBy')->willReturnSelf();
-        $listQueryBuilder->method('expr')->willReturn($expressionBuilder);
-        $listQueryBuilder->method('createNamedParameter')->willReturn("'0'");
         $listQueryBuilder->method('executeQuery')->willReturn($listResult);
 
         $callCount = 0;
@@ -176,25 +157,19 @@ final class RecordServiceTest extends TestCase
         $listResult = $this->createStub(Result::class);
         $listResult->method('fetchAllAssociative')->willReturn($expectedRecords);
 
-        $expressionBuilder = $this->createStub(ExpressionBuilder::class);
-
-        $countQueryBuilder = $this->createStub(QueryBuilder::class);
+        $countQueryBuilder = $this->createQueryBuilderStub();
         $countQueryBuilder->method('count')->willReturnSelf();
         $countQueryBuilder->method('from')->willReturnSelf();
         $countQueryBuilder->method('andWhere')->willReturnSelf();
-        $countQueryBuilder->method('expr')->willReturn($expressionBuilder);
-        $countQueryBuilder->method('createNamedParameter')->willReturn("'%Hello%'");
         $countQueryBuilder->method('executeQuery')->willReturn($countResult);
 
-        $listQueryBuilder = $this->createStub(QueryBuilder::class);
+        $listQueryBuilder = $this->createQueryBuilderStub();
         $listQueryBuilder->method('select')->willReturnSelf();
         $listQueryBuilder->method('from')->willReturnSelf();
         $listQueryBuilder->method('andWhere')->willReturnSelf();
         $listQueryBuilder->method('setMaxResults')->willReturnSelf();
         $listQueryBuilder->method('setFirstResult')->willReturnSelf();
         $listQueryBuilder->method('orderBy')->willReturnSelf();
-        $listQueryBuilder->method('expr')->willReturn($expressionBuilder);
-        $listQueryBuilder->method('createNamedParameter')->willReturn("'%Hello%'");
         $listQueryBuilder->method('executeQuery')->willReturn($listResult);
 
         $callCount = 0;
@@ -221,25 +196,19 @@ final class RecordServiceTest extends TestCase
         $listResult = $this->createStub(Result::class);
         $listResult->method('fetchAllAssociative')->willReturn([]);
 
-        $expressionBuilder = $this->createStub(ExpressionBuilder::class);
-
-        $countQueryBuilder = $this->createStub(QueryBuilder::class);
+        $countQueryBuilder = $this->createQueryBuilderStub();
         $countQueryBuilder->method('count')->willReturnSelf();
         $countQueryBuilder->method('from')->willReturnSelf();
         $countQueryBuilder->method('andWhere')->willReturnSelf();
-        $countQueryBuilder->method('expr')->willReturn($expressionBuilder);
-        $countQueryBuilder->method('createNamedParameter')->willReturn("'0'");
         $countQueryBuilder->method('executeQuery')->willReturn($countResult);
 
-        $listQueryBuilder = $this->createStub(QueryBuilder::class);
+        $listQueryBuilder = $this->createQueryBuilderStub();
         $listQueryBuilder->method('select')->willReturnSelf();
         $listQueryBuilder->method('from')->willReturnSelf();
         $listQueryBuilder->method('andWhere')->willReturnSelf();
         $listQueryBuilder->method('setMaxResults')->willReturnSelf();
         $listQueryBuilder->method('setFirstResult')->willReturnSelf();
         $listQueryBuilder->method('orderBy')->willReturnSelf();
-        $listQueryBuilder->method('expr')->willReturn($expressionBuilder);
-        $listQueryBuilder->method('createNamedParameter')->willReturn("'0'");
         $listQueryBuilder->method('executeQuery')->willReturn($listResult);
 
         $callCount = 0;
@@ -268,15 +237,11 @@ final class RecordServiceTest extends TestCase
         $result = $this->createStub(Result::class);
         $result->method('fetchAllAssociative')->willReturn($expectedRows);
 
-        $expressionBuilder = $this->createStub(ExpressionBuilder::class);
-
-        $queryBuilder = $this->createStub(QueryBuilder::class);
+        $queryBuilder = $this->createQueryBuilderStub();
         $queryBuilder->method('select')->willReturnSelf();
         $queryBuilder->method('from')->willReturnSelf();
         $queryBuilder->method('where')->willReturnSelf();
         $queryBuilder->method('orderBy')->willReturnSelf();
-        $queryBuilder->method('expr')->willReturn($expressionBuilder);
-        $queryBuilder->method('createNamedParameter')->willReturn("'42'");
         $queryBuilder->method('executeQuery')->willReturn($result);
 
         $connectionPool = $this->createStub(ConnectionPool::class);
@@ -290,5 +255,19 @@ final class RecordServiceTest extends TestCase
         self::assertSame(1, $translations[0]['sys_language_uid']);
         self::assertSame(88, $translations[1]['uid']);
         self::assertSame(2, $translations[1]['sys_language_uid']);
+    }
+
+    /** @return QueryBuilder&\PHPUnit\Framework\MockObject\Stub */
+    private function createQueryBuilderStub(): QueryBuilder
+    {
+        $restrictions = $this->createStub(QueryRestrictionContainerInterface::class);
+        $expressionBuilder = $this->createStub(ExpressionBuilder::class);
+
+        $queryBuilder = $this->createStub(QueryBuilder::class);
+        $queryBuilder->method('getRestrictions')->willReturn($restrictions);
+        $queryBuilder->method('expr')->willReturn($expressionBuilder);
+        $queryBuilder->method('createNamedParameter')->willReturn("'0'");
+
+        return $queryBuilder;
     }
 }
