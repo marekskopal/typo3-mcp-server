@@ -18,6 +18,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 - PHPUnit notices caused by using `createMock()` instead of `createStub()` where no expectations were configured
 - `pages_update` ignoring `hidden`, `starttime`, `endtime`, and `fe_group` fields — enablecolumns are no longer treated as system fields
 - Translated pages invisible to `pages_get`, `pages_list`, and other read operations — query restrictions now removed for backend-context queries
+- `sys_language_uid` treated as system field — update tools can now modify the language field
+- `record_translate` creating broken translations from records with `sys_language_uid = -1` — now validates that the source record is in the default language before localizing
 
 
 ## [0.2.0] - 2026-04-19
