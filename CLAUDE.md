@@ -42,17 +42,18 @@ vendor/bin/typo3 mcp:cleanup
 - `OAuth/PkceVerifier` — S256 PKCE verification
 - `OAuth/OAuthTokenPair` — DTO for access/refresh token pairs
 - `Authentication/BackendUserBootstrap` — Bootstraps a `BackendUserAuthentication` from a be_users record
-- `Server/McpServerFactory` — Builds the MCP Server instance with all tools registered (19 static + dynamic)
+- `Server/McpServerFactory` — Builds the MCP Server instance with all tools registered (20 static + dynamic)
 - `Server/InitializedSession` — Fixed SessionInterface implementation (workaround for SDK's `readData()` bug)
 - `Server/InitializedSessionFactory` — Factory for InitializedSession instances
 - `Service/DataHandlerService` — Wraps TYPO3 DataHandler for create/update/delete operations
-- `Service/RecordService` — Read operations via QueryBuilder (findByUid, findByPid with pagination capped at 500)
+- `Service/RecordService` — Read operations via QueryBuilder (findByUid, findByPid, search with pagination capped at 500)
 - `Service/FileService` — File operations via TYPO3 ResourceStorage (list, upload, delete, directory ops)
 - `Service/TcaSchemaService` — TCA field metadata extraction for schema introspection and dynamic tools
 - `Tool/Pages/*` — CRUD tools for pages table (use `#[McpTool]` attributes)
 - `Tool/Content/*` — CRUD tools for tt_content table (use `#[McpTool]` attributes)
 - `Tool/File/*` — File management tools (list, get info, upload, upload from URL, delete, directory create/delete, file reference add)
 - `Tool/Schema/TableSchemaTool` — TCA field introspection for any table
+- `Tool/Search/RecordSearchTool` — Search records in any table by field values (LIKE match)
 - `Tool/Dynamic/DynamicToolRegistrar` — Registers CRUD tools at runtime for tables configured via `EXTCONF`
 - `Command/CleanupExpiredTokensCommand` — CLI command (`mcp:cleanup`) to purge expired OAuth tokens and stale MCP session files
 - `Controller/OAuthClientController` — Backend module for managing OAuth clients (create, edit, delete) and tokens (view, revoke)
@@ -81,11 +82,13 @@ vendor/bin/typo3 mcp:cleanup
 
 ## Testing
 
-185 unit tests covering:
-- All 19 static MCP tools (Pages/Content/File/Schema CRUD + error handling)
+237 unit tests covering:
+- All 20 static MCP tools (Pages/Content/File/Schema/Search CRUD + error handling)
 - Dynamic tool registration and execution (DynamicToolRegistrar)
 - OAuth classes (AuthorizationService incl. revocation, ClientRepository, PkceVerifier, OAuthTokenPair)
+- OAuthMiddleware (metadata, authorize, register, revoke, token endpoints)
 - BackendUserBootstrap, McpServerFactory, McpServerMiddleware
+- InitializedSession and InitializedSessionFactory
 - Services (RecordService, DataHandlerService, FileService, TcaSchemaService)
 - CleanupExpiredTokensCommand
 
