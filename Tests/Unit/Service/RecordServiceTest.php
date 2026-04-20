@@ -164,6 +164,100 @@ final class RecordServiceTest extends TestCase
         self::assertSame(1, $result['total']);
     }
 
+    public function testSearchReturnsRecordsAndTotal(): void
+    {
+        $expectedRecords = [
+            ['uid' => 1, 'title' => 'Hello World'],
+        ];
+
+        $countResult = $this->createStub(Result::class);
+        $countResult->method('fetchOne')->willReturn(1);
+
+        $listResult = $this->createStub(Result::class);
+        $listResult->method('fetchAllAssociative')->willReturn($expectedRecords);
+
+        $expressionBuilder = $this->createStub(ExpressionBuilder::class);
+
+        $countQueryBuilder = $this->createStub(QueryBuilder::class);
+        $countQueryBuilder->method('count')->willReturnSelf();
+        $countQueryBuilder->method('from')->willReturnSelf();
+        $countQueryBuilder->method('andWhere')->willReturnSelf();
+        $countQueryBuilder->method('expr')->willReturn($expressionBuilder);
+        $countQueryBuilder->method('createNamedParameter')->willReturn("'%Hello%'");
+        $countQueryBuilder->method('executeQuery')->willReturn($countResult);
+
+        $listQueryBuilder = $this->createStub(QueryBuilder::class);
+        $listQueryBuilder->method('select')->willReturnSelf();
+        $listQueryBuilder->method('from')->willReturnSelf();
+        $listQueryBuilder->method('andWhere')->willReturnSelf();
+        $listQueryBuilder->method('setMaxResults')->willReturnSelf();
+        $listQueryBuilder->method('setFirstResult')->willReturnSelf();
+        $listQueryBuilder->method('orderBy')->willReturnSelf();
+        $listQueryBuilder->method('expr')->willReturn($expressionBuilder);
+        $listQueryBuilder->method('createNamedParameter')->willReturn("'%Hello%'");
+        $listQueryBuilder->method('executeQuery')->willReturn($listResult);
+
+        $callCount = 0;
+        $connectionPool = $this->createStub(ConnectionPool::class);
+        $connectionPool->method('getQueryBuilderForTable')
+            ->willReturnCallback(function () use (&$callCount, $listQueryBuilder, $countQueryBuilder): QueryBuilder {
+                $callCount++;
+
+                return $callCount === 1 ? $listQueryBuilder : $countQueryBuilder;
+            });
+
+        $service = new RecordService($connectionPool);
+        $result = $service->search('pages', ['title' => 'Hello'], 20, 0, ['uid', 'title']);
+
+        self::assertSame($expectedRecords, $result['records']);
+        self::assertSame(1, $result['total']);
+    }
+
+    public function testSearchWithPidFilter(): void
+    {
+        $countResult = $this->createStub(Result::class);
+        $countResult->method('fetchOne')->willReturn(0);
+
+        $listResult = $this->createStub(Result::class);
+        $listResult->method('fetchAllAssociative')->willReturn([]);
+
+        $expressionBuilder = $this->createStub(ExpressionBuilder::class);
+
+        $countQueryBuilder = $this->createStub(QueryBuilder::class);
+        $countQueryBuilder->method('count')->willReturnSelf();
+        $countQueryBuilder->method('from')->willReturnSelf();
+        $countQueryBuilder->method('andWhere')->willReturnSelf();
+        $countQueryBuilder->method('expr')->willReturn($expressionBuilder);
+        $countQueryBuilder->method('createNamedParameter')->willReturn("'0'");
+        $countQueryBuilder->method('executeQuery')->willReturn($countResult);
+
+        $listQueryBuilder = $this->createStub(QueryBuilder::class);
+        $listQueryBuilder->method('select')->willReturnSelf();
+        $listQueryBuilder->method('from')->willReturnSelf();
+        $listQueryBuilder->method('andWhere')->willReturnSelf();
+        $listQueryBuilder->method('setMaxResults')->willReturnSelf();
+        $listQueryBuilder->method('setFirstResult')->willReturnSelf();
+        $listQueryBuilder->method('orderBy')->willReturnSelf();
+        $listQueryBuilder->method('expr')->willReturn($expressionBuilder);
+        $listQueryBuilder->method('createNamedParameter')->willReturn("'0'");
+        $listQueryBuilder->method('executeQuery')->willReturn($listResult);
+
+        $callCount = 0;
+        $connectionPool = $this->createStub(ConnectionPool::class);
+        $connectionPool->method('getQueryBuilderForTable')
+            ->willReturnCallback(function () use (&$callCount, $listQueryBuilder, $countQueryBuilder): QueryBuilder {
+                $callCount++;
+
+                return $callCount === 1 ? $listQueryBuilder : $countQueryBuilder;
+            });
+
+        $service = new RecordService($connectionPool);
+        $result = $service->search('pages', ['title' => 'Test'], 20, 0, ['uid', 'title'], 5);
+
+        self::assertSame([], $result['records']);
+        self::assertSame(0, $result['total']);
+    }
+
     public function testFindTranslationsReturnsTranslationRecords(): void
     {
         $expectedRows = [

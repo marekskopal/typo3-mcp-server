@@ -26,6 +26,7 @@ use MarekSkopal\MsMcpServer\Tool\Pages\PagesListTool;
 use MarekSkopal\MsMcpServer\Tool\Pages\PagesUpdateTool;
 use MarekSkopal\MsMcpServer\Tool\Pages\PageTreeTool;
 use MarekSkopal\MsMcpServer\Tool\Schema\TableSchemaTool;
+use MarekSkopal\MsMcpServer\Tool\Search\RecordSearchTool;
 use MarekSkopal\MsMcpServer\Tool\Translation\RecordTranslateTool;
 use MarekSkopal\MsMcpServer\Tool\Translation\SiteLanguagesTool;
 use Mcp\Server;
@@ -57,6 +58,7 @@ readonly class McpServerFactory
         [FileReferenceAddTool::class, 'execute', 'file_reference_add'],
         [FileUploadFromUrlTool::class, 'execute', 'file_upload_from_url'],
         [TableSchemaTool::class, 'execute', 'table_schema'],
+        [RecordSearchTool::class, 'execute', 'record_search'],
         [SiteLanguagesTool::class, 'execute', 'site_languages'],
         [RecordTranslateTool::class, 'execute', 'record_translate'],
     ];

@@ -88,6 +88,55 @@ readonly class RecordService
     }
 
     /**
+     * @param list<string> $fields
+     * @param array<string, string> $searchConditions field => search value (LIKE %value%)
+     * @return array{records: list<array<string, mixed>>, total: int}
+     */
+    public function search(string $table, array $searchConditions, int $limit, int $offset, array $fields, ?int $pid = null,): array
+    {
+        $limit = min(max($limit, 1), 500);
+
+        $queryBuilder = $this->connectionPool->getQueryBuilderForTable($table);
+        $countQueryBuilder = $this->connectionPool->getQueryBuilderForTable($table);
+
+        $queryBuilder->select(...$fields)->from($table);
+        $countQueryBuilder->count('uid')->from($table);
+
+        if ($pid !== null) {
+            $queryBuilder->andWhere(
+                $queryBuilder->expr()->eq('pid', $queryBuilder->createNamedParameter($pid, ParameterType::INTEGER)),
+            );
+            $countQueryBuilder->andWhere(
+                $countQueryBuilder->expr()->eq('pid', $countQueryBuilder->createNamedParameter($pid, ParameterType::INTEGER)),
+            );
+        }
+
+        foreach ($searchConditions as $field => $value) {
+            $queryBuilder->andWhere(
+                $queryBuilder->expr()->like($field, $queryBuilder->createNamedParameter('%' . $value . '%')),
+            );
+            $countQueryBuilder->andWhere(
+                $countQueryBuilder->expr()->like($field, $countQueryBuilder->createNamedParameter('%' . $value . '%')),
+            );
+        }
+
+        /** @var int|string $totalResult */
+        $totalResult = $countQueryBuilder->executeQuery()->fetchOne();
+
+        $records = $queryBuilder
+            ->setMaxResults($limit)
+            ->setFirstResult($offset)
+            ->orderBy('uid', 'ASC')
+            ->executeQuery()
+            ->fetchAllAssociative();
+
+        return [
+            'records' => $records,
+            'total' => (int) $totalResult,
+        ];
+    }
+
+    /**
      * Find all translations of a record.
      *
      * @return list<array{uid: int, sys_language_uid: int}>
