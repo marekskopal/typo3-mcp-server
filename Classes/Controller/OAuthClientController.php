@@ -82,12 +82,15 @@ readonly class OAuthClientController
         $uriList = array_values(array_filter(array_map('trim', explode("\n", $redirectUris))));
         $clientId = bin2hex(random_bytes(16));
 
+        $now = time();
         $connection = $this->connectionPool->getConnectionForTable(self::TABLE);
         $connection->insert(self::TABLE, [
             'client_id' => $clientId,
             'client_name' => $clientName,
             'redirect_uris' => json_encode($uriList, JSON_THROW_ON_ERROR),
             'be_user' => (int) ($body['be_user'] ?? 0),
+            'crdate' => $now,
+            'tstamp' => $now,
         ]);
 
         $this->addFlashMessage(

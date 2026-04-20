@@ -62,12 +62,15 @@ readonly class ClientRepository
     {
         $clientId = bin2hex(random_bytes(16));
 
+        $now = time();
         $connection = $this->connectionPool->getConnectionForTable(self::TABLE);
         $connection->insert(self::TABLE, [
             'client_id' => $clientId,
             'client_name' => $clientName,
             'redirect_uris' => json_encode($redirectUris, JSON_THROW_ON_ERROR),
             'be_user' => 0,
+            'crdate' => $now,
+            'tstamp' => $now,
         ]);
 
         return [
