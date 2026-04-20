@@ -134,6 +134,7 @@ Add to your Claude Desktop config (`claude_desktop_config.json`):
 | `content_create` | Create a new content element |
 | `content_update` | Update content element fields |
 | `content_delete` | Delete a content element |
+| `content_move` | Move a content element to a new position |
 
 #### File Management (fileadmin)
 | Tool | Description |
@@ -147,10 +148,17 @@ Add to your Claude Desktop config (`claude_desktop_config.json`):
 | `directory_delete` | Delete a directory |
 | `file_reference_add` | Attach a file to a record's image/media field |
 
-#### Schema Introspection
+#### Schema & Search
 | Tool | Description |
 |------|-------------|
 | `table_schema` | Get TCA field definitions for any table |
+| `record_search` | Search records in any table by field values |
+
+#### Translation
+| Tool | Description |
+|------|-------------|
+| `site_languages` | List configured site languages |
+| `record_translate` | Translate a record to another language |
 
 #### Dynamic Extension Tools
 
@@ -163,6 +171,7 @@ Additional CRUD tools are registered automatically for tables configured via `EX
 | `news_create` | Create a new news record |
 | `news_update` | Update news record fields |
 | `news_delete` | Delete a news record |
+| `news_move` | Move a news record to a new position |
 
 ### Backend Module
 
@@ -184,7 +193,7 @@ $GLOBALS['TYPO3_CONF_VARS']['EXTCONF']['ms_mcp_server']['tables']['tx_blog_domai
 ];
 ```
 
-This automatically creates 5 CRUD tools (`blog_post_list`, `blog_post_get`, `blog_post_create`, `blog_post_update`, `blog_post_delete`) with fields resolved from TCA. You can optionally specify `listFields`, `readFields`, and `writableFields` arrays to override the defaults.
+This automatically creates 6 tools (`blog_post_list`, `blog_post_get`, `blog_post_create`, `blog_post_update`, `blog_post_delete`, `blog_post_move`) with fields resolved from TCA. You can optionally specify `listFields`, `readFields`, and `writableFields` arrays to override the defaults.
 
 ## Maintenance
 
@@ -208,7 +217,7 @@ vendor/bin/phpstan analyse
 vendor/bin/phpcs
 vendor/bin/phpcbf
 
-# Tests (185 tests, 643 assertions)
+# Tests (237 tests, 803 assertions)
 vendor/bin/phpunit
 ```
 
