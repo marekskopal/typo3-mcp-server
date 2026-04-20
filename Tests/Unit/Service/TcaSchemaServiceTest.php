@@ -262,8 +262,9 @@ final class TcaSchemaServiceTest extends TestCase
                 'crdate' => ['config' => ['type' => 'number']],
                 'deleted' => ['config' => ['type' => 'check']],
                 'sorting' => ['config' => ['type' => 'number']],
-                'sys_language_uid' => ['config' => ['type' => 'number']],
+                'sys_language_uid' => ['config' => ['type' => 'language']],
                 'l10n_parent' => ['config' => ['type' => 'number']],
+                'l10n_source' => ['config' => ['type' => 'number']],
                 'hidden' => ['config' => ['type' => 'check']],
                 'starttime' => ['config' => ['type' => 'datetime']],
                 'endtime' => ['config' => ['type' => 'datetime']],
@@ -279,9 +280,11 @@ final class TcaSchemaServiceTest extends TestCase
         self::assertNotContains('crdate', $fields);
         self::assertNotContains('deleted', $fields);
         self::assertNotContains('sorting', $fields);
-        // languageField is user-editable, transOrigPointerField is a system field
+        // languageField and transOrigPointerField are user-editable
         self::assertContains('sys_language_uid', $fields);
-        self::assertNotContains('l10n_parent', $fields);
+        self::assertContains('l10n_parent', $fields);
+        // translationSource is a system field
+        self::assertNotContains('l10n_source', $fields);
         // enablecolumns are user-editable, not system fields
         self::assertContains('hidden', $fields);
         self::assertContains('starttime', $fields);

@@ -21,6 +21,7 @@ readonly class TcaSchemaService
         'json',
         'uuid',
         'country',
+        'language',
     ];
 
     /** TCA types that may store simple values depending on configuration (no MM table). */
@@ -521,7 +522,6 @@ readonly class TcaSchemaService
             'crdate',
             'delete',
             'sortby',
-            'transOrigPointerField',
             'translationSource',
             'origUid',
             'descriptionColumn',
