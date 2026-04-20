@@ -58,7 +58,7 @@ readonly class McpServerMiddleware implements MiddlewareInterface
         /** @var ResponseInterface $response */
         $response = $server->run($transport);
 
-        return $response;
+        return $this->withCorsHeaders($response);
     }
 
     private function extractBearerToken(ServerRequestInterface $request): ?string
