@@ -36,6 +36,8 @@ use TYPO3\CMS\Core\Core\Environment;
 
 readonly class McpServerFactory
 {
+    public const string VERSION = '0.2.0';
+
     private const array TOOLS = [
         [PagesListTool::class, 'execute', 'pages_list'],
         [PagesGetTool::class, 'execute', 'pages_get'],
@@ -73,7 +75,7 @@ readonly class McpServerFactory
         $sessionStore = new FileSessionStore($sessionDir);
 
         $builder = Server::builder()
-            ->setServerInfo('TYPO3 MCP Server', '0.2.0')
+            ->setServerInfo('TYPO3 MCP Server', self::VERSION)
             ->setContainer($this->container)
             ->setSession($sessionStore, new InitializedSessionFactory());
 
