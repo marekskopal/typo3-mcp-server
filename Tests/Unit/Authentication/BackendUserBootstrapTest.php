@@ -12,6 +12,7 @@ use TYPO3\CMS\Core\Database\ConnectionPool;
 use TYPO3\CMS\Core\Database\Query\Expression\ExpressionBuilder;
 use TYPO3\CMS\Core\Database\Query\QueryBuilder;
 use TYPO3\CMS\Core\Database\Query\Restriction\QueryRestrictionContainerInterface;
+use TYPO3\CMS\Core\Localization\LanguageServiceFactory;
 
 #[CoversClass(BackendUserBootstrap::class)]
 final class BackendUserBootstrapTest extends TestCase
@@ -21,7 +22,8 @@ final class BackendUserBootstrapTest extends TestCase
         $result = $this->createStub(Result::class);
         $result->method('fetchAssociative')->willReturn(false);
 
-        $bootstrap = new BackendUserBootstrap($this->createConnectionPool($result));
+        $languageServiceFactory = $this->createStub(LanguageServiceFactory::class);
+        $bootstrap = new BackendUserBootstrap($this->createConnectionPool($result), $languageServiceFactory);
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionCode(1712000010);
@@ -38,7 +40,8 @@ final class BackendUserBootstrapTest extends TestCase
             'disable' => 1,
         ]);
 
-        $bootstrap = new BackendUserBootstrap($this->createConnectionPool($result));
+        $languageServiceFactory = $this->createStub(LanguageServiceFactory::class);
+        $bootstrap = new BackendUserBootstrap($this->createConnectionPool($result), $languageServiceFactory);
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionCode(1712000011);

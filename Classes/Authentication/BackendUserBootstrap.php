@@ -7,10 +7,11 @@ namespace MarekSkopal\MsMcpServer\Authentication;
 use Doctrine\DBAL\ParameterType;
 use TYPO3\CMS\Core\Authentication\BackendUserAuthentication;
 use TYPO3\CMS\Core\Database\ConnectionPool;
+use TYPO3\CMS\Core\Localization\LanguageServiceFactory;
 
 readonly class BackendUserBootstrap
 {
-    public function __construct(private ConnectionPool $connectionPool)
+    public function __construct(private ConnectionPool $connectionPool, private LanguageServiceFactory $languageServiceFactory)
     {
     }
 
@@ -48,6 +49,7 @@ readonly class BackendUserBootstrap
         $backendUser->fetchGroupData();
 
         $GLOBALS['BE_USER'] = $backendUser;
+        $GLOBALS['LANG'] = $this->languageServiceFactory->createFromUserPreferences($backendUser);
 
         return $backendUser;
     }
