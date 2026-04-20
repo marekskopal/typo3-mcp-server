@@ -67,6 +67,20 @@ readonly class DataHandlerService
         }
     }
 
+    /**
+     * Move a record to a new position.
+     *
+     * @param int $target Positive = page pid (move to top of page), negative = -(uid) of record to move after
+     */
+    public function moveRecord(string $table, int $uid, int $target): void
+    {
+        $dataHandler = GeneralUtility::makeInstance(DataHandler::class);
+        $dataHandler->start([], [$table => [$uid => ['move' => $target]]]);
+        $dataHandler->process_cmdmap();
+
+        $this->checkErrors($dataHandler);
+    }
+
     public function deleteRecord(string $table, int $uid): void
     {
         $dataHandler = GeneralUtility::makeInstance(DataHandler::class);

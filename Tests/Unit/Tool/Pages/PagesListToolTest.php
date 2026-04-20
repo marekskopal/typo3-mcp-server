@@ -103,6 +103,29 @@ final class PagesListToolTest extends TestCase
         $tool->execute(0, 20, 0, 0);
     }
 
+    public function testExecuteUsesCustomSelectFields(): void
+    {
+        $recordService = $this->createMock(RecordService::class);
+        $recordService->expects(self::once())
+            ->method('findByPid')
+            ->with(
+                'pages',
+                0,
+                20,
+                0,
+                self::callback(static function (array $fields): bool {
+                    return in_array('uid', $fields, true)
+                        && in_array('pid', $fields, true)
+                        && in_array('title', $fields, true)
+                        && in_array('slug', $fields, true);
+                }),
+            )
+            ->willReturn(['records' => [], 'total' => 0]);
+
+        $tool = new PagesListTool($recordService, new TcaSchemaService(), new NullLogger());
+        $tool->execute(0, 20, 0, -1, 'title,slug');
+    }
+
     public function testExecuteThrowsToolCallExceptionOnError(): void
     {
         $recordService = $this->createMock(RecordService::class);

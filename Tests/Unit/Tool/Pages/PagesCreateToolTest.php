@@ -121,6 +121,25 @@ final class PagesCreateToolTest extends TestCase
         );
 
         self::assertSame(100, $result['uid']);
+        self::assertSame(['invalid_field'], $result['ignoredFields']);
+    }
+
+    public function testExecuteOmitsIgnoredFieldsWhenAllFieldsValid(): void
+    {
+        $dataHandlerService = $this->createMock(DataHandlerService::class);
+        $dataHandlerService->expects(self::once())
+            ->method('createRecord')
+            ->willReturn(100);
+
+        $tool = new PagesCreateTool($dataHandlerService, new TcaSchemaService(), new NullLogger());
+        $result = json_decode(
+            $tool->execute(0, json_encode(['title' => 'Page'], JSON_THROW_ON_ERROR)),
+            true,
+            512,
+            JSON_THROW_ON_ERROR,
+        );
+
+        self::assertArrayNotHasKey('ignoredFields', $result);
     }
 
     public function testExecuteReturnsErrorWhenNoValidFields(): void
@@ -138,6 +157,34 @@ final class PagesCreateToolTest extends TestCase
         );
 
         self::assertSame('No valid fields provided', $result['error']);
+        self::assertSame(['bad_field'], $result['ignoredFields']);
+    }
+
+    public function testExecuteSetsSysLanguageUid(): void
+    {
+        $GLOBALS['TCA']['pages']['ctrl']['languageField'] = 'sys_language_uid';
+
+        $dataHandlerService = $this->createMock(DataHandlerService::class);
+        $dataHandlerService->expects(self::once())
+            ->method('createRecord')
+            ->with(
+                'pages',
+                0,
+                self::callback(static function (array $data): bool {
+                    return $data['sys_language_uid'] === -1 && $data['title'] === 'Test';
+                }),
+            )
+            ->willReturn(100);
+
+        $tool = new PagesCreateTool($dataHandlerService, new TcaSchemaService(), new NullLogger());
+        $result = json_decode(
+            $tool->execute(0, json_encode(['title' => 'Test'], JSON_THROW_ON_ERROR), -1),
+            true,
+            512,
+            JSON_THROW_ON_ERROR,
+        );
+
+        self::assertSame(100, $result['uid']);
     }
 
     public function testExecuteThrowsToolCallExceptionOnError(): void

@@ -238,7 +238,15 @@ final class DynamicToolRegistrarTest extends TestCase
             $dataHandlerService,
             'create',
         );
-        $closure(10, json_encode(['title' => 'Valid', 'invalid_field' => 'ignored'], JSON_THROW_ON_ERROR));
+        $result = json_decode(
+            $closure(10, json_encode(['title' => 'Valid', 'invalid_field' => 'ignored'], JSON_THROW_ON_ERROR)),
+            true,
+            512,
+            JSON_THROW_ON_ERROR,
+        );
+
+        self::assertSame(42, $result['uid']);
+        self::assertSame(['invalid_field'], $result['ignoredFields']);
     }
 
     public function testCreateToolReturnsErrorWhenNoValidFields(): void
@@ -259,6 +267,7 @@ final class DynamicToolRegistrarTest extends TestCase
         );
 
         self::assertSame('No valid fields provided', $result['error']);
+        self::assertSame(['invalid'], $result['ignoredFields']);
     }
 
     public function testCreateToolThrowsToolCallExceptionOnError(): void
@@ -300,6 +309,29 @@ final class DynamicToolRegistrarTest extends TestCase
         self::assertSame(['title'], $result['updated']);
     }
 
+    public function testUpdateToolReturnsIgnoredFields(): void
+    {
+        $dataHandlerService = $this->createMock(DataHandlerService::class);
+        $dataHandlerService->expects(self::once())
+            ->method('updateRecord')
+            ->with(self::TABLE, 1, ['title' => 'Updated']);
+
+        $closure = $this->getRegisteredClosure(
+            $this->createStub(RecordService::class),
+            $dataHandlerService,
+            'update',
+        );
+        $result = json_decode(
+            $closure(1, json_encode(['title' => 'Updated', 'bad' => 'x'], JSON_THROW_ON_ERROR)),
+            true,
+            512,
+            JSON_THROW_ON_ERROR,
+        );
+
+        self::assertSame(['title'], $result['updated']);
+        self::assertSame(['bad'], $result['ignoredFields']);
+    }
+
     public function testUpdateToolReturnsErrorWhenNoValidFields(): void
     {
         $dataHandlerService = $this->createMock(DataHandlerService::class);
@@ -318,6 +350,7 @@ final class DynamicToolRegistrarTest extends TestCase
         );
 
         self::assertSame('No valid fields provided', $result['error']);
+        self::assertSame(['invalid'], $result['ignoredFields']);
     }
 
     public function testUpdateToolThrowsToolCallExceptionOnError(): void
@@ -334,6 +367,41 @@ final class DynamicToolRegistrarTest extends TestCase
 
         $this->expectException(ToolCallException::class);
         $closure(1, json_encode(['title' => 'Test'], JSON_THROW_ON_ERROR));
+    }
+
+    public function testMoveToolCallsDataHandlerService(): void
+    {
+        $dataHandlerService = $this->createMock(DataHandlerService::class);
+        $dataHandlerService->expects(self::once())
+            ->method('moveRecord')
+            ->with(self::TABLE, 5, -3);
+
+        $closure = $this->getRegisteredClosure(
+            $this->createStub(RecordService::class),
+            $dataHandlerService,
+            'move',
+        );
+        $result = json_decode($closure(5, -3), true, 512, JSON_THROW_ON_ERROR);
+
+        self::assertSame(5, $result['uid']);
+        self::assertTrue($result['moved']);
+        self::assertSame(-3, $result['target']);
+    }
+
+    public function testMoveToolThrowsToolCallExceptionOnError(): void
+    {
+        $dataHandlerService = $this->createStub(DataHandlerService::class);
+        $dataHandlerService->method('moveRecord')
+            ->willThrowException(new \RuntimeException('Move failed'));
+
+        $closure = $this->getRegisteredClosure(
+            $this->createStub(RecordService::class),
+            $dataHandlerService,
+            'move',
+        );
+
+        $this->expectException(ToolCallException::class);
+        $closure(5, 10);
     }
 
     public function testDeleteToolCallsDataHandlerService(): void

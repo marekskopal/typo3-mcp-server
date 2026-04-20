@@ -129,6 +129,44 @@ final class ContentCreateToolTest extends TestCase
         self::assertSame(300, $result['uid']);
     }
 
+    public function testExecuteReturnsIgnoredFieldsWhenSomeFieldsDropped(): void
+    {
+        $dataHandlerService = $this->createMock(DataHandlerService::class);
+        $dataHandlerService->expects(self::once())
+            ->method('createRecord')
+            ->willReturn(100);
+
+        $tool = new ContentCreateTool($dataHandlerService, new TcaSchemaService(), new NullLogger());
+        $result = json_decode(
+            $tool->execute(10, json_encode(['header' => 'Test', 'unknown_field' => 'x'], JSON_THROW_ON_ERROR)),
+            true,
+            512,
+            JSON_THROW_ON_ERROR,
+        );
+
+        self::assertSame(100, $result['uid']);
+        self::assertSame(['unknown_field'], $result['ignoredFields']);
+    }
+
+    public function testExecuteOmitsIgnoredFieldsWhenAllFieldsValid(): void
+    {
+        $dataHandlerService = $this->createMock(DataHandlerService::class);
+        $dataHandlerService->expects(self::once())
+            ->method('createRecord')
+            ->willReturn(100);
+
+        $tool = new ContentCreateTool($dataHandlerService, new TcaSchemaService(), new NullLogger());
+        $result = json_decode(
+            $tool->execute(10, json_encode(['header' => 'Test'], JSON_THROW_ON_ERROR)),
+            true,
+            512,
+            JSON_THROW_ON_ERROR,
+        );
+
+        self::assertSame(100, $result['uid']);
+        self::assertArrayNotHasKey('ignoredFields', $result);
+    }
+
     public function testExecuteReturnsErrorWhenNoValidFields(): void
     {
         $dataHandlerService = $this->createMock(DataHandlerService::class);
@@ -144,6 +182,54 @@ final class ContentCreateToolTest extends TestCase
         );
 
         self::assertSame('No valid fields provided', $result['error']);
+        self::assertSame(['bad_field'], $result['ignoredFields']);
+    }
+
+    public function testExecuteSetsSysLanguageUid(): void
+    {
+        $GLOBALS['TCA']['tt_content']['ctrl']['languageField'] = 'sys_language_uid';
+
+        $dataHandlerService = $this->createMock(DataHandlerService::class);
+        $dataHandlerService->expects(self::once())
+            ->method('createRecord')
+            ->with(
+                'tt_content',
+                10,
+                self::callback(static function (array $data): bool {
+                    return $data['sys_language_uid'] === -1 && $data['header'] === 'Test';
+                }),
+            )
+            ->willReturn(100);
+
+        $tool = new ContentCreateTool($dataHandlerService, new TcaSchemaService(), new NullLogger());
+        $result = json_decode(
+            $tool->execute(10, json_encode(['header' => 'Test'], JSON_THROW_ON_ERROR), -1),
+            true,
+            512,
+            JSON_THROW_ON_ERROR,
+        );
+
+        self::assertSame(100, $result['uid']);
+    }
+
+    public function testExecuteDefaultsSysLanguageUidToZero(): void
+    {
+        $GLOBALS['TCA']['tt_content']['ctrl']['languageField'] = 'sys_language_uid';
+
+        $dataHandlerService = $this->createMock(DataHandlerService::class);
+        $dataHandlerService->expects(self::once())
+            ->method('createRecord')
+            ->with(
+                'tt_content',
+                10,
+                self::callback(static function (array $data): bool {
+                    return $data['sys_language_uid'] === 0;
+                }),
+            )
+            ->willReturn(100);
+
+        $tool = new ContentCreateTool($dataHandlerService, new TcaSchemaService(), new NullLogger());
+        $tool->execute(10, json_encode(['header' => 'Test'], JSON_THROW_ON_ERROR));
     }
 
     public function testExecuteThrowsToolCallExceptionOnError(): void

@@ -82,6 +82,24 @@ final class PagesUpdateToolTest extends TestCase
 
         self::assertSame(10, $result['uid']);
         self::assertSame(['title'], $result['updated']);
+        self::assertSame(['invalid_field'], $result['ignoredFields']);
+    }
+
+    public function testExecuteOmitsIgnoredFieldsWhenAllFieldsValid(): void
+    {
+        $dataHandlerService = $this->createMock(DataHandlerService::class);
+        $dataHandlerService->expects(self::once())
+            ->method('updateRecord');
+
+        $tool = new PagesUpdateTool($dataHandlerService, new TcaSchemaService(), new NullLogger());
+        $result = json_decode(
+            $tool->execute(10, json_encode(['title' => 'T'], JSON_THROW_ON_ERROR)),
+            true,
+            512,
+            JSON_THROW_ON_ERROR,
+        );
+
+        self::assertArrayNotHasKey('ignoredFields', $result);
     }
 
     public function testExecuteReturnsErrorWhenNoValidFields(): void
@@ -99,6 +117,7 @@ final class PagesUpdateToolTest extends TestCase
         );
 
         self::assertSame('No valid fields provided', $result['error']);
+        self::assertSame(['bad_field'], $result['ignoredFields']);
     }
 
     public function testExecuteThrowsToolCallExceptionOnError(): void

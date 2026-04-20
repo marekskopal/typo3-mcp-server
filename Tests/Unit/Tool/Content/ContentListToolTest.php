@@ -126,6 +126,47 @@ final class ContentListToolTest extends TestCase
         $tool->execute(10, 20, 0, -1);
     }
 
+    public function testExecuteUsesCustomSelectFields(): void
+    {
+        $recordService = $this->createMock(RecordService::class);
+        $recordService->expects(self::once())
+            ->method('findByPid')
+            ->with(
+                'tt_content',
+                10,
+                20,
+                0,
+                self::callback(static function (array $fields): bool {
+                    return in_array('uid', $fields, true)
+                        && in_array('pid', $fields, true)
+                        && in_array('header', $fields, true)
+                        && in_array('bodytext', $fields, true);
+                }),
+            )
+            ->willReturn(['records' => [], 'total' => 0]);
+
+        $tool = new ContentListTool($recordService, new TcaSchemaService(), new NullLogger());
+        $tool->execute(10, 20, 0, -1, 'header,bodytext');
+    }
+
+    public function testExecuteFallsBackToDefaultFieldsWhenAllSelectFieldsInvalid(): void
+    {
+        $recordService = $this->createMock(RecordService::class);
+        $recordService->expects(self::once())
+            ->method('findByPid')
+            ->with(
+                'tt_content',
+                10,
+                20,
+                0,
+                ['uid', 'pid', 'header', 'subheader', 'hidden', 'sys_language_uid', 'l18n_parent'],
+            )
+            ->willReturn(['records' => [], 'total' => 0]);
+
+        $tool = new ContentListTool($recordService, new TcaSchemaService(), new NullLogger());
+        $tool->execute(10, 20, 0, -1, 'nonexistent_field,another_bad');
+    }
+
     public function testExecuteThrowsToolCallExceptionOnError(): void
     {
         $recordService = $this->createMock(RecordService::class);

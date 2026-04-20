@@ -22,12 +22,24 @@ readonly class PagesListTool
 
     #[McpTool(
         name: 'pages_list',
-        description: 'List pages by parent page ID with pagination. Use sysLanguageUid to filter by language (0 = default, -1 = all).',
+        description: 'List pages by parent page ID with pagination. Use sysLanguageUid to filter by language (0 = default, -1 = all).'
+            . ' Use selectFields (comma-separated) to choose which fields to return.',
     )]
-    public function execute(int $pid = 0, int $limit = 20, int $offset = 0, int $sysLanguageUid = -1): string
+    public function execute(int $pid = 0, int $limit = 20, int $offset = 0, int $sysLanguageUid = -1, string $selectFields = ''): string
     {
         $translationConfig = $this->tcaSchemaService->getTranslationConfig('pages');
-        $fields = $this->tcaSchemaService->getListFields('pages');
+
+        if ($selectFields !== '') {
+            $requested = array_map('trim', explode(',', $selectFields));
+            $readable = $this->tcaSchemaService->getReadFields('pages');
+            $allowed = array_merge(['uid', 'pid'], $readable);
+            $valid = array_values(array_intersect($requested, $allowed));
+            $fields = $valid !== []
+                ? array_values(array_unique(array_merge(['uid', 'pid'], $valid)))
+                : $this->tcaSchemaService->getListFields('pages');
+        } else {
+            $fields = $this->tcaSchemaService->getListFields('pages');
+        }
 
         $languageField = $translationConfig['languageField'];
         if ($languageField !== null && !in_array($languageField, $fields, true)) {

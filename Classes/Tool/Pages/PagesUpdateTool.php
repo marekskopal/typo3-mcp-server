@@ -31,8 +31,10 @@ readonly class PagesUpdateTool
 
         $writableFields = $this->tcaSchemaService->getWritableFields('pages');
         $filteredData = array_intersect_key($data, array_flip($writableFields));
+        $ignoredFields = array_values(array_diff(array_keys($data), array_keys($filteredData)));
+
         if ($filteredData === []) {
-            return json_encode(['error' => 'No valid fields provided'], JSON_THROW_ON_ERROR);
+            return json_encode(['error' => 'No valid fields provided', 'ignoredFields' => $ignoredFields], JSON_THROW_ON_ERROR);
         }
 
         try {
@@ -43,6 +45,11 @@ readonly class PagesUpdateTool
             throw new ToolCallException($e->getMessage(), (int) $e->getCode(), $e);
         }
 
-        return json_encode(['uid' => $uid, 'updated' => array_keys($filteredData)], JSON_THROW_ON_ERROR);
+        $response = ['uid' => $uid, 'updated' => array_keys($filteredData)];
+        if ($ignoredFields !== []) {
+            $response['ignoredFields'] = $ignoredFields;
+        }
+
+        return json_encode($response, JSON_THROW_ON_ERROR);
     }
 }

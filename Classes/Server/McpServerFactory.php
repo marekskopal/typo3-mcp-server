@@ -8,6 +8,7 @@ use MarekSkopal\MsMcpServer\Tool\Content\ContentCreateTool;
 use MarekSkopal\MsMcpServer\Tool\Content\ContentDeleteTool;
 use MarekSkopal\MsMcpServer\Tool\Content\ContentGetTool;
 use MarekSkopal\MsMcpServer\Tool\Content\ContentListTool;
+use MarekSkopal\MsMcpServer\Tool\Content\ContentMoveTool;
 use MarekSkopal\MsMcpServer\Tool\Content\ContentUpdateTool;
 use MarekSkopal\MsMcpServer\Tool\Dynamic\DynamicToolRegistrar;
 use MarekSkopal\MsMcpServer\Tool\File\DirectoryCreateTool;
@@ -46,6 +47,7 @@ readonly class McpServerFactory
         [ContentCreateTool::class, 'execute', 'content_create'],
         [ContentUpdateTool::class, 'execute', 'content_update'],
         [ContentDeleteTool::class, 'execute', 'content_delete'],
+        [ContentMoveTool::class, 'execute', 'content_move'],
         [FileListTool::class, 'execute', 'file_list'],
         [FileGetInfoTool::class, 'execute', 'file_get_info'],
         [FileUploadTool::class, 'execute', 'file_upload'],

@@ -39,6 +39,7 @@ readonly class DynamicToolRegistrar
             $this->registerCreateTool($builder, $tableName, $resolvedConfig);
             $this->registerUpdateTool($builder, $tableName, $resolvedConfig);
             $this->registerDeleteTool($builder, $tableName, $resolvedConfig);
+            $this->registerMoveTool($builder, $tableName, $resolvedConfig);
         }
     }
 
@@ -108,8 +109,27 @@ readonly class DynamicToolRegistrar
     {
         $recordService = $this->recordService;
         $logger = $this->logger;
-        $fields = $config['listFields'];
+        $defaultFields = $config['listFields'];
+        $readFields = $config['readFields'];
         $languageField = $config['translationConfig']['languageField'];
+
+        /**
+         * @param list<string> $defaultFields
+         * @param list<string> $readFields
+         * @return list<string>
+         */
+        $resolveFields = static function (string $selectFieldsRaw, array $defaultFields, array $readFields): array {
+            if ($selectFieldsRaw === '') {
+                return $defaultFields;
+            }
+
+            $requested = array_map('trim', explode(',', $selectFieldsRaw));
+            /** @var list<string> $allowed */
+            $allowed = array_merge(['uid', 'pid'], $readFields);
+            $valid = array_values(array_intersect($requested, $allowed));
+
+            return $valid !== [] ? array_values(array_unique(array_merge(['uid', 'pid'], $valid))) : $defaultFields;
+        };
 
         if ($languageField !== null) {
             $builder->addTool(
@@ -118,13 +138,23 @@ readonly class DynamicToolRegistrar
                     int $limit = 20,
                     int $offset = 0,
                     int $sysLanguageUid = -1,
+                    string $selectFields = '',
                 ) use (
                     $recordService,
                     $logger,
                     $tableName,
-                    $fields,
+                    $defaultFields,
+                    $readFields,
                     $languageField,
+                    $resolveFields,
                 ): string {
+                    /** @var list<string> $fields */
+                    $fields = $resolveFields($selectFields, $defaultFields, $readFields);
+
+                    if (!in_array($languageField, $fields, true)) {
+                        $fields[] = $languageField;
+                    }
+
                     try {
                         $result = $recordService->findByPid(
                             $tableName,
@@ -145,7 +175,8 @@ readonly class DynamicToolRegistrar
                 },
                 name: $config['prefix'] . '_list',
                 description: 'List ' . $config['label'] . ' records by parent page ID with pagination.'
-                    . ' Use sysLanguageUid to filter by language (0 = default, -1 = all).',
+                    . ' Use sysLanguageUid to filter by language (0 = default, -1 = all).'
+                    . ' Use selectFields (comma-separated) to choose which fields to return.',
             );
         } else {
             $builder->addTool(
@@ -153,12 +184,18 @@ readonly class DynamicToolRegistrar
                     int $pid = 0,
                     int $limit = 20,
                     int $offset = 0,
+                    string $selectFields = '',
                 ) use (
                     $recordService,
                     $logger,
                     $tableName,
-                    $fields,
+                    $defaultFields,
+                    $readFields,
+                    $resolveFields,
                 ): string {
+                    /** @var list<string> $fields */
+                    $fields = $resolveFields($selectFields, $defaultFields, $readFields);
+
                     try {
                         $result = $recordService->findByPid($tableName, $pid, $limit, $offset, $fields);
                     } catch (\Throwable $e) {
@@ -170,7 +207,8 @@ readonly class DynamicToolRegistrar
                     return json_encode($result, JSON_THROW_ON_ERROR);
                 },
                 name: $config['prefix'] . '_list',
-                description: 'List ' . $config['label'] . ' records by parent page ID with pagination.',
+                description: 'List ' . $config['label'] . ' records by parent page ID with pagination.'
+                    . ' Use selectFields (comma-separated) to choose which fields to return.',
             );
         }
     }
@@ -227,39 +265,85 @@ readonly class DynamicToolRegistrar
         $dataHandlerService = $this->dataHandlerService;
         $logger = $this->logger;
         $writableFields = $config['writableFields'];
+        $languageField = $config['translationConfig']['languageField'];
 
-        $builder->addTool(
-            handler: static function (
-                int $pid,
-                string $fields,
-            ) use (
-                $dataHandlerService,
-                $logger,
-                $tableName,
-                $writableFields,
-            ): string {
-                /** @var array<string, mixed> $data */
-                $data = json_decode($fields, true, 512, JSON_THROW_ON_ERROR);
+        $createHandler = static function (
+            array $data,
+            int $pid,
+            int $sysLanguageUid,
+        ) use (
+            $dataHandlerService,
+            $logger,
+            $tableName,
+            $writableFields,
+            $languageField,
+        ): string {
+            $filteredData = array_intersect_key($data, array_flip($writableFields));
 
-                $filteredData = array_intersect_key($data, array_flip($writableFields));
-                if ($filteredData === []) {
-                    return json_encode(['error' => 'No valid fields provided'], JSON_THROW_ON_ERROR);
-                }
+            if ($languageField !== null) {
+                $filteredData[$languageField] = $sysLanguageUid;
+                unset($data[$languageField]);
+            }
 
-                try {
-                    $uid = $dataHandlerService->createRecord($tableName, $pid, $filteredData);
-                } catch (\Throwable $e) {
-                    $logger->error($tableName . ' create tool failed', ['exception' => $e]);
+            $ignoredFields = array_values(array_diff(array_keys($data), array_keys($filteredData)));
 
-                    throw new ToolCallException($e->getMessage(), (int) $e->getCode(), $e);
-                }
+            if ($filteredData === []) {
+                return json_encode(
+                    ['error' => 'No valid fields provided', 'ignoredFields' => $ignoredFields],
+                    JSON_THROW_ON_ERROR,
+                );
+            }
 
-                return json_encode(['uid' => $uid], JSON_THROW_ON_ERROR);
-            },
-            name: $config['prefix'] . '_create',
-            description: 'Create a new ' . $config['label'] . ' record. Pass fields as a JSON object string.'
-                . ' Available fields: ' . implode(', ', $config['writableFields']) . '.',
-        );
+            try {
+                $uid = $dataHandlerService->createRecord($tableName, $pid, $filteredData);
+            } catch (\Throwable $e) {
+                $logger->error($tableName . ' create tool failed', ['exception' => $e]);
+
+                throw new ToolCallException($e->getMessage(), (int) $e->getCode(), $e);
+            }
+
+            $response = ['uid' => $uid];
+            if ($ignoredFields !== []) {
+                $response['ignoredFields'] = $ignoredFields;
+            }
+
+            return json_encode($response, JSON_THROW_ON_ERROR);
+        };
+
+        $description = 'Create a new ' . $config['label'] . ' record. Pass fields as a JSON object string.'
+            . ' Available fields: ' . implode(', ', $config['writableFields']) . '.';
+
+        if ($languageField !== null) {
+            $builder->addTool(
+                handler: static function (
+                    int $pid,
+                    string $fields,
+                    int $sysLanguageUid = 0,
+                ) use ($createHandler): string {
+                    /** @var array<string, mixed> $data */
+                    $data = json_decode($fields, true, 512, JSON_THROW_ON_ERROR);
+
+                    return $createHandler($data, $pid, $sysLanguageUid);
+                },
+                name: $config['prefix'] . '_create',
+                description: $description
+                    . ' Use sysLanguageUid to set the language (0 = default, -1 = all languages).',
+            );
+        } else {
+            $builder->addTool(
+                handler: static function (
+                    int $pid,
+                    string $fields,
+                ) use ($createHandler): string {
+                    /** @var array<string, mixed> $data */
+                    $data = json_decode($fields, true, 512, JSON_THROW_ON_ERROR);
+
+                    return $createHandler($data, $pid, 0);
+                },
+                name: $config['prefix'] . '_create',
+                description: $description,
+            );
+        }
     }
 
     /** @param array{label: string, prefix: string, listFields: list<string>, readFields: list<string>, writableFields: list<string>, translationConfig: array{languageField: string|null, transOrigPointerField: string|null, translationSource: string|null}} $config */
@@ -283,8 +367,13 @@ readonly class DynamicToolRegistrar
                 $data = json_decode($fields, true, 512, JSON_THROW_ON_ERROR);
 
                 $filteredData = array_intersect_key($data, array_flip($writableFields));
+                $ignoredFields = array_values(array_diff(array_keys($data), array_keys($filteredData)));
+
                 if ($filteredData === []) {
-                    return json_encode(['error' => 'No valid fields provided'], JSON_THROW_ON_ERROR);
+                    return json_encode(
+                        ['error' => 'No valid fields provided', 'ignoredFields' => $ignoredFields],
+                        JSON_THROW_ON_ERROR,
+                    );
                 }
 
                 try {
@@ -295,7 +384,12 @@ readonly class DynamicToolRegistrar
                     throw new ToolCallException($e->getMessage(), (int) $e->getCode(), $e);
                 }
 
-                return json_encode(['uid' => $uid, 'updated' => array_keys($filteredData)], JSON_THROW_ON_ERROR);
+                $response = ['uid' => $uid, 'updated' => array_keys($filteredData)];
+                if ($ignoredFields !== []) {
+                    $response['ignoredFields'] = $ignoredFields;
+                }
+
+                return json_encode($response, JSON_THROW_ON_ERROR);
             },
             name: $config['prefix'] . '_update',
             description: 'Update an existing ' . $config['label'] . ' record. Pass fields as a JSON object string'
@@ -324,6 +418,31 @@ readonly class DynamicToolRegistrar
             },
             name: $config['prefix'] . '_delete',
             description: 'Delete a ' . $config['label'] . ' record by its uid.',
+        );
+    }
+
+    /** @param array{label: string, prefix: string, listFields: list<string>, readFields: list<string>, writableFields: list<string>, translationConfig: array{languageField: string|null, transOrigPointerField: string|null, translationSource: string|null}} $config */
+    private function registerMoveTool(Builder $builder, string $tableName, array $config): void
+    {
+        $dataHandlerService = $this->dataHandlerService;
+        $logger = $this->logger;
+
+        $builder->addTool(
+            handler: static function (int $uid, int $target) use ($dataHandlerService, $logger, $tableName): string {
+                try {
+                    $dataHandlerService->moveRecord($tableName, $uid, $target);
+                } catch (\Throwable $e) {
+                    $logger->error($tableName . ' move tool failed', ['exception' => $e]);
+
+                    throw new ToolCallException($e->getMessage(), (int) $e->getCode(), $e);
+                }
+
+                return json_encode(['uid' => $uid, 'moved' => true, 'target' => $target], JSON_THROW_ON_ERROR);
+            },
+            name: $config['prefix'] . '_move',
+            description: 'Move a ' . $config['label'] . ' record to a new position.'
+                . ' Use a positive target to move to the top of a page (target = page pid).'
+                . ' Use a negative target to move after another record (target = -uid of the record to place after).',
         );
     }
 }

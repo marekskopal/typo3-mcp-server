@@ -20,16 +20,30 @@ readonly class ContentCreateTool
     ) {
     }
 
-    #[McpTool(name: 'content_create', description: 'Create a new content element on a page. Pass fields as a JSON object string.')]
-    public function execute(int $pid, string $fields): string
+    #[McpTool(
+        name: 'content_create',
+        description: 'Create a new content element on a page. Pass fields as a JSON object string.'
+            . ' Use sysLanguageUid to set the language (0 = default, -1 = all languages).',
+    )]
+    public function execute(int $pid, string $fields, int $sysLanguageUid = 0): string
     {
         /** @var array<string, mixed> $data */
         $data = json_decode($fields, true, 512, JSON_THROW_ON_ERROR);
 
         $writableFields = $this->tcaSchemaService->getWritableFields('tt_content');
         $filteredData = array_intersect_key($data, array_flip($writableFields));
+
+        $translationConfig = $this->tcaSchemaService->getTranslationConfig('tt_content');
+        $languageField = $translationConfig['languageField'];
+        if ($languageField !== null) {
+            $filteredData[$languageField] = $sysLanguageUid;
+            unset($data[$languageField]);
+        }
+
+        $ignoredFields = array_values(array_diff(array_keys($data), array_keys($filteredData)));
+
         if ($filteredData === []) {
-            return json_encode(['error' => 'No valid fields provided'], JSON_THROW_ON_ERROR);
+            return json_encode(['error' => 'No valid fields provided', 'ignoredFields' => $ignoredFields], JSON_THROW_ON_ERROR);
         }
 
         try {
@@ -40,6 +54,11 @@ readonly class ContentCreateTool
             throw new ToolCallException($e->getMessage(), (int) $e->getCode(), $e);
         }
 
-        return json_encode(['uid' => $uid], JSON_THROW_ON_ERROR);
+        $response = ['uid' => $uid];
+        if ($ignoredFields !== []) {
+            $response['ignoredFields'] = $ignoredFields;
+        }
+
+        return json_encode($response, JSON_THROW_ON_ERROR);
     }
 }
