@@ -110,7 +110,7 @@ final class PageTreeToolTest extends TestCase
 
     public function testExecuteClampsDepthToMaximum(): void
     {
-        $recordService = $this->createMock(RecordService::class);
+        $recordService = $this->createStub(RecordService::class);
         $recordService->method('findByPid')
             ->willReturn(['records' => [], 'total' => 0]);
 

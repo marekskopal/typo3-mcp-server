@@ -87,7 +87,7 @@ final class RecordSearchToolTest extends TestCase
 
     public function testExecuteReportsIgnoredFields(): void
     {
-        $recordService = $this->createMock(RecordService::class);
+        $recordService = $this->createStub(RecordService::class);
         $recordService->method('search')->willReturn(['records' => [], 'total' => 0]);
 
         $tool = new RecordSearchTool($recordService, new TcaSchemaService(), new NullLogger());
@@ -142,7 +142,7 @@ final class RecordSearchToolTest extends TestCase
 
     public function testExecuteThrowsToolCallExceptionOnError(): void
     {
-        $recordService = $this->createMock(RecordService::class);
+        $recordService = $this->createStub(RecordService::class);
         $recordService->method('search')->willThrowException(new \RuntimeException('Database error'));
 
         $tool = new RecordSearchTool($recordService, new TcaSchemaService(), new NullLogger());
