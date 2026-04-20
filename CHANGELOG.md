@@ -4,6 +4,19 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.3.0] - 2026-04-20
+
+### Added
+- **Search tool:** `record_search` for searching records in any table by field values (LIKE match) with optional pid filtering
+- `RecordService::search()` method for flexible record queries
+- Unit tests for `InitializedSession`, `InitializedSessionFactory`, and `OAuthMiddleware` (26 new tests)
+- `McpServerFactory::VERSION` constant as single source of truth for version string
+
+### Fixed
+- CORS headers missing on authenticated MCP responses — browser-based MCP clients now work correctly
+- OAuth client `crdate` always showing 1970-01-01 — both `ClientRepository` and `OAuthClientController` now set `crdate`/`tstamp` on insert
+- PHPUnit notices caused by using `createMock()` instead of `createStub()` where no expectations were configured
+
 ## [0.2.0] - 2026-04-19
 
 ### Changed

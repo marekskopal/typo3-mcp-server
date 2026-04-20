@@ -36,7 +36,7 @@ use TYPO3\CMS\Core\Core\Environment;
 
 readonly class McpServerFactory
 {
-    public const string VERSION = '0.2.0';
+    public const string VERSION = '0.3.0';
 
     private const array TOOLS = [
         [PagesListTool::class, 'execute', 'pages_list'],
