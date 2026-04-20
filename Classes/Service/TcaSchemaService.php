@@ -521,7 +521,6 @@ readonly class TcaSchemaService
             'crdate',
             'delete',
             'sortby',
-            'languageField',
             'transOrigPointerField',
             'translationSource',
             'origUid',

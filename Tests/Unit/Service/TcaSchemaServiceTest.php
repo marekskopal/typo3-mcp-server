@@ -279,7 +279,8 @@ final class TcaSchemaServiceTest extends TestCase
         self::assertNotContains('crdate', $fields);
         self::assertNotContains('deleted', $fields);
         self::assertNotContains('sorting', $fields);
-        self::assertNotContains('sys_language_uid', $fields);
+        // languageField is user-editable, transOrigPointerField is a system field
+        self::assertContains('sys_language_uid', $fields);
         self::assertNotContains('l10n_parent', $fields);
         // enablecolumns are user-editable, not system fields
         self::assertContains('hidden', $fields);
