@@ -9,6 +9,7 @@ services:
 
   MarekSkopal\MsMcpServer\Tool\:
     resource: '../Classes/Tool/*'
+    exclude: '../Classes/Tool/Result/*'
     public: true
 
   MarekSkopal\MsMcpServer\Command\CleanupExpiredTokensCommand:
