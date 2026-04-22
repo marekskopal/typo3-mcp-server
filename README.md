@@ -24,7 +24,7 @@ These are the kinds of tasks an AI agent can accomplish autonomously through thi
 
 - PHP 8.3+
 - TYPO3 v13.4 or v14.x
-- [mcp/sdk](https://github.com/php-mcp/sdk) (installed via Composer)
+- [modelcontextprotocol/php-sdk](https://github.com/modelcontextprotocol/php-sdk) (installed via Composer)
 
 ## Installation
 
