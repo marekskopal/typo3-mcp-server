@@ -7,6 +7,11 @@ namespace MarekSkopal\MsMcpServer\Tool\Dynamic;
 use MarekSkopal\MsMcpServer\Service\DataHandlerService;
 use MarekSkopal\MsMcpServer\Service\RecordService;
 use MarekSkopal\MsMcpServer\Service\TcaSchemaService;
+use MarekSkopal\MsMcpServer\Tool\Result\ErrorResult;
+use MarekSkopal\MsMcpServer\Tool\Result\RecordCreatedResult;
+use MarekSkopal\MsMcpServer\Tool\Result\RecordDeletedResult;
+use MarekSkopal\MsMcpServer\Tool\Result\RecordMovedResult;
+use MarekSkopal\MsMcpServer\Tool\Result\RecordUpdatedResult;
 use Mcp\Exception\ToolCallException;
 use Mcp\Server\Builder;
 use Psr\Log\LoggerInterface;
@@ -267,6 +272,7 @@ readonly class DynamicToolRegistrar
         $writableFields = $config['writableFields'];
         $languageField = $config['translationConfig']['languageField'];
 
+        /** @param array<string, mixed> $data */
         $createHandler = static function (
             array $data,
             int $pid,
@@ -277,7 +283,7 @@ readonly class DynamicToolRegistrar
             $tableName,
             $writableFields,
             $languageField,
-        ): string {
+        ): RecordCreatedResult|ErrorResult {
             $filteredData = array_intersect_key($data, array_flip($writableFields));
 
             if ($languageField !== null) {
@@ -285,13 +291,10 @@ readonly class DynamicToolRegistrar
                 unset($data[$languageField]);
             }
 
-            $ignoredFields = array_values(array_diff(array_keys($data), array_keys($filteredData)));
+            $ignoredFields = array_map('strval', array_values(array_diff(array_keys($data), array_keys($filteredData))));
 
             if ($filteredData === []) {
-                return json_encode(
-                    ['error' => 'No valid fields provided', 'ignoredFields' => $ignoredFields],
-                    JSON_THROW_ON_ERROR,
-                );
+                return new ErrorResult('No valid fields provided', ['ignoredFields' => $ignoredFields]);
             }
 
             try {
@@ -302,12 +305,7 @@ readonly class DynamicToolRegistrar
                 throw new ToolCallException($e->getMessage(), (int) $e->getCode(), $e);
             }
 
-            $response = ['uid' => $uid];
-            if ($ignoredFields !== []) {
-                $response['ignoredFields'] = $ignoredFields;
-            }
-
-            return json_encode($response, JSON_THROW_ON_ERROR);
+            return new RecordCreatedResult($uid, $ignoredFields);
         };
 
         $description = 'Create a new ' . $config['label'] . ' record. Pass fields as a JSON object string.'
@@ -319,7 +317,7 @@ readonly class DynamicToolRegistrar
                     int $pid,
                     string $fields,
                     int $sysLanguageUid = 0,
-                ) use ($createHandler): string {
+                ) use ($createHandler): RecordCreatedResult|ErrorResult {
                     /** @var array<string, mixed> $data */
                     $data = json_decode($fields, true, 512, JSON_THROW_ON_ERROR);
 
@@ -334,7 +332,7 @@ readonly class DynamicToolRegistrar
                 handler: static function (
                     int $pid,
                     string $fields,
-                ) use ($createHandler): string {
+                ) use ($createHandler): RecordCreatedResult|ErrorResult {
                     /** @var array<string, mixed> $data */
                     $data = json_decode($fields, true, 512, JSON_THROW_ON_ERROR);
 
@@ -362,7 +360,7 @@ readonly class DynamicToolRegistrar
                 $logger,
                 $tableName,
                 $writableFields,
-            ): string {
+            ): RecordUpdatedResult|ErrorResult {
                 /** @var array<string, mixed> $data */
                 $data = json_decode($fields, true, 512, JSON_THROW_ON_ERROR);
 
@@ -370,10 +368,7 @@ readonly class DynamicToolRegistrar
                 $ignoredFields = array_values(array_diff(array_keys($data), array_keys($filteredData)));
 
                 if ($filteredData === []) {
-                    return json_encode(
-                        ['error' => 'No valid fields provided', 'ignoredFields' => $ignoredFields],
-                        JSON_THROW_ON_ERROR,
-                    );
+                    return new ErrorResult('No valid fields provided', ['ignoredFields' => $ignoredFields]);
                 }
 
                 try {
@@ -384,12 +379,7 @@ readonly class DynamicToolRegistrar
                     throw new ToolCallException($e->getMessage(), (int) $e->getCode(), $e);
                 }
 
-                $response = ['uid' => $uid, 'updated' => array_keys($filteredData)];
-                if ($ignoredFields !== []) {
-                    $response['ignoredFields'] = $ignoredFields;
-                }
-
-                return json_encode($response, JSON_THROW_ON_ERROR);
+                return new RecordUpdatedResult($uid, array_keys($filteredData), $ignoredFields);
             },
             name: $config['prefix'] . '_update',
             description: 'Update an existing ' . $config['label'] . ' record. Pass fields as a JSON object string'
@@ -405,7 +395,7 @@ readonly class DynamicToolRegistrar
         $logger = $this->logger;
 
         $builder->addTool(
-            handler: static function (int $uid) use ($dataHandlerService, $logger, $tableName): string {
+            handler: static function (int $uid) use ($dataHandlerService, $logger, $tableName): RecordDeletedResult {
                 try {
                     $dataHandlerService->deleteRecord($tableName, $uid);
                 } catch (\Throwable $e) {
@@ -414,7 +404,7 @@ readonly class DynamicToolRegistrar
                     throw new ToolCallException($e->getMessage(), (int) $e->getCode(), $e);
                 }
 
-                return json_encode(['uid' => $uid, 'deleted' => true], JSON_THROW_ON_ERROR);
+                return new RecordDeletedResult($uid);
             },
             name: $config['prefix'] . '_delete',
             description: 'Delete a ' . $config['label'] . ' record by its uid.',
@@ -428,7 +418,7 @@ readonly class DynamicToolRegistrar
         $logger = $this->logger;
 
         $builder->addTool(
-            handler: static function (int $uid, int $target) use ($dataHandlerService, $logger, $tableName): string {
+            handler: static function (int $uid, int $target) use ($dataHandlerService, $logger, $tableName): RecordMovedResult {
                 try {
                     $dataHandlerService->moveRecord($tableName, $uid, $target);
                 } catch (\Throwable $e) {
@@ -437,7 +427,7 @@ readonly class DynamicToolRegistrar
                     throw new ToolCallException($e->getMessage(), (int) $e->getCode(), $e);
                 }
 
-                return json_encode(['uid' => $uid, 'moved' => true, 'target' => $target], JSON_THROW_ON_ERROR);
+                return new RecordMovedResult($uid, $target);
             },
             name: $config['prefix'] . '_move',
             description: 'Move a ' . $config['label'] . ' record to a new position.'

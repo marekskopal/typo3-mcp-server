@@ -7,11 +7,12 @@ namespace MarekSkopal\MsMcpServer\Tests\Unit\Tool\File;
 use MarekSkopal\MsMcpServer\Service\DataHandlerService;
 use MarekSkopal\MsMcpServer\Service\TcaSchemaService;
 use MarekSkopal\MsMcpServer\Tool\File\FileReferenceAddTool;
+use MarekSkopal\MsMcpServer\Tool\Result\ErrorResult;
+use MarekSkopal\MsMcpServer\Tool\Result\FileReferenceAddedResult;
 use Mcp\Exception\ToolCallException;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
-use const JSON_THROW_ON_ERROR;
 
 #[CoversClass(FileReferenceAddTool::class)]
 final class FileReferenceAddToolTest extends TestCase
@@ -40,13 +41,14 @@ final class FileReferenceAddToolTest extends TestCase
             ->willReturn([201, 202]);
 
         $tool = new FileReferenceAddTool($dataHandlerService, new TcaSchemaService(), new NullLogger());
-        $result = json_decode($tool->execute('tx_test', 100, 'image', '42,43'), true, 512, JSON_THROW_ON_ERROR);
+        $result = $tool->execute('tx_test', 100, 'image', '42,43');
 
-        self::assertSame('tx_test', $result['table']);
-        self::assertSame(100, $result['uid']);
-        self::assertSame('image', $result['fieldName']);
-        self::assertSame(2, $result['referencesCreated']);
-        self::assertSame([201, 202], $result['referenceUids']);
+        self::assertInstanceOf(FileReferenceAddedResult::class, $result);
+        self::assertSame('tx_test', $result->table);
+        self::assertSame(100, $result->uid);
+        self::assertSame('image', $result->fieldName);
+        self::assertSame(2, $result->referencesCreated);
+        self::assertSame([201, 202], $result->referenceUids);
     }
 
     public function testExecuteReturnsErrorForInvalidFieldName(): void
@@ -55,9 +57,10 @@ final class FileReferenceAddToolTest extends TestCase
         $dataHandlerService->expects(self::never())->method('createFileReferences');
 
         $tool = new FileReferenceAddTool($dataHandlerService, new TcaSchemaService(), new NullLogger());
-        $result = json_decode($tool->execute('tx_test', 100, 'bogus', '42'), true, 512, JSON_THROW_ON_ERROR);
+        $result = $tool->execute('tx_test', 100, 'bogus', '42');
 
-        self::assertStringContainsString('not a file field', $result['error']);
+        self::assertInstanceOf(ErrorResult::class, $result);
+        self::assertStringContainsString('not a file field', $result->error);
     }
 
     public function testExecuteReturnsErrorForEmptyFileUids(): void
@@ -66,9 +69,10 @@ final class FileReferenceAddToolTest extends TestCase
         $dataHandlerService->expects(self::never())->method('createFileReferences');
 
         $tool = new FileReferenceAddTool($dataHandlerService, new TcaSchemaService(), new NullLogger());
-        $result = json_decode($tool->execute('tx_test', 100, 'image', '0,'), true, 512, JSON_THROW_ON_ERROR);
+        $result = $tool->execute('tx_test', 100, 'image', '0,');
 
-        self::assertSame('No valid file UIDs provided', $result['error']);
+        self::assertInstanceOf(ErrorResult::class, $result);
+        self::assertSame('No valid file UIDs provided', $result->error);
     }
 
     public function testExecuteParsesMultipleFileUids(): void

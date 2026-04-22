@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace MarekSkopal\MsMcpServer\Tool\File;
 
 use MarekSkopal\MsMcpServer\Service\FileService;
+use MarekSkopal\MsMcpServer\Tool\Result\FileDeletedResult;
 use Mcp\Capability\Attribute\McpTool;
 use Mcp\Exception\ToolCallException;
 use Psr\Log\LoggerInterface;
-use const JSON_THROW_ON_ERROR;
 
 readonly class DirectoryDeleteTool
 {
@@ -17,7 +17,7 @@ readonly class DirectoryDeleteTool
     }
 
     #[McpTool(name: 'directory_delete', description: 'Delete a directory from a storage.')]
-    public function execute(string $directoryIdentifier, bool $recursive = false, int $storageUid = 1): string
+    public function execute(string $directoryIdentifier, bool $recursive = false, int $storageUid = 1): FileDeletedResult
     {
         try {
             $this->fileService->deleteDirectory($storageUid, $directoryIdentifier, $recursive);
@@ -27,6 +27,6 @@ readonly class DirectoryDeleteTool
             throw new ToolCallException($e->getMessage(), (int) $e->getCode(), $e);
         }
 
-        return json_encode(['identifier' => $directoryIdentifier, 'deleted' => true], JSON_THROW_ON_ERROR);
+        return new FileDeletedResult($directoryIdentifier);
     }
 }

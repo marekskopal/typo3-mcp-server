@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace MarekSkopal\MsMcpServer\Tool\Pages;
 
 use MarekSkopal\MsMcpServer\Service\DataHandlerService;
+use MarekSkopal\MsMcpServer\Tool\Result\RecordDeletedResult;
 use Mcp\Capability\Attribute\McpTool;
 use Mcp\Exception\ToolCallException;
 use Psr\Log\LoggerInterface;
-use const JSON_THROW_ON_ERROR;
 
 readonly class PagesDeleteTool
 {
@@ -17,7 +17,7 @@ readonly class PagesDeleteTool
     }
 
     #[McpTool(name: 'pages_delete', description: 'Delete a page by its uid.')]
-    public function execute(int $uid): string
+    public function execute(int $uid): RecordDeletedResult
     {
         try {
             $this->dataHandlerService->deleteRecord('pages', $uid);
@@ -27,6 +27,6 @@ readonly class PagesDeleteTool
             throw new ToolCallException($e->getMessage(), (int) $e->getCode(), $e);
         }
 
-        return json_encode(['uid' => $uid, 'deleted' => true], JSON_THROW_ON_ERROR);
+        return new RecordDeletedResult($uid);
     }
 }

@@ -6,16 +6,16 @@ namespace MarekSkopal\MsMcpServer\Tests\Unit\Tool\File;
 
 use MarekSkopal\MsMcpServer\Service\FileService;
 use MarekSkopal\MsMcpServer\Tool\File\DirectoryDeleteTool;
+use MarekSkopal\MsMcpServer\Tool\Result\FileDeletedResult;
 use Mcp\Exception\ToolCallException;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
-use const JSON_THROW_ON_ERROR;
 
 #[CoversClass(DirectoryDeleteTool::class)]
 final class DirectoryDeleteToolTest extends TestCase
 {
-    public function testExecuteDeletesDirectoryAndReturnsJson(): void
+    public function testExecuteDeletesDirectoryAndReturnsResult(): void
     {
         $fileService = $this->createMock(FileService::class);
         $fileService->expects(self::once())
@@ -23,10 +23,10 @@ final class DirectoryDeleteToolTest extends TestCase
             ->with(1, '/old/', false);
 
         $tool = new DirectoryDeleteTool($fileService, new NullLogger());
-        $result = json_decode($tool->execute('/old/'), true, 512, JSON_THROW_ON_ERROR);
+        $result = $tool->execute('/old/');
 
-        self::assertSame('/old/', $result['identifier']);
-        self::assertTrue($result['deleted']);
+        self::assertInstanceOf(FileDeletedResult::class, $result);
+        self::assertSame('/old/', $result->identifier);
     }
 
     public function testExecutePassesRecursiveFlag(): void

@@ -7,6 +7,8 @@ namespace MarekSkopal\MsMcpServer\Tests\Unit\Tool\Pages;
 use MarekSkopal\MsMcpServer\Service\DataHandlerService;
 use MarekSkopal\MsMcpServer\Service\TcaSchemaService;
 use MarekSkopal\MsMcpServer\Tool\Pages\PagesCreateTool;
+use MarekSkopal\MsMcpServer\Tool\Result\ErrorResult;
+use MarekSkopal\MsMcpServer\Tool\Result\RecordCreatedResult;
 use Mcp\Exception\ToolCallException;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
@@ -40,7 +42,7 @@ final class PagesCreateToolTest extends TestCase
         unset($GLOBALS['TCA']['pages']);
     }
 
-    public function testExecuteCreatesPageAndReturnsJson(): void
+    public function testExecuteCreatesPageAndReturnsResult(): void
     {
         $dataHandlerService = $this->createMock(DataHandlerService::class);
         $dataHandlerService->expects(self::once())
@@ -53,14 +55,10 @@ final class PagesCreateToolTest extends TestCase
             ->willReturn(123);
 
         $tool = new PagesCreateTool($dataHandlerService, new TcaSchemaService(), new NullLogger());
-        $result = json_decode(
-            $tool->execute(5, json_encode(['title' => 'New Page', 'doktype' => 1], JSON_THROW_ON_ERROR)),
-            true,
-            512,
-            JSON_THROW_ON_ERROR,
-        );
+        $result = $tool->execute(5, json_encode(['title' => 'New Page', 'doktype' => 1], JSON_THROW_ON_ERROR));
 
-        self::assertSame(123, $result['uid']);
+        self::assertInstanceOf(RecordCreatedResult::class, $result);
+        self::assertSame(123, $result->uid);
     }
 
     public function testExecuteCreatesPageWithAllFields(): void
@@ -83,21 +81,17 @@ final class PagesCreateToolTest extends TestCase
             ->willReturn(789);
 
         $tool = new PagesCreateTool($dataHandlerService, new TcaSchemaService(), new NullLogger());
-        $result = json_decode(
-            $tool->execute(1, json_encode([
-                'title' => 'Full Page',
-                'doktype' => 1,
-                'slug' => '/full-page',
-                'nav_title' => 'Nav Title',
-                'subtitle' => 'Subtitle',
-                'abstract' => 'Abstract text',
-            ], JSON_THROW_ON_ERROR)),
-            true,
-            512,
-            JSON_THROW_ON_ERROR,
-        );
+        $result = $tool->execute(1, json_encode([
+            'title' => 'Full Page',
+            'doktype' => 1,
+            'slug' => '/full-page',
+            'nav_title' => 'Nav Title',
+            'subtitle' => 'Subtitle',
+            'abstract' => 'Abstract text',
+        ], JSON_THROW_ON_ERROR));
 
-        self::assertSame(789, $result['uid']);
+        self::assertInstanceOf(RecordCreatedResult::class, $result);
+        self::assertSame(789, $result->uid);
     }
 
     public function testExecuteFiltersInvalidFields(): void
@@ -113,15 +107,11 @@ final class PagesCreateToolTest extends TestCase
             ->willReturn(100);
 
         $tool = new PagesCreateTool($dataHandlerService, new TcaSchemaService(), new NullLogger());
-        $result = json_decode(
-            $tool->execute(0, json_encode(['title' => 'Page', 'invalid_field' => 'x'], JSON_THROW_ON_ERROR)),
-            true,
-            512,
-            JSON_THROW_ON_ERROR,
-        );
+        $result = $tool->execute(0, json_encode(['title' => 'Page', 'invalid_field' => 'x'], JSON_THROW_ON_ERROR));
 
-        self::assertSame(100, $result['uid']);
-        self::assertSame(['invalid_field'], $result['ignoredFields']);
+        self::assertInstanceOf(RecordCreatedResult::class, $result);
+        self::assertSame(100, $result->uid);
+        self::assertSame(['invalid_field'], $result->ignoredFields);
     }
 
     public function testExecuteOmitsIgnoredFieldsWhenAllFieldsValid(): void
@@ -132,14 +122,10 @@ final class PagesCreateToolTest extends TestCase
             ->willReturn(100);
 
         $tool = new PagesCreateTool($dataHandlerService, new TcaSchemaService(), new NullLogger());
-        $result = json_decode(
-            $tool->execute(0, json_encode(['title' => 'Page'], JSON_THROW_ON_ERROR)),
-            true,
-            512,
-            JSON_THROW_ON_ERROR,
-        );
+        $result = $tool->execute(0, json_encode(['title' => 'Page'], JSON_THROW_ON_ERROR));
 
-        self::assertArrayNotHasKey('ignoredFields', $result);
+        self::assertInstanceOf(RecordCreatedResult::class, $result);
+        self::assertSame([], $result->ignoredFields);
     }
 
     public function testExecuteReturnsErrorWhenNoValidFields(): void
@@ -149,15 +135,11 @@ final class PagesCreateToolTest extends TestCase
             ->method('createRecord');
 
         $tool = new PagesCreateTool($dataHandlerService, new TcaSchemaService(), new NullLogger());
-        $result = json_decode(
-            $tool->execute(0, json_encode(['bad_field' => 'x'], JSON_THROW_ON_ERROR)),
-            true,
-            512,
-            JSON_THROW_ON_ERROR,
-        );
+        $result = $tool->execute(0, json_encode(['bad_field' => 'x'], JSON_THROW_ON_ERROR));
 
-        self::assertSame('No valid fields provided', $result['error']);
-        self::assertSame(['bad_field'], $result['ignoredFields']);
+        self::assertInstanceOf(ErrorResult::class, $result);
+        self::assertSame('No valid fields provided', $result->error);
+        self::assertSame(['bad_field'], $result->context['ignoredFields']);
     }
 
     public function testExecuteSetsSysLanguageUid(): void
@@ -177,14 +159,10 @@ final class PagesCreateToolTest extends TestCase
             ->willReturn(100);
 
         $tool = new PagesCreateTool($dataHandlerService, new TcaSchemaService(), new NullLogger());
-        $result = json_decode(
-            $tool->execute(0, json_encode(['title' => 'Test'], JSON_THROW_ON_ERROR), -1),
-            true,
-            512,
-            JSON_THROW_ON_ERROR,
-        );
+        $result = $tool->execute(0, json_encode(['title' => 'Test'], JSON_THROW_ON_ERROR), -1);
 
-        self::assertSame(100, $result['uid']);
+        self::assertInstanceOf(RecordCreatedResult::class, $result);
+        self::assertSame(100, $result->uid);
     }
 
     public function testExecuteThrowsToolCallExceptionOnError(): void

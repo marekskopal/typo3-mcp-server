@@ -7,6 +7,8 @@ namespace MarekSkopal\MsMcpServer\Tests\Unit\Tool\Content;
 use MarekSkopal\MsMcpServer\Service\DataHandlerService;
 use MarekSkopal\MsMcpServer\Service\TcaSchemaService;
 use MarekSkopal\MsMcpServer\Tool\Content\ContentCreateTool;
+use MarekSkopal\MsMcpServer\Tool\Result\ErrorResult;
+use MarekSkopal\MsMcpServer\Tool\Result\RecordCreatedResult;
 use Mcp\Exception\ToolCallException;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
@@ -40,7 +42,7 @@ final class ContentCreateToolTest extends TestCase
         unset($GLOBALS['TCA']['tt_content']);
     }
 
-    public function testExecuteCreatesContentAndReturnsJson(): void
+    public function testExecuteCreatesContentAndReturnsResult(): void
     {
         $dataHandlerService = $this->createMock(DataHandlerService::class);
         $dataHandlerService->expects(self::once())
@@ -53,14 +55,10 @@ final class ContentCreateToolTest extends TestCase
             ->willReturn(100);
 
         $tool = new ContentCreateTool($dataHandlerService, new TcaSchemaService(), new NullLogger());
-        $result = json_decode(
-            $tool->execute(10, json_encode(['CType' => 'text', 'header' => 'My Header'], JSON_THROW_ON_ERROR)),
-            true,
-            512,
-            JSON_THROW_ON_ERROR,
-        );
+        $result = $tool->execute(10, json_encode(['CType' => 'text', 'header' => 'My Header'], JSON_THROW_ON_ERROR));
 
-        self::assertSame(100, $result['uid']);
+        self::assertInstanceOf(RecordCreatedResult::class, $result);
+        self::assertSame(100, $result->uid);
     }
 
     public function testExecuteCreatesContentWithAllParams(): void
@@ -81,19 +79,15 @@ final class ContentCreateToolTest extends TestCase
             ->willReturn(200);
 
         $tool = new ContentCreateTool($dataHandlerService, new TcaSchemaService(), new NullLogger());
-        $result = json_decode(
-            $tool->execute(5, json_encode([
-                'CType' => 'html',
-                'header' => 'My Header',
-                'bodytext' => '<p>Body</p>',
-                'colPos' => 2,
-            ], JSON_THROW_ON_ERROR)),
-            true,
-            512,
-            JSON_THROW_ON_ERROR,
-        );
+        $result = $tool->execute(5, json_encode([
+            'CType' => 'html',
+            'header' => 'My Header',
+            'bodytext' => '<p>Body</p>',
+            'colPos' => 2,
+        ], JSON_THROW_ON_ERROR));
 
-        self::assertSame(200, $result['uid']);
+        self::assertInstanceOf(RecordCreatedResult::class, $result);
+        self::assertSame(200, $result->uid);
     }
 
     public function testExecuteCreatesPluginContent(): void
@@ -114,19 +108,15 @@ final class ContentCreateToolTest extends TestCase
             ->willReturn(300);
 
         $tool = new ContentCreateTool($dataHandlerService, new TcaSchemaService(), new NullLogger());
-        $result = json_decode(
-            $tool->execute(10, json_encode([
-                'CType' => 'list',
-                'header' => 'News Plugin',
-                'list_type' => 'news_pi1',
-                'pi_flexform' => '<xml>config</xml>',
-            ], JSON_THROW_ON_ERROR)),
-            true,
-            512,
-            JSON_THROW_ON_ERROR,
-        );
+        $result = $tool->execute(10, json_encode([
+            'CType' => 'list',
+            'header' => 'News Plugin',
+            'list_type' => 'news_pi1',
+            'pi_flexform' => '<xml>config</xml>',
+        ], JSON_THROW_ON_ERROR));
 
-        self::assertSame(300, $result['uid']);
+        self::assertInstanceOf(RecordCreatedResult::class, $result);
+        self::assertSame(300, $result->uid);
     }
 
     public function testExecuteReturnsIgnoredFieldsWhenSomeFieldsDropped(): void
@@ -137,15 +127,11 @@ final class ContentCreateToolTest extends TestCase
             ->willReturn(100);
 
         $tool = new ContentCreateTool($dataHandlerService, new TcaSchemaService(), new NullLogger());
-        $result = json_decode(
-            $tool->execute(10, json_encode(['header' => 'Test', 'unknown_field' => 'x'], JSON_THROW_ON_ERROR)),
-            true,
-            512,
-            JSON_THROW_ON_ERROR,
-        );
+        $result = $tool->execute(10, json_encode(['header' => 'Test', 'unknown_field' => 'x'], JSON_THROW_ON_ERROR));
 
-        self::assertSame(100, $result['uid']);
-        self::assertSame(['unknown_field'], $result['ignoredFields']);
+        self::assertInstanceOf(RecordCreatedResult::class, $result);
+        self::assertSame(100, $result->uid);
+        self::assertSame(['unknown_field'], $result->ignoredFields);
     }
 
     public function testExecuteOmitsIgnoredFieldsWhenAllFieldsValid(): void
@@ -156,15 +142,11 @@ final class ContentCreateToolTest extends TestCase
             ->willReturn(100);
 
         $tool = new ContentCreateTool($dataHandlerService, new TcaSchemaService(), new NullLogger());
-        $result = json_decode(
-            $tool->execute(10, json_encode(['header' => 'Test'], JSON_THROW_ON_ERROR)),
-            true,
-            512,
-            JSON_THROW_ON_ERROR,
-        );
+        $result = $tool->execute(10, json_encode(['header' => 'Test'], JSON_THROW_ON_ERROR));
 
-        self::assertSame(100, $result['uid']);
-        self::assertArrayNotHasKey('ignoredFields', $result);
+        self::assertInstanceOf(RecordCreatedResult::class, $result);
+        self::assertSame(100, $result->uid);
+        self::assertSame([], $result->ignoredFields);
     }
 
     public function testExecuteReturnsErrorWhenNoValidFields(): void
@@ -174,15 +156,11 @@ final class ContentCreateToolTest extends TestCase
             ->method('createRecord');
 
         $tool = new ContentCreateTool($dataHandlerService, new TcaSchemaService(), new NullLogger());
-        $result = json_decode(
-            $tool->execute(10, json_encode(['bad_field' => 'x'], JSON_THROW_ON_ERROR)),
-            true,
-            512,
-            JSON_THROW_ON_ERROR,
-        );
+        $result = $tool->execute(10, json_encode(['bad_field' => 'x'], JSON_THROW_ON_ERROR));
 
-        self::assertSame('No valid fields provided', $result['error']);
-        self::assertSame(['bad_field'], $result['ignoredFields']);
+        self::assertInstanceOf(ErrorResult::class, $result);
+        self::assertSame('No valid fields provided', $result->error);
+        self::assertSame(['bad_field'], $result->context['ignoredFields']);
     }
 
     public function testExecuteSetsSysLanguageUid(): void
@@ -202,14 +180,10 @@ final class ContentCreateToolTest extends TestCase
             ->willReturn(100);
 
         $tool = new ContentCreateTool($dataHandlerService, new TcaSchemaService(), new NullLogger());
-        $result = json_decode(
-            $tool->execute(10, json_encode(['header' => 'Test'], JSON_THROW_ON_ERROR), -1),
-            true,
-            512,
-            JSON_THROW_ON_ERROR,
-        );
+        $result = $tool->execute(10, json_encode(['header' => 'Test'], JSON_THROW_ON_ERROR), -1);
 
-        self::assertSame(100, $result['uid']);
+        self::assertInstanceOf(RecordCreatedResult::class, $result);
+        self::assertSame(100, $result->uid);
     }
 
     public function testExecuteDefaultsSysLanguageUidToZero(): void

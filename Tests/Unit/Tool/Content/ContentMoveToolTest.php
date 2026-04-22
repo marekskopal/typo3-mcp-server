@@ -6,11 +6,11 @@ namespace MarekSkopal\MsMcpServer\Tests\Unit\Tool\Content;
 
 use MarekSkopal\MsMcpServer\Service\DataHandlerService;
 use MarekSkopal\MsMcpServer\Tool\Content\ContentMoveTool;
+use MarekSkopal\MsMcpServer\Tool\Result\RecordMovedResult;
 use Mcp\Exception\ToolCallException;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
-use const JSON_THROW_ON_ERROR;
 
 #[CoversClass(ContentMoveTool::class)]
 final class ContentMoveToolTest extends TestCase
@@ -23,11 +23,11 @@ final class ContentMoveToolTest extends TestCase
             ->with('tt_content', 42, 10);
 
         $tool = new ContentMoveTool($dataHandlerService, new NullLogger());
-        $result = json_decode($tool->execute(42, 10), true, 512, JSON_THROW_ON_ERROR);
+        $result = $tool->execute(42, 10);
 
-        self::assertSame(42, $result['uid']);
-        self::assertTrue($result['moved']);
-        self::assertSame(10, $result['target']);
+        self::assertInstanceOf(RecordMovedResult::class, $result);
+        self::assertSame(42, $result->uid);
+        self::assertSame(10, $result->target);
     }
 
     public function testExecuteMovesContentAfterAnotherElement(): void
@@ -38,11 +38,11 @@ final class ContentMoveToolTest extends TestCase
             ->with('tt_content', 42, -5);
 
         $tool = new ContentMoveTool($dataHandlerService, new NullLogger());
-        $result = json_decode($tool->execute(42, -5), true, 512, JSON_THROW_ON_ERROR);
+        $result = $tool->execute(42, -5);
 
-        self::assertSame(42, $result['uid']);
-        self::assertTrue($result['moved']);
-        self::assertSame(-5, $result['target']);
+        self::assertInstanceOf(RecordMovedResult::class, $result);
+        self::assertSame(42, $result->uid);
+        self::assertSame(-5, $result->target);
     }
 
     public function testExecuteThrowsToolCallExceptionOnError(): void

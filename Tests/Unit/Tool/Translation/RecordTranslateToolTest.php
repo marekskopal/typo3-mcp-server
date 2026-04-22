@@ -7,12 +7,13 @@ namespace MarekSkopal\MsMcpServer\Tests\Unit\Tool\Translation;
 use MarekSkopal\MsMcpServer\Service\DataHandlerService;
 use MarekSkopal\MsMcpServer\Service\RecordService;
 use MarekSkopal\MsMcpServer\Service\TcaSchemaService;
+use MarekSkopal\MsMcpServer\Tool\Result\ErrorResult;
+use MarekSkopal\MsMcpServer\Tool\Result\RecordTranslatedResult;
 use MarekSkopal\MsMcpServer\Tool\Translation\RecordTranslateTool;
 use Mcp\Exception\ToolCallException;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
-use const JSON_THROW_ON_ERROR;
 
 #[CoversClass(RecordTranslateTool::class)]
 final class RecordTranslateToolTest extends TestCase
@@ -41,11 +42,12 @@ final class RecordTranslateToolTest extends TestCase
             ->willReturn(99);
 
         $tool = new RecordTranslateTool($dataHandlerService, $recordService, new TcaSchemaService(), new NullLogger());
-        $result = json_decode($tool->execute('pages', 1, 2), true, 512, JSON_THROW_ON_ERROR);
+        $result = $tool->execute('pages', 1, 2);
 
-        self::assertSame(99, $result['uid']);
-        self::assertSame('pages', $result['table']);
-        self::assertSame(2, $result['targetLanguageId']);
+        self::assertInstanceOf(RecordTranslatedResult::class, $result);
+        self::assertSame(99, $result->uid);
+        self::assertSame('pages', $result->table);
+        self::assertSame(2, $result->targetLanguageId);
     }
 
     public function testExecuteReturnsErrorForNonTranslatableTable(): void
@@ -61,10 +63,10 @@ final class RecordTranslateToolTest extends TestCase
         $recordService = $this->createStub(RecordService::class);
 
         $tool = new RecordTranslateTool($dataHandlerService, $recordService, new TcaSchemaService(), new NullLogger());
-        $result = json_decode($tool->execute('sys_file', 1, 1), true, 512, JSON_THROW_ON_ERROR);
+        $result = $tool->execute('sys_file', 1, 1);
 
-        self::assertArrayHasKey('error', $result);
-        self::assertStringContainsString('not language-aware', $result['error']);
+        self::assertInstanceOf(ErrorResult::class, $result);
+        self::assertStringContainsString('not language-aware', $result->error);
     }
 
     public function testExecuteReturnsErrorForRecordNotFound(): void
@@ -78,10 +80,10 @@ final class RecordTranslateToolTest extends TestCase
         $dataHandlerService->expects(self::never())->method('localizeRecord');
 
         $tool = new RecordTranslateTool($dataHandlerService, $recordService, new TcaSchemaService(), new NullLogger());
-        $result = json_decode($tool->execute('pages', 999, 1), true, 512, JSON_THROW_ON_ERROR);
+        $result = $tool->execute('pages', 999, 1);
 
-        self::assertArrayHasKey('error', $result);
-        self::assertStringContainsString('Record not found', $result['error']);
+        self::assertInstanceOf(ErrorResult::class, $result);
+        self::assertStringContainsString('Record not found', $result->error);
     }
 
     public function testExecuteReturnsErrorForAllLanguagesRecord(): void
@@ -95,10 +97,10 @@ final class RecordTranslateToolTest extends TestCase
         $dataHandlerService->expects(self::never())->method('localizeRecord');
 
         $tool = new RecordTranslateTool($dataHandlerService, $recordService, new TcaSchemaService(), new NullLogger());
-        $result = json_decode($tool->execute('pages', 1, 1), true, 512, JSON_THROW_ON_ERROR);
+        $result = $tool->execute('pages', 1, 1);
 
-        self::assertArrayHasKey('error', $result);
-        self::assertStringContainsString('sys_language_uid = -1', $result['error']);
+        self::assertInstanceOf(ErrorResult::class, $result);
+        self::assertStringContainsString('sys_language_uid = -1', $result->error);
     }
 
     public function testExecuteReturnsErrorForAlreadyTranslatedRecord(): void
@@ -112,10 +114,10 @@ final class RecordTranslateToolTest extends TestCase
         $dataHandlerService->expects(self::never())->method('localizeRecord');
 
         $tool = new RecordTranslateTool($dataHandlerService, $recordService, new TcaSchemaService(), new NullLogger());
-        $result = json_decode($tool->execute('pages', 5, 1), true, 512, JSON_THROW_ON_ERROR);
+        $result = $tool->execute('pages', 5, 1);
 
-        self::assertArrayHasKey('error', $result);
-        self::assertStringContainsString('already a translation', $result['error']);
+        self::assertInstanceOf(ErrorResult::class, $result);
+        self::assertStringContainsString('already a translation', $result->error);
     }
 
     public function testExecuteThrowsToolCallExceptionOnDataHandlerError(): void

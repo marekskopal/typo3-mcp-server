@@ -6,16 +6,16 @@ namespace MarekSkopal\MsMcpServer\Tests\Unit\Tool\File;
 
 use MarekSkopal\MsMcpServer\Service\FileService;
 use MarekSkopal\MsMcpServer\Tool\File\FileDeleteTool;
+use MarekSkopal\MsMcpServer\Tool\Result\FileDeletedResult;
 use Mcp\Exception\ToolCallException;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
-use const JSON_THROW_ON_ERROR;
 
 #[CoversClass(FileDeleteTool::class)]
 final class FileDeleteToolTest extends TestCase
 {
-    public function testExecuteDeletesFileAndReturnsJson(): void
+    public function testExecuteDeletesFileAndReturnsResult(): void
     {
         $fileService = $this->createMock(FileService::class);
         $fileService->expects(self::once())
@@ -23,10 +23,10 @@ final class FileDeleteToolTest extends TestCase
             ->with(1, '/test.txt');
 
         $tool = new FileDeleteTool($fileService, new NullLogger());
-        $result = json_decode($tool->execute('/test.txt'), true, 512, JSON_THROW_ON_ERROR);
+        $result = $tool->execute('/test.txt');
 
-        self::assertSame('/test.txt', $result['identifier']);
-        self::assertTrue($result['deleted']);
+        self::assertInstanceOf(FileDeletedResult::class, $result);
+        self::assertSame('/test.txt', $result->identifier);
     }
 
     public function testExecuteThrowsToolCallExceptionOnError(): void

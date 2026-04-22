@@ -6,10 +6,11 @@ namespace MarekSkopal\MsMcpServer\Tool\File;
 
 use MarekSkopal\MsMcpServer\Service\DataHandlerService;
 use MarekSkopal\MsMcpServer\Service\TcaSchemaService;
+use MarekSkopal\MsMcpServer\Tool\Result\ErrorResult;
+use MarekSkopal\MsMcpServer\Tool\Result\FileReferenceAddedResult;
 use Mcp\Capability\Attribute\McpTool;
 use Mcp\Exception\ToolCallException;
 use Psr\Log\LoggerInterface;
-use const JSON_THROW_ON_ERROR;
 
 readonly class FileReferenceAddTool
 {
@@ -24,7 +25,7 @@ readonly class FileReferenceAddTool
         name: 'file_reference_add',
         description: 'Attach uploaded files to a record\'s file/image field. Pass sys_file UIDs from file_upload results.',
     )]
-    public function execute(string $table, int $uid, string $fieldName, string $fileUids): string
+    public function execute(string $table, int $uid, string $fieldName, string $fileUids): FileReferenceAddedResult|ErrorResult
     {
         $parsedUids = array_values(array_filter(
             array_map(static fn (string $v): int => (int) trim($v), explode(',', $fileUids)),
@@ -32,15 +33,15 @@ readonly class FileReferenceAddTool
         ));
 
         if ($parsedUids === []) {
-            return json_encode(['error' => 'No valid file UIDs provided'], JSON_THROW_ON_ERROR);
+            return new ErrorResult('No valid file UIDs provided');
         }
 
         $fileFields = $this->tcaSchemaService->getFileFields($table);
         if (!in_array($fieldName, $fileFields, true)) {
-            return json_encode([
-                'error' => 'Field \'' . $fieldName . '\' is not a file field on table \'' . $table . '\'',
-                'availableFileFields' => $fileFields,
-            ], JSON_THROW_ON_ERROR);
+            return new ErrorResult(
+                'Field \'' . $fieldName . '\' is not a file field on table \'' . $table . '\'',
+                ['availableFileFields' => $fileFields],
+            );
         }
 
         try {
@@ -51,12 +52,6 @@ readonly class FileReferenceAddTool
             throw new ToolCallException($e->getMessage(), (int) $e->getCode(), $e);
         }
 
-        return json_encode([
-            'table' => $table,
-            'uid' => $uid,
-            'fieldName' => $fieldName,
-            'referencesCreated' => count($referenceUids),
-            'referenceUids' => $referenceUids,
-        ], JSON_THROW_ON_ERROR);
+        return new FileReferenceAddedResult($table, $uid, $fieldName, count($referenceUids), $referenceUids);
     }
 }

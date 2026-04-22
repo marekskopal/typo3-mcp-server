@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace MarekSkopal\MsMcpServer\Tool\File;
 
 use MarekSkopal\MsMcpServer\Service\FileService;
+use MarekSkopal\MsMcpServer\Tool\Result\FileDeletedResult;
 use Mcp\Capability\Attribute\McpTool;
 use Mcp\Exception\ToolCallException;
 use Psr\Log\LoggerInterface;
-use const JSON_THROW_ON_ERROR;
 
 readonly class FileDeleteTool
 {
@@ -17,7 +17,7 @@ readonly class FileDeleteTool
     }
 
     #[McpTool(name: 'file_delete', description: 'Delete a file by its identifier from a storage.')]
-    public function execute(string $fileIdentifier, int $storageUid = 1): string
+    public function execute(string $fileIdentifier, int $storageUid = 1): FileDeletedResult
     {
         try {
             $this->fileService->deleteFile($storageUid, $fileIdentifier);
@@ -27,6 +27,6 @@ readonly class FileDeleteTool
             throw new ToolCallException($e->getMessage(), (int) $e->getCode(), $e);
         }
 
-        return json_encode(['identifier' => $fileIdentifier, 'deleted' => true], JSON_THROW_ON_ERROR);
+        return new FileDeletedResult($fileIdentifier);
     }
 }

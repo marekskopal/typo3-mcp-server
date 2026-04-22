@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace MarekSkopal\MsMcpServer\Tool\Content;
 
 use MarekSkopal\MsMcpServer\Service\DataHandlerService;
+use MarekSkopal\MsMcpServer\Tool\Result\RecordDeletedResult;
 use Mcp\Capability\Attribute\McpTool;
 use Mcp\Exception\ToolCallException;
 use Psr\Log\LoggerInterface;
-use const JSON_THROW_ON_ERROR;
 
 readonly class ContentDeleteTool
 {
@@ -17,7 +17,7 @@ readonly class ContentDeleteTool
     }
 
     #[McpTool(name: 'content_delete', description: 'Delete a content element by its uid.')]
-    public function execute(int $uid): string
+    public function execute(int $uid): RecordDeletedResult
     {
         try {
             $this->dataHandlerService->deleteRecord('tt_content', $uid);
@@ -27,6 +27,6 @@ readonly class ContentDeleteTool
             throw new ToolCallException($e->getMessage(), (int) $e->getCode(), $e);
         }
 
-        return json_encode(['uid' => $uid, 'deleted' => true], JSON_THROW_ON_ERROR);
+        return new RecordDeletedResult($uid);
     }
 }

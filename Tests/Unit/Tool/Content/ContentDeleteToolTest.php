@@ -6,16 +6,16 @@ namespace MarekSkopal\MsMcpServer\Tests\Unit\Tool\Content;
 
 use MarekSkopal\MsMcpServer\Service\DataHandlerService;
 use MarekSkopal\MsMcpServer\Tool\Content\ContentDeleteTool;
+use MarekSkopal\MsMcpServer\Tool\Result\RecordDeletedResult;
 use Mcp\Exception\ToolCallException;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
-use const JSON_THROW_ON_ERROR;
 
 #[CoversClass(ContentDeleteTool::class)]
 final class ContentDeleteToolTest extends TestCase
 {
-    public function testExecuteDeletesContentAndReturnsJson(): void
+    public function testExecuteDeletesContentAndReturnsResult(): void
     {
         $dataHandlerService = $this->createMock(DataHandlerService::class);
         $dataHandlerService->expects(self::once())
@@ -23,10 +23,10 @@ final class ContentDeleteToolTest extends TestCase
             ->with('tt_content', 42);
 
         $tool = new ContentDeleteTool($dataHandlerService, new NullLogger());
-        $result = json_decode($tool->execute(42), true, 512, JSON_THROW_ON_ERROR);
+        $result = $tool->execute(42);
 
-        self::assertSame(42, $result['uid']);
-        self::assertSame(true, $result['deleted']);
+        self::assertInstanceOf(RecordDeletedResult::class, $result);
+        self::assertSame(42, $result->uid);
     }
 
     public function testExecuteThrowsToolCallExceptionOnError(): void

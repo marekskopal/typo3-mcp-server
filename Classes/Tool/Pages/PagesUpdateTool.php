@@ -6,6 +6,8 @@ namespace MarekSkopal\MsMcpServer\Tool\Pages;
 
 use MarekSkopal\MsMcpServer\Service\DataHandlerService;
 use MarekSkopal\MsMcpServer\Service\TcaSchemaService;
+use MarekSkopal\MsMcpServer\Tool\Result\ErrorResult;
+use MarekSkopal\MsMcpServer\Tool\Result\RecordUpdatedResult;
 use Mcp\Capability\Attribute\McpTool;
 use Mcp\Exception\ToolCallException;
 use Psr\Log\LoggerInterface;
@@ -24,7 +26,7 @@ readonly class PagesUpdateTool
         name: 'pages_update',
         description: 'Update an existing page. Pass fields as a JSON object string with field names and their new values.',
     )]
-    public function execute(int $uid, string $fields): string
+    public function execute(int $uid, string $fields): RecordUpdatedResult|ErrorResult
     {
         /** @var array<string, mixed> $data */
         $data = json_decode($fields, true, 512, JSON_THROW_ON_ERROR);
@@ -34,7 +36,7 @@ readonly class PagesUpdateTool
         $ignoredFields = array_values(array_diff(array_keys($data), array_keys($filteredData)));
 
         if ($filteredData === []) {
-            return json_encode(['error' => 'No valid fields provided', 'ignoredFields' => $ignoredFields], JSON_THROW_ON_ERROR);
+            return new ErrorResult('No valid fields provided', ['ignoredFields' => $ignoredFields]);
         }
 
         try {
@@ -45,11 +47,6 @@ readonly class PagesUpdateTool
             throw new ToolCallException($e->getMessage(), (int) $e->getCode(), $e);
         }
 
-        $response = ['uid' => $uid, 'updated' => array_keys($filteredData)];
-        if ($ignoredFields !== []) {
-            $response['ignoredFields'] = $ignoredFields;
-        }
-
-        return json_encode($response, JSON_THROW_ON_ERROR);
+        return new RecordUpdatedResult($uid, array_keys($filteredData), $ignoredFields);
     }
 }

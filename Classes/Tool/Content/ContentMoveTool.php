@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace MarekSkopal\MsMcpServer\Tool\Content;
 
 use MarekSkopal\MsMcpServer\Service\DataHandlerService;
+use MarekSkopal\MsMcpServer\Tool\Result\RecordMovedResult;
 use Mcp\Capability\Attribute\McpTool;
 use Mcp\Exception\ToolCallException;
 use Psr\Log\LoggerInterface;
-use const JSON_THROW_ON_ERROR;
 
 readonly class ContentMoveTool
 {
@@ -22,7 +22,7 @@ readonly class ContentMoveTool
             . ' Use a positive target to move to the top of a page (target = page pid).'
             . ' Use a negative target to move after another content element (target = -uid of the element to place after).',
     )]
-    public function execute(int $uid, int $target): string
+    public function execute(int $uid, int $target): RecordMovedResult
     {
         try {
             $this->dataHandlerService->moveRecord('tt_content', $uid, $target);
@@ -32,6 +32,6 @@ readonly class ContentMoveTool
             throw new ToolCallException($e->getMessage(), (int) $e->getCode(), $e);
         }
 
-        return json_encode(['uid' => $uid, 'moved' => true, 'target' => $target], JSON_THROW_ON_ERROR);
+        return new RecordMovedResult($uid, $target);
     }
 }

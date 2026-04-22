@@ -8,6 +8,11 @@ use MarekSkopal\MsMcpServer\Service\DataHandlerService;
 use MarekSkopal\MsMcpServer\Service\RecordService;
 use MarekSkopal\MsMcpServer\Service\TcaSchemaService;
 use MarekSkopal\MsMcpServer\Tool\Dynamic\DynamicToolRegistrar;
+use MarekSkopal\MsMcpServer\Tool\Result\ErrorResult;
+use MarekSkopal\MsMcpServer\Tool\Result\RecordCreatedResult;
+use MarekSkopal\MsMcpServer\Tool\Result\RecordDeletedResult;
+use MarekSkopal\MsMcpServer\Tool\Result\RecordMovedResult;
+use MarekSkopal\MsMcpServer\Tool\Result\RecordUpdatedResult;
 use Mcp\Exception\ToolCallException;
 use Mcp\Server;
 use PHPUnit\Framework\Attributes\CoversClass;
@@ -215,14 +220,10 @@ final class DynamicToolRegistrarTest extends TestCase
             $dataHandlerService,
             'create',
         );
-        $result = json_decode(
-            $closure(10, json_encode(['title' => 'New Item'], JSON_THROW_ON_ERROR)),
-            true,
-            512,
-            JSON_THROW_ON_ERROR,
-        );
+        $result = $closure(10, json_encode(['title' => 'New Item'], JSON_THROW_ON_ERROR));
 
-        self::assertSame(42, $result['uid']);
+        self::assertInstanceOf(RecordCreatedResult::class, $result);
+        self::assertSame(42, $result->uid);
     }
 
     public function testCreateToolFiltersInvalidFields(): void
@@ -238,15 +239,11 @@ final class DynamicToolRegistrarTest extends TestCase
             $dataHandlerService,
             'create',
         );
-        $result = json_decode(
-            $closure(10, json_encode(['title' => 'Valid', 'invalid_field' => 'ignored'], JSON_THROW_ON_ERROR)),
-            true,
-            512,
-            JSON_THROW_ON_ERROR,
-        );
+        $result = $closure(10, json_encode(['title' => 'Valid', 'invalid_field' => 'ignored'], JSON_THROW_ON_ERROR));
 
-        self::assertSame(42, $result['uid']);
-        self::assertSame(['invalid_field'], $result['ignoredFields']);
+        self::assertInstanceOf(RecordCreatedResult::class, $result);
+        self::assertSame(42, $result->uid);
+        self::assertSame(['invalid_field'], $result->ignoredFields);
     }
 
     public function testCreateToolReturnsErrorWhenNoValidFields(): void
@@ -259,15 +256,11 @@ final class DynamicToolRegistrarTest extends TestCase
             $dataHandlerService,
             'create',
         );
-        $result = json_decode(
-            $closure(10, json_encode(['invalid' => 'value'], JSON_THROW_ON_ERROR)),
-            true,
-            512,
-            JSON_THROW_ON_ERROR,
-        );
+        $result = $closure(10, json_encode(['invalid' => 'value'], JSON_THROW_ON_ERROR));
 
-        self::assertSame('No valid fields provided', $result['error']);
-        self::assertSame(['invalid'], $result['ignoredFields']);
+        self::assertInstanceOf(ErrorResult::class, $result);
+        self::assertSame('No valid fields provided', $result->error);
+        self::assertSame(['invalid'], $result->context['ignoredFields']);
     }
 
     public function testCreateToolThrowsToolCallExceptionOnError(): void
@@ -298,15 +291,11 @@ final class DynamicToolRegistrarTest extends TestCase
             $dataHandlerService,
             'update',
         );
-        $result = json_decode(
-            $closure(1, json_encode(['title' => 'Updated'], JSON_THROW_ON_ERROR)),
-            true,
-            512,
-            JSON_THROW_ON_ERROR,
-        );
+        $result = $closure(1, json_encode(['title' => 'Updated'], JSON_THROW_ON_ERROR));
 
-        self::assertSame(1, $result['uid']);
-        self::assertSame(['title'], $result['updated']);
+        self::assertInstanceOf(RecordUpdatedResult::class, $result);
+        self::assertSame(1, $result->uid);
+        self::assertSame(['title'], $result->updated);
     }
 
     public function testUpdateToolReturnsIgnoredFields(): void
@@ -321,15 +310,11 @@ final class DynamicToolRegistrarTest extends TestCase
             $dataHandlerService,
             'update',
         );
-        $result = json_decode(
-            $closure(1, json_encode(['title' => 'Updated', 'bad' => 'x'], JSON_THROW_ON_ERROR)),
-            true,
-            512,
-            JSON_THROW_ON_ERROR,
-        );
+        $result = $closure(1, json_encode(['title' => 'Updated', 'bad' => 'x'], JSON_THROW_ON_ERROR));
 
-        self::assertSame(['title'], $result['updated']);
-        self::assertSame(['bad'], $result['ignoredFields']);
+        self::assertInstanceOf(RecordUpdatedResult::class, $result);
+        self::assertSame(['title'], $result->updated);
+        self::assertSame(['bad'], $result->ignoredFields);
     }
 
     public function testUpdateToolReturnsErrorWhenNoValidFields(): void
@@ -342,15 +327,11 @@ final class DynamicToolRegistrarTest extends TestCase
             $dataHandlerService,
             'update',
         );
-        $result = json_decode(
-            $closure(1, json_encode(['invalid' => 'value'], JSON_THROW_ON_ERROR)),
-            true,
-            512,
-            JSON_THROW_ON_ERROR,
-        );
+        $result = $closure(1, json_encode(['invalid' => 'value'], JSON_THROW_ON_ERROR));
 
-        self::assertSame('No valid fields provided', $result['error']);
-        self::assertSame(['invalid'], $result['ignoredFields']);
+        self::assertInstanceOf(ErrorResult::class, $result);
+        self::assertSame('No valid fields provided', $result->error);
+        self::assertSame(['invalid'], $result->context['ignoredFields']);
     }
 
     public function testUpdateToolThrowsToolCallExceptionOnError(): void
@@ -381,11 +362,11 @@ final class DynamicToolRegistrarTest extends TestCase
             $dataHandlerService,
             'move',
         );
-        $result = json_decode($closure(5, -3), true, 512, JSON_THROW_ON_ERROR);
+        $result = $closure(5, -3);
 
-        self::assertSame(5, $result['uid']);
-        self::assertTrue($result['moved']);
-        self::assertSame(-3, $result['target']);
+        self::assertInstanceOf(RecordMovedResult::class, $result);
+        self::assertSame(5, $result->uid);
+        self::assertSame(-3, $result->target);
     }
 
     public function testMoveToolThrowsToolCallExceptionOnError(): void
@@ -416,10 +397,10 @@ final class DynamicToolRegistrarTest extends TestCase
             $dataHandlerService,
             'delete',
         );
-        $result = json_decode($closure(5), true, 512, JSON_THROW_ON_ERROR);
+        $result = $closure(5);
 
-        self::assertSame(5, $result['uid']);
-        self::assertTrue($result['deleted']);
+        self::assertInstanceOf(RecordDeletedResult::class, $result);
+        self::assertSame(5, $result->uid);
     }
 
     public function testDeleteToolThrowsToolCallExceptionOnError(): void

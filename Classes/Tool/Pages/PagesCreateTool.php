@@ -6,6 +6,8 @@ namespace MarekSkopal\MsMcpServer\Tool\Pages;
 
 use MarekSkopal\MsMcpServer\Service\DataHandlerService;
 use MarekSkopal\MsMcpServer\Service\TcaSchemaService;
+use MarekSkopal\MsMcpServer\Tool\Result\ErrorResult;
+use MarekSkopal\MsMcpServer\Tool\Result\RecordCreatedResult;
 use Mcp\Capability\Attribute\McpTool;
 use Mcp\Exception\ToolCallException;
 use Psr\Log\LoggerInterface;
@@ -25,7 +27,7 @@ readonly class PagesCreateTool
         description: 'Create a new page in the TYPO3 page tree. Pass fields as a JSON object string.'
             . ' Use sysLanguageUid to set the language (0 = default, -1 = all languages).',
     )]
-    public function execute(int $pid, string $fields, int $sysLanguageUid = 0): string
+    public function execute(int $pid, string $fields, int $sysLanguageUid = 0): RecordCreatedResult|ErrorResult
     {
         /** @var array<string, mixed> $data */
         $data = json_decode($fields, true, 512, JSON_THROW_ON_ERROR);
@@ -43,7 +45,7 @@ readonly class PagesCreateTool
         $ignoredFields = array_values(array_diff(array_keys($data), array_keys($filteredData)));
 
         if ($filteredData === []) {
-            return json_encode(['error' => 'No valid fields provided', 'ignoredFields' => $ignoredFields], JSON_THROW_ON_ERROR);
+            return new ErrorResult('No valid fields provided', ['ignoredFields' => $ignoredFields]);
         }
 
         try {
@@ -54,11 +56,6 @@ readonly class PagesCreateTool
             throw new ToolCallException($e->getMessage(), (int) $e->getCode(), $e);
         }
 
-        $response = ['uid' => $uid];
-        if ($ignoredFields !== []) {
-            $response['ignoredFields'] = $ignoredFields;
-        }
-
-        return json_encode($response, JSON_THROW_ON_ERROR);
+        return new RecordCreatedResult($uid, $ignoredFields);
     }
 }

@@ -7,6 +7,8 @@ namespace MarekSkopal\MsMcpServer\Tests\Unit\Tool\Pages;
 use MarekSkopal\MsMcpServer\Service\DataHandlerService;
 use MarekSkopal\MsMcpServer\Service\TcaSchemaService;
 use MarekSkopal\MsMcpServer\Tool\Pages\PagesUpdateTool;
+use MarekSkopal\MsMcpServer\Tool\Result\ErrorResult;
+use MarekSkopal\MsMcpServer\Tool\Result\RecordUpdatedResult;
 use Mcp\Exception\ToolCallException;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
@@ -50,15 +52,11 @@ final class PagesUpdateToolTest extends TestCase
             );
 
         $tool = new PagesUpdateTool($dataHandlerService, new TcaSchemaService(), new NullLogger());
-        $result = json_decode(
-            $tool->execute(42, json_encode(['title' => 'New Title', 'slug' => '/new'], JSON_THROW_ON_ERROR)),
-            true,
-            512,
-            JSON_THROW_ON_ERROR,
-        );
+        $result = $tool->execute(42, json_encode(['title' => 'New Title', 'slug' => '/new'], JSON_THROW_ON_ERROR));
 
-        self::assertSame(42, $result['uid']);
-        self::assertSame(['title', 'slug'], $result['updated']);
+        self::assertInstanceOf(RecordUpdatedResult::class, $result);
+        self::assertSame(42, $result->uid);
+        self::assertSame(['title', 'slug'], $result->updated);
     }
 
     public function testExecuteFiltersInvalidFields(): void
@@ -73,16 +71,12 @@ final class PagesUpdateToolTest extends TestCase
             );
 
         $tool = new PagesUpdateTool($dataHandlerService, new TcaSchemaService(), new NullLogger());
-        $result = json_decode(
-            $tool->execute(10, json_encode(['title' => 'T', 'invalid_field' => 'x'], JSON_THROW_ON_ERROR)),
-            true,
-            512,
-            JSON_THROW_ON_ERROR,
-        );
+        $result = $tool->execute(10, json_encode(['title' => 'T', 'invalid_field' => 'x'], JSON_THROW_ON_ERROR));
 
-        self::assertSame(10, $result['uid']);
-        self::assertSame(['title'], $result['updated']);
-        self::assertSame(['invalid_field'], $result['ignoredFields']);
+        self::assertInstanceOf(RecordUpdatedResult::class, $result);
+        self::assertSame(10, $result->uid);
+        self::assertSame(['title'], $result->updated);
+        self::assertSame(['invalid_field'], $result->ignoredFields);
     }
 
     public function testExecuteOmitsIgnoredFieldsWhenAllFieldsValid(): void
@@ -92,14 +86,10 @@ final class PagesUpdateToolTest extends TestCase
             ->method('updateRecord');
 
         $tool = new PagesUpdateTool($dataHandlerService, new TcaSchemaService(), new NullLogger());
-        $result = json_decode(
-            $tool->execute(10, json_encode(['title' => 'T'], JSON_THROW_ON_ERROR)),
-            true,
-            512,
-            JSON_THROW_ON_ERROR,
-        );
+        $result = $tool->execute(10, json_encode(['title' => 'T'], JSON_THROW_ON_ERROR));
 
-        self::assertArrayNotHasKey('ignoredFields', $result);
+        self::assertInstanceOf(RecordUpdatedResult::class, $result);
+        self::assertSame([], $result->ignoredFields);
     }
 
     public function testExecuteReturnsErrorWhenNoValidFields(): void
@@ -109,15 +99,11 @@ final class PagesUpdateToolTest extends TestCase
             ->method('updateRecord');
 
         $tool = new PagesUpdateTool($dataHandlerService, new TcaSchemaService(), new NullLogger());
-        $result = json_decode(
-            $tool->execute(1, json_encode(['bad_field' => 'x'], JSON_THROW_ON_ERROR)),
-            true,
-            512,
-            JSON_THROW_ON_ERROR,
-        );
+        $result = $tool->execute(1, json_encode(['bad_field' => 'x'], JSON_THROW_ON_ERROR));
 
-        self::assertSame('No valid fields provided', $result['error']);
-        self::assertSame(['bad_field'], $result['ignoredFields']);
+        self::assertInstanceOf(ErrorResult::class, $result);
+        self::assertSame('No valid fields provided', $result->error);
+        self::assertSame(['bad_field'], $result->context['ignoredFields']);
     }
 
     public function testExecuteThrowsToolCallExceptionOnError(): void

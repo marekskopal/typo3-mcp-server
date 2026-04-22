@@ -7,6 +7,8 @@ namespace MarekSkopal\MsMcpServer\Tests\Unit\Tool\Content;
 use MarekSkopal\MsMcpServer\Service\DataHandlerService;
 use MarekSkopal\MsMcpServer\Service\TcaSchemaService;
 use MarekSkopal\MsMcpServer\Tool\Content\ContentUpdateTool;
+use MarekSkopal\MsMcpServer\Tool\Result\ErrorResult;
+use MarekSkopal\MsMcpServer\Tool\Result\RecordUpdatedResult;
 use Mcp\Exception\ToolCallException;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
@@ -59,10 +61,11 @@ final class ContentUpdateToolTest extends TestCase
 
         $tool = new ContentUpdateTool($dataHandlerService, new TcaSchemaService(), new NullLogger());
         $fields = json_encode(['header' => 'Updated Header', 'bodytext' => 'Updated Body'], JSON_THROW_ON_ERROR);
-        $result = json_decode($tool->execute(42, $fields), true, 512, JSON_THROW_ON_ERROR);
+        $result = $tool->execute(42, $fields);
 
-        self::assertSame(42, $result['uid']);
-        self::assertSame(['header', 'bodytext'], $result['updated']);
+        self::assertInstanceOf(RecordUpdatedResult::class, $result);
+        self::assertSame(42, $result->uid);
+        self::assertSame(['header', 'bodytext'], $result->updated);
     }
 
     public function testExecuteFiltersInvalidFields(): void
@@ -80,11 +83,12 @@ final class ContentUpdateToolTest extends TestCase
 
         $tool = new ContentUpdateTool($dataHandlerService, new TcaSchemaService(), new NullLogger());
         $fields = json_encode(['header' => 'Valid', 'invalid_field' => 'Ignored', 'uid' => 999], JSON_THROW_ON_ERROR);
-        $result = json_decode($tool->execute(10, $fields), true, 512, JSON_THROW_ON_ERROR);
+        $result = $tool->execute(10, $fields);
 
-        self::assertSame(10, $result['uid']);
-        self::assertSame(['header'], $result['updated']);
-        self::assertSame(['invalid_field', 'uid'], $result['ignoredFields']);
+        self::assertInstanceOf(RecordUpdatedResult::class, $result);
+        self::assertSame(10, $result->uid);
+        self::assertSame(['header'], $result->updated);
+        self::assertSame(['invalid_field', 'uid'], $result->ignoredFields);
     }
 
     public function testExecuteOmitsIgnoredFieldsWhenAllFieldsValid(): void
@@ -95,9 +99,10 @@ final class ContentUpdateToolTest extends TestCase
 
         $tool = new ContentUpdateTool($dataHandlerService, new TcaSchemaService(), new NullLogger());
         $fields = json_encode(['header' => 'Valid'], JSON_THROW_ON_ERROR);
-        $result = json_decode($tool->execute(10, $fields), true, 512, JSON_THROW_ON_ERROR);
+        $result = $tool->execute(10, $fields);
 
-        self::assertArrayNotHasKey('ignoredFields', $result);
+        self::assertInstanceOf(RecordUpdatedResult::class, $result);
+        self::assertSame([], $result->ignoredFields);
     }
 
     public function testExecuteReturnsErrorWhenNoValidFields(): void
@@ -108,10 +113,11 @@ final class ContentUpdateToolTest extends TestCase
 
         $tool = new ContentUpdateTool($dataHandlerService, new TcaSchemaService(), new NullLogger());
         $fields = json_encode(['invalid_field' => 'value', 'another_bad' => 'value'], JSON_THROW_ON_ERROR);
-        $result = json_decode($tool->execute(10, $fields), true, 512, JSON_THROW_ON_ERROR);
+        $result = $tool->execute(10, $fields);
 
-        self::assertSame('No valid fields provided', $result['error']);
-        self::assertSame(['invalid_field', 'another_bad'], $result['ignoredFields']);
+        self::assertInstanceOf(ErrorResult::class, $result);
+        self::assertSame('No valid fields provided', $result->error);
+        self::assertSame(['invalid_field', 'another_bad'], $result->context['ignoredFields']);
     }
 
     public function testExecuteUpdatesPluginFields(): void
@@ -133,10 +139,11 @@ final class ContentUpdateToolTest extends TestCase
             ['list_type' => 'news_pi1', 'pi_flexform' => '<xml>config</xml>'],
             JSON_THROW_ON_ERROR,
         );
-        $result = json_decode($tool->execute(42, $fields), true, 512, JSON_THROW_ON_ERROR);
+        $result = $tool->execute(42, $fields);
 
-        self::assertSame(42, $result['uid']);
-        self::assertSame(['list_type', 'pi_flexform'], $result['updated']);
+        self::assertInstanceOf(RecordUpdatedResult::class, $result);
+        self::assertSame(42, $result->uid);
+        self::assertSame(['list_type', 'pi_flexform'], $result->updated);
     }
 
     public function testExecuteThrowsToolCallExceptionOnError(): void
