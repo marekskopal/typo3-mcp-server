@@ -114,25 +114,11 @@ final class FileServiceTest extends TestCase
         $storageRepository->method('findByUid')->willReturn($storage);
 
         $service = new FileService($storageRepository);
-        $result = $service->uploadFile(1, '/', 'upload.txt', base64_encode('Hello, World!'));
+        $result = $service->uploadFile(1, '/', 'upload.txt', 'Hello, World!');
 
         self::assertSame(42, $result['uid']);
         self::assertSame('upload.txt', $result['name']);
         self::assertSame(13, $result['size']);
-    }
-
-    public function testUploadFileThrowsOnInvalidBase64(): void
-    {
-        $storage = $this->createStub(ResourceStorage::class);
-        $storageRepository = $this->createStub(StorageRepository::class);
-        $storageRepository->method('findByUid')->willReturn($storage);
-
-        $service = new FileService($storageRepository);
-
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionCode(1712002002);
-
-        $service->uploadFile(1, '/', 'test.txt', '!!!invalid-base64!!!');
     }
 
     public function testCreateDirectoryReturnsDirectoryInfo(): void

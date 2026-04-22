@@ -16,11 +16,22 @@ readonly class FileUploadTool
     {
     }
 
-    #[McpTool(name: 'file_upload', description: 'Upload a file to a storage directory. Content must be base64-encoded.')]
-    public function execute(string $fileName, string $base64Content, string $directoryPath = '/', int $storageUid = 1,): string
-    {
+    #[McpTool(
+        name: 'file_upload',
+        description: 'Upload a file to a storage directory. Provide either "content" for plain text or "base64Content" for base64-encoded binary data. Exactly one must be specified.',
+    )]
+    public function execute(
+        string $fileName,
+        string $base64Content = '',
+        string $content = '',
+        string $directoryPath = '/',
+        int $storageUid = 1,
+    ): string {
         try {
-            $result = $this->fileService->uploadFile($storageUid, $directoryPath, $fileName, $base64Content);
+            $fileContent = $this->resolveContent($base64Content, $content);
+            $result = $this->fileService->uploadFile($storageUid, $directoryPath, $fileName, $fileContent);
+        } catch (ToolCallException $e) {
+            throw $e;
         } catch (\Throwable $e) {
             $this->logger->error('file_upload tool failed', ['exception' => $e]);
 
@@ -28,5 +39,27 @@ readonly class FileUploadTool
         }
 
         return json_encode($result, JSON_THROW_ON_ERROR);
+    }
+
+    private function resolveContent(string $base64Content, string $content): string
+    {
+        if ($base64Content !== '' && $content !== '') {
+            throw new ToolCallException('Provide either "content" or "base64Content", not both');
+        }
+
+        if ($base64Content === '' && $content === '') {
+            throw new ToolCallException('Either "content" or "base64Content" must be provided');
+        }
+
+        if ($content !== '') {
+            return $content;
+        }
+
+        $decoded = base64_decode($base64Content, true);
+        if ($decoded === false) {
+            throw new ToolCallException('Invalid base64 content');
+        }
+
+        return $decoded;
     }
 }

@@ -69,13 +69,8 @@ readonly class FileService
     }
 
     /** @return array{uid: int, name: string, identifier: string, size: int, mimeType: string} */
-    public function uploadFile(int $storageUid, string $directoryPath, string $fileName, string $base64Content): array
+    public function uploadFile(int $storageUid, string $directoryPath, string $fileName, string $content): array
     {
-        $content = base64_decode($base64Content, true);
-        if ($content === false) {
-            throw new \RuntimeException('Invalid base64 content', 1712002002);
-        }
-
         $storage = $this->getStorage($storageUid);
         $folder = $storage->getFolder($directoryPath);
 
