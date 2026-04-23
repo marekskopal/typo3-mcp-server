@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace MarekSkopal\MsMcpServer\Service;
 
 use Psr\Http\Message\ServerRequestInterface;
+use TYPO3\CMS\Core\Authentication\BackendUserAuthentication;
 use TYPO3\CMS\Core\DataHandling\DataHandler;
 use TYPO3\CMS\Core\Exception\SiteNotFoundException;
 use TYPO3\CMS\Core\Site\SiteFinder;
@@ -79,6 +80,51 @@ readonly class DataHandlerService
         $dataHandler->process_cmdmap();
 
         $this->checkErrors($dataHandler);
+    }
+
+    /**
+     * Copy a record to a new position.
+     *
+     * @param int $target Positive = destination pid, negative = -(uid) of record to copy after
+     * @param int $copyTreeDepth For pages: depth of subpages to include (0 = page only, 99 = all)
+     * @return int The uid of the new copied record
+     */
+    public function copyRecord(string $table, int $uid, int $target, int $copyTreeDepth = 0): int
+    {
+        $originalRequest = $table === 'pages' ? $this->ensureSiteContext($uid) : null;
+        $previousCopyLevels = null;
+
+        try {
+            if ($table === 'pages' && $copyTreeDepth > 0 && isset($GLOBALS['BE_USER'])) {
+                /** @var BackendUserAuthentication $beUser */
+                $beUser = $GLOBALS['BE_USER'];
+                $previousCopyLevels = $beUser->uc['copyLevels'] ?? 0;
+                $beUser->uc['copyLevels'] = $copyTreeDepth;
+            }
+
+            $dataHandler = GeneralUtility::makeInstance(DataHandler::class);
+            $dataHandler->start([], [$table => [$uid => ['copy' => $target]]]);
+            $dataHandler->process_cmdmap();
+
+            $this->checkErrors($dataHandler);
+
+            // @phpstan-ignore property.internal
+            $newUid = $dataHandler->copyMappingArray[$table][$uid] ?? null;
+            if (!is_int($newUid) && !is_string($newUid)) {
+                throw new \RuntimeException('Copy command did not return a new record uid', 1712000040);
+            }
+
+            return (int) $newUid;
+        } finally {
+            if ($previousCopyLevels !== null) {
+                /** @var BackendUserAuthentication $beUser */
+                $beUser = $GLOBALS['BE_USER'];
+                $beUser->uc['copyLevels'] = $previousCopyLevels;
+            }
+            if ($originalRequest !== null) {
+                $GLOBALS['TYPO3_REQUEST'] = $originalRequest;
+            }
+        }
     }
 
     public function deleteRecord(string $table, int $uid): void

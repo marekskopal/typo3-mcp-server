@@ -76,6 +76,7 @@ final class McpServerFactoryTest extends TestCase
                     str_contains($id, 'SiteLanguageService') => $siteLanguageService,
                     str_contains($id, 'LoggerInterface') || str_contains($id, 'Logger') => $logger,
                     str_contains($id, 'TableSchemaTool') => new ($id)($tcaSchemaService, $logger),
+                    str_contains($id, 'CopyTool') => new ($id)($dataHandlerService, $logger),
                     str_contains($id, 'RecordTranslateTool') => new ($id)($dataHandlerService, $tcaSchemaService, $logger),
                     str_contains($id, 'SiteLanguagesTool') => new ($id)($siteLanguageService, $logger),
                     str_contains($id, 'CacheClearTool') => new ($id)($cacheService, $logger),

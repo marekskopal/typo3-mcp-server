@@ -14,6 +14,7 @@ use MarekSkopal\MsMcpServer\Resource\SystemInfoResource;
 use MarekSkopal\MsMcpServer\Resource\TcaTableSchemaResource;
 use MarekSkopal\MsMcpServer\Resource\TcaTablesResource;
 use MarekSkopal\MsMcpServer\Tool\Cache\CacheClearTool;
+use MarekSkopal\MsMcpServer\Tool\Content\ContentCopyTool;
 use MarekSkopal\MsMcpServer\Tool\Content\ContentCreateTool;
 use MarekSkopal\MsMcpServer\Tool\Content\ContentDeleteTool;
 use MarekSkopal\MsMcpServer\Tool\Content\ContentGetTool;
@@ -29,6 +30,7 @@ use MarekSkopal\MsMcpServer\Tool\File\FileListTool;
 use MarekSkopal\MsMcpServer\Tool\File\FileReferenceAddTool;
 use MarekSkopal\MsMcpServer\Tool\File\FileUploadFromUrlTool;
 use MarekSkopal\MsMcpServer\Tool\File\FileUploadTool;
+use MarekSkopal\MsMcpServer\Tool\Pages\PagesCopyTool;
 use MarekSkopal\MsMcpServer\Tool\Pages\PagesCreateTool;
 use MarekSkopal\MsMcpServer\Tool\Pages\PagesDeleteTool;
 use MarekSkopal\MsMcpServer\Tool\Pages\PagesGetTool;
@@ -54,6 +56,7 @@ readonly class McpServerFactory
         [PagesCreateTool::class, 'execute', 'pages_create'],
         [PagesUpdateTool::class, 'execute', 'pages_update'],
         [PagesDeleteTool::class, 'execute', 'pages_delete'],
+        [PagesCopyTool::class, 'execute', 'pages_copy'],
         [PageTreeTool::class, 'execute', 'pages_tree'],
         [ContentListTool::class, 'execute', 'content_list'],
         [ContentGetTool::class, 'execute', 'content_get'],
@@ -61,6 +64,7 @@ readonly class McpServerFactory
         [ContentUpdateTool::class, 'execute', 'content_update'],
         [ContentDeleteTool::class, 'execute', 'content_delete'],
         [ContentMoveTool::class, 'execute', 'content_move'],
+        [ContentCopyTool::class, 'execute', 'content_copy'],
         [FileListTool::class, 'execute', 'file_list'],
         [FileGetInfoTool::class, 'execute', 'file_get_info'],
         [FileUploadTool::class, 'execute', 'file_upload'],
