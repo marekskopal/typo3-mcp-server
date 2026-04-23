@@ -12,6 +12,11 @@ services:
     exclude: '../Classes/Tool/Result/*'
     public: true
 
+  MarekSkopal\MsMcpServer\Resource\:
+    resource: '../Classes/Resource/*'
+    exclude: '../Classes/Resource/Result/*'
+    public: true
+
   MarekSkopal\MsMcpServer\Command\CleanupExpiredTokensCommand:
     tags:
       - name: 'console.command'

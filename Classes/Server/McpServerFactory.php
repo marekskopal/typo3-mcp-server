@@ -4,6 +4,11 @@ declare(strict_types=1);
 
 namespace MarekSkopal\MsMcpServer\Server;
 
+use MarekSkopal\MsMcpServer\Resource\BackendUserResource;
+use MarekSkopal\MsMcpServer\Resource\SiteConfigurationResource;
+use MarekSkopal\MsMcpServer\Resource\SystemInfoResource;
+use MarekSkopal\MsMcpServer\Resource\TcaTableSchemaResource;
+use MarekSkopal\MsMcpServer\Resource\TcaTablesResource;
 use MarekSkopal\MsMcpServer\Tool\Content\ContentCreateTool;
 use MarekSkopal\MsMcpServer\Tool\Content\ContentDeleteTool;
 use MarekSkopal\MsMcpServer\Tool\Content\ContentGetTool;
@@ -65,6 +70,17 @@ readonly class McpServerFactory
         [RecordTranslateTool::class, 'execute', 'record_translate'],
     ];
 
+    private const array RESOURCES = [
+        [SystemInfoResource::class, 'execute', 'typo3://system/info'],
+        [SiteConfigurationResource::class, 'execute', 'typo3://sites'],
+        [TcaTablesResource::class, 'execute', 'typo3://schema/tables'],
+        [BackendUserResource::class, 'execute', 'typo3://user/me'],
+    ];
+
+    private const array RESOURCE_TEMPLATES = [
+        [TcaTableSchemaResource::class, 'execute', 'typo3://schema/tables/{tableName}'],
+    ];
+
     public function __construct(private ContainerInterface $container, private DynamicToolRegistrar $dynamicToolRegistrar,)
     {
     }
@@ -84,6 +100,14 @@ readonly class McpServerFactory
         }
 
         $this->dynamicToolRegistrar->register($builder);
+
+        foreach (self::RESOURCES as [$class, $method, $uri]) {
+            $builder->addResource([$class, $method], $uri);
+        }
+
+        foreach (self::RESOURCE_TEMPLATES as [$class, $method, $uriTemplate]) {
+            $builder->addResourceTemplate([$class, $method], $uriTemplate);
+        }
 
         return $builder->build();
     }

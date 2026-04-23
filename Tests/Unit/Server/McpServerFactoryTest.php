@@ -12,6 +12,7 @@ use MarekSkopal\MsMcpServer\Service\RecordService;
 use MarekSkopal\MsMcpServer\Service\SiteLanguageService;
 use MarekSkopal\MsMcpServer\Service\TcaSchemaService;
 use MarekSkopal\MsMcpServer\Tool\Dynamic\DynamicToolRegistrar;
+use TYPO3\CMS\Core\Information\Typo3Version;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 use Psr\Container\ContainerInterface;
@@ -44,6 +45,7 @@ final class McpServerFactoryTest extends TestCase
     {
         $connectionPool = $this->createStub(ConnectionPool::class);
         $storageRepository = $this->createStub(StorageRepository::class);
+        $siteFinder = $this->createStub(SiteFinder::class);
         $recordService = new RecordService($connectionPool);
         $dataHandlerService = new DataHandlerService($this->createStub(SiteFinder::class));
         $fileService = new FileService($storageRepository);
@@ -51,12 +53,15 @@ final class McpServerFactoryTest extends TestCase
 
         $tcaSchemaService = new TcaSchemaService();
 
-        $siteLanguageService = new SiteLanguageService($this->createStub(SiteFinder::class));
+        $siteLanguageService = new SiteLanguageService($siteFinder);
+
+        $typo3Version = $this->createStub(Typo3Version::class);
+        $typo3Version->method('getVersion')->willReturn('13.4.0');
 
         $container = $this->createStub(ContainerInterface::class);
         $container->method('has')->willReturn(true);
         $container->method('get')->willReturnCallback(
-            static function (string $id) use ($recordService, $dataHandlerService, $fileService, $tcaSchemaService, $siteLanguageService, $logger): object {
+            static function (string $id) use ($recordService, $dataHandlerService, $fileService, $tcaSchemaService, $siteLanguageService, $siteFinder, $typo3Version, $logger): object {
                 return match (true) {
                     str_contains($id, 'RecordService') => $recordService,
                     str_contains($id, 'DataHandlerService') => $dataHandlerService,
@@ -67,6 +72,10 @@ final class McpServerFactoryTest extends TestCase
                     str_contains($id, 'TableSchemaTool') => new ($id)($tcaSchemaService, $logger),
                     str_contains($id, 'RecordTranslateTool') => new ($id)($dataHandlerService, $tcaSchemaService, $logger),
                     str_contains($id, 'SiteLanguagesTool') => new ($id)($siteLanguageService, $logger),
+                    str_contains($id, 'SystemInfoResource') => new ($id)($typo3Version, $logger),
+                    str_contains($id, 'SiteConfigurationResource') => new ($id)($siteFinder, $logger),
+                    str_contains($id, 'TcaTableSchemaResource') => new ($id)($tcaSchemaService, $logger),
+                    str_contains($id, 'BackendUserResource') || str_contains($id, 'TcaTablesResource') => new ($id)($logger),
                     default => new ($id)($recordService, $logger),
                 };
             },
