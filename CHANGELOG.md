@@ -4,6 +4,30 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.4.0] - 2026-04-23
+
+### Added
+- **MCP Resources** for read-only TYPO3 instance discovery:
+  - `typo3://system/info` — TYPO3 version, PHP version, and environment context
+  - `typo3://sites` — All configured sites with root pages, base URLs, and languages
+  - `typo3://schema/tables` — List of all available TCA database tables
+  - `typo3://user/me` — Current authenticated backend user information
+  - `typo3://schema/tables/{tableName}` — Full TCA field schema for a specific table
+  - `typo3://pages/{pageId}/backend-layout` — Backend layout for a page including available column positions (colPos) and grid structure
+- **MCP Prompts** for guided multi-step workflows:
+  - `translate_page_content` — Translate a page and all its content elements to a target language
+  - `audit_page_seo` — Audit SEO metadata for a page and suggest fixes
+  - `summarize_page` — Generate a content inventory and summary of a page
+- **Cache tool:** `cache_clear` for flushing TYPO3 caches (all, pages, or specific groups)
+- `file_upload` now supports plain text content in addition to base64-encoded content
+
+### Changed
+- Tool return values refactored from arrays to typed Result DTOs
+- Result DTOs excluded from DI container registration
+
+### Fixed
+- Fixed link in readme
+
 ## [0.3.0] - 2026-04-20
 
 ### Added
