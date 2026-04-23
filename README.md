@@ -160,6 +160,11 @@ Add to your Claude Desktop config (`claude_desktop_config.json`):
 | `site_languages` | List configured site languages |
 | `record_translate` | Translate a record to another language |
 
+#### Cache
+| Tool | Description |
+|------|-------------|
+| `cache_clear` | Flush TYPO3 caches (all, pages, or specific groups) |
+
 #### Dynamic Extension Tools
 
 Additional CRUD tools are registered automatically for tables configured via `EXTCONF`. News is pre-configured:
@@ -172,6 +177,29 @@ Additional CRUD tools are registered automatically for tables configured via `EX
 | `news_update` | Update news record fields |
 | `news_delete` | Delete a news record |
 | `news_move` | Move a news record to a new position |
+
+### Available Resources
+
+Resources provide read-only data that AI clients can access for context about the TYPO3 instance.
+
+| Resource | URI | Description |
+|----------|-----|-------------|
+| `typo3_info` | `typo3://system/info` | TYPO3 version, PHP version, and environment context |
+| `site_configuration` | `typo3://sites` | All configured sites with root pages, base URLs, and languages |
+| `tca_tables` | `typo3://schema/tables` | List of all available TCA database tables |
+| `backend_user` | `typo3://user/me` | Current authenticated backend user information |
+| `tca_table_schema` | `typo3://schema/tables/{tableName}` | Full TCA field schema for a specific table |
+| `backend_layout` | `typo3://pages/{pageId}/backend-layout` | Backend layout for a page including available column positions (colPos) and grid structure |
+
+### Available Prompts
+
+Prompts provide guided multi-step workflows for common tasks.
+
+| Prompt | Description |
+|--------|-------------|
+| `translate_page_content` | Translate a page and all its content elements to a target language or all available languages |
+| `audit_page_seo` | Audit SEO metadata for a page and its content, then report findings and suggest fixes |
+| `summarize_page` | Generate a content inventory and summary of a page, including all content elements and translations |
 
 ### Backend Module
 
@@ -217,7 +245,7 @@ vendor/bin/phpstan analyse
 vendor/bin/phpcs
 vendor/bin/phpcbf
 
-# Tests (237 tests, 803 assertions)
+# Tests (279 tests, 1000 assertions)
 vendor/bin/phpunit
 ```
 
