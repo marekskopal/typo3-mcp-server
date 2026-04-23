@@ -28,6 +28,8 @@ use MarekSkopal\MsMcpServer\Tool\File\FileDeleteTool;
 use MarekSkopal\MsMcpServer\Tool\File\FileGetInfoTool;
 use MarekSkopal\MsMcpServer\Tool\File\FileListTool;
 use MarekSkopal\MsMcpServer\Tool\File\FileReferenceAddTool;
+use MarekSkopal\MsMcpServer\Tool\File\FileReferenceListTool;
+use MarekSkopal\MsMcpServer\Tool\File\FileReferenceRemoveTool;
 use MarekSkopal\MsMcpServer\Tool\File\FileUploadFromUrlTool;
 use MarekSkopal\MsMcpServer\Tool\File\FileUploadTool;
 use MarekSkopal\MsMcpServer\Tool\Pages\PagesCopyTool;
@@ -72,6 +74,8 @@ readonly class McpServerFactory
         [DirectoryCreateTool::class, 'execute', 'directory_create'],
         [DirectoryDeleteTool::class, 'execute', 'directory_delete'],
         [FileReferenceAddTool::class, 'execute', 'file_reference_add'],
+        [FileReferenceListTool::class, 'execute', 'file_reference_list'],
+        [FileReferenceRemoveTool::class, 'execute', 'file_reference_remove'],
         [FileUploadFromUrlTool::class, 'execute', 'file_upload_from_url'],
         [TableSchemaTool::class, 'execute', 'table_schema'],
         [RecordSearchTool::class, 'execute', 'record_search'],

@@ -227,6 +227,58 @@ final class RecordServiceTest extends TestCase
         self::assertSame(0, $result['total']);
     }
 
+    public function testFindFileReferencesReturnsReferences(): void
+    {
+        $expectedRows = [
+            ['uid' => 201, 'uid_local' => 10, 'title' => 'Logo', 'description' => '', 'alternative' => '', 'link' => '', 'crop' => '', 'autoplay' => 0, 'sorting_foreign' => 1],
+            ['uid' => 202, 'uid_local' => 11, 'title' => '', 'description' => '', 'alternative' => '', 'link' => '', 'crop' => '', 'autoplay' => 0, 'sorting_foreign' => 2],
+        ];
+
+        $result = $this->createStub(Result::class);
+        $result->method('fetchAllAssociative')->willReturn($expectedRows);
+
+        $queryBuilder = $this->createQueryBuilderStub();
+        $queryBuilder->method('select')->willReturnSelf();
+        $queryBuilder->method('from')->willReturnSelf();
+        $queryBuilder->method('where')->willReturnSelf();
+        $queryBuilder->method('andWhere')->willReturnSelf();
+        $queryBuilder->method('orderBy')->willReturnSelf();
+        $queryBuilder->method('executeQuery')->willReturn($result);
+
+        $connectionPool = $this->createStub(ConnectionPool::class);
+        $connectionPool->method('getQueryBuilderForTable')->willReturn($queryBuilder);
+
+        $service = new RecordService($connectionPool);
+        $references = $service->findFileReferences('tt_content', 100, 'image');
+
+        self::assertCount(2, $references);
+        self::assertSame(201, $references[0]['uid']);
+        self::assertSame(10, $references[0]['uid_local']);
+        self::assertSame('Logo', $references[0]['title']);
+    }
+
+    public function testFindFileReferencesReturnsEmptyArrayWhenNoneFound(): void
+    {
+        $result = $this->createStub(Result::class);
+        $result->method('fetchAllAssociative')->willReturn([]);
+
+        $queryBuilder = $this->createQueryBuilderStub();
+        $queryBuilder->method('select')->willReturnSelf();
+        $queryBuilder->method('from')->willReturnSelf();
+        $queryBuilder->method('where')->willReturnSelf();
+        $queryBuilder->method('andWhere')->willReturnSelf();
+        $queryBuilder->method('orderBy')->willReturnSelf();
+        $queryBuilder->method('executeQuery')->willReturn($result);
+
+        $connectionPool = $this->createStub(ConnectionPool::class);
+        $connectionPool->method('getQueryBuilderForTable')->willReturn($queryBuilder);
+
+        $service = new RecordService($connectionPool);
+        $references = $service->findFileReferences('tt_content', 999, 'image');
+
+        self::assertSame([], $references);
+    }
+
     public function testFindTranslationsReturnsTranslationRecords(): void
     {
         $expectedRows = [

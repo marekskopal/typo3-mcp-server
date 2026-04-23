@@ -142,6 +142,27 @@ readonly class RecordService
     }
 
     /**
+     * Find all file references for a record field.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function findFileReferences(string $table, int $uid, string $fieldName): array
+    {
+        $queryBuilder = $this->connectionPool->getQueryBuilderForTable('sys_file_reference');
+        $queryBuilder->getRestrictions()->removeAll();
+
+        return $queryBuilder
+            ->select('uid', 'uid_local', 'title', 'description', 'alternative', 'link', 'crop', 'autoplay', 'sorting_foreign')
+            ->from('sys_file_reference')
+            ->where($queryBuilder->expr()->eq('uid_foreign', $queryBuilder->createNamedParameter($uid, ParameterType::INTEGER)))
+            ->andWhere($queryBuilder->expr()->eq('tablenames', $queryBuilder->createNamedParameter($table)))
+            ->andWhere($queryBuilder->expr()->eq('fieldname', $queryBuilder->createNamedParameter($fieldName)))
+            ->orderBy('sorting_foreign', 'ASC')
+            ->executeQuery()
+            ->fetchAllAssociative();
+    }
+
+    /**
      * Find all translations of a record.
      *
      * @return list<array{uid: int, sys_language_uid: int}>
