@@ -6,6 +6,7 @@ namespace MarekSkopal\MsMcpServer\Tests\Unit\Server;
 
 use Mcp\Server;
 use MarekSkopal\MsMcpServer\Server\McpServerFactory;
+use MarekSkopal\MsMcpServer\Service\CacheService;
 use MarekSkopal\MsMcpServer\Service\DataHandlerService;
 use MarekSkopal\MsMcpServer\Service\FileService;
 use MarekSkopal\MsMcpServer\Service\RecordService;
@@ -19,6 +20,7 @@ use Psr\Container\ContainerInterface;
 use Psr\Log\NullLogger;
 use TYPO3\CMS\Core\Core\ApplicationContext;
 use TYPO3\CMS\Core\Core\Environment;
+use TYPO3\CMS\Core\Cache\CacheManager;
 use TYPO3\CMS\Core\Database\ConnectionPool;
 use TYPO3\CMS\Core\Resource\StorageRepository;
 use TYPO3\CMS\Core\Site\SiteFinder;
@@ -54,6 +56,7 @@ final class McpServerFactoryTest extends TestCase
         $tcaSchemaService = new TcaSchemaService();
 
         $siteLanguageService = new SiteLanguageService($siteFinder);
+        $cacheService = new CacheService($this->createStub(CacheManager::class));
 
         $typo3Version = $this->createStub(Typo3Version::class);
         $typo3Version->method('getVersion')->willReturn('13.4.0');
@@ -61,7 +64,7 @@ final class McpServerFactoryTest extends TestCase
         $container = $this->createStub(ContainerInterface::class);
         $container->method('has')->willReturn(true);
         $container->method('get')->willReturnCallback(
-            static function (string $id) use ($recordService, $dataHandlerService, $fileService, $tcaSchemaService, $siteLanguageService, $siteFinder, $typo3Version, $logger): object {
+            static function (string $id) use ($recordService, $dataHandlerService, $fileService, $tcaSchemaService, $siteLanguageService, $cacheService, $siteFinder, $typo3Version, $logger): object {
                 return match (true) {
                     str_contains($id, 'RecordService') => $recordService,
                     str_contains($id, 'DataHandlerService') => $dataHandlerService,
@@ -72,6 +75,7 @@ final class McpServerFactoryTest extends TestCase
                     str_contains($id, 'TableSchemaTool') => new ($id)($tcaSchemaService, $logger),
                     str_contains($id, 'RecordTranslateTool') => new ($id)($dataHandlerService, $tcaSchemaService, $logger),
                     str_contains($id, 'SiteLanguagesTool') => new ($id)($siteLanguageService, $logger),
+                    str_contains($id, 'CacheClearTool') => new ($id)($cacheService, $logger),
                     str_contains($id, 'SystemInfoResource') => new ($id)($typo3Version, $logger),
                     str_contains($id, 'SiteConfigurationResource') => new ($id)($siteFinder, $logger),
                     str_contains($id, 'TcaTableSchemaResource') => new ($id)($tcaSchemaService, $logger),

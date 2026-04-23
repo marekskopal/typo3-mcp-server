@@ -9,6 +9,7 @@ use MarekSkopal\MsMcpServer\Resource\SiteConfigurationResource;
 use MarekSkopal\MsMcpServer\Resource\SystemInfoResource;
 use MarekSkopal\MsMcpServer\Resource\TcaTableSchemaResource;
 use MarekSkopal\MsMcpServer\Resource\TcaTablesResource;
+use MarekSkopal\MsMcpServer\Tool\Cache\CacheClearTool;
 use MarekSkopal\MsMcpServer\Tool\Content\ContentCreateTool;
 use MarekSkopal\MsMcpServer\Tool\Content\ContentDeleteTool;
 use MarekSkopal\MsMcpServer\Tool\Content\ContentGetTool;
@@ -68,6 +69,7 @@ readonly class McpServerFactory
         [RecordSearchTool::class, 'execute', 'record_search'],
         [SiteLanguagesTool::class, 'execute', 'site_languages'],
         [RecordTranslateTool::class, 'execute', 'record_translate'],
+        [CacheClearTool::class, 'execute', 'cache_clear'],
     ];
 
     private const array RESOURCES = [
