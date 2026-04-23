@@ -12,6 +12,10 @@ services:
     exclude: '../Classes/Tool/Result/*'
     public: true
 
+  MarekSkopal\MsMcpServer\Prompt\:
+    resource: '../Classes/Prompt/*'
+    public: true
+
   MarekSkopal\MsMcpServer\Resource\:
     resource: '../Classes/Resource/*'
     exclude: '../Classes/Resource/Result/*'

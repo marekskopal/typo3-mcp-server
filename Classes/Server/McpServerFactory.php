@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace MarekSkopal\MsMcpServer\Server;
 
+use MarekSkopal\MsMcpServer\Prompt\AuditPageSeoPrompt;
+use MarekSkopal\MsMcpServer\Prompt\SummarizePagePrompt;
+use MarekSkopal\MsMcpServer\Prompt\TranslatePageContentPrompt;
 use MarekSkopal\MsMcpServer\Resource\BackendUserResource;
 use MarekSkopal\MsMcpServer\Resource\SiteConfigurationResource;
 use MarekSkopal\MsMcpServer\Resource\SystemInfoResource;
@@ -83,6 +86,12 @@ readonly class McpServerFactory
         [TcaTableSchemaResource::class, 'execute', 'typo3://schema/tables/{tableName}'],
     ];
 
+    private const array PROMPTS = [
+        [TranslatePageContentPrompt::class, 'execute', 'translate_page_content'],
+        [AuditPageSeoPrompt::class, 'execute', 'audit_page_seo'],
+        [SummarizePagePrompt::class, 'execute', 'summarize_page'],
+    ];
+
     public function __construct(private ContainerInterface $container, private DynamicToolRegistrar $dynamicToolRegistrar,)
     {
     }
@@ -109,6 +118,10 @@ readonly class McpServerFactory
 
         foreach (self::RESOURCE_TEMPLATES as [$class, $method, $uriTemplate]) {
             $builder->addResourceTemplate([$class, $method], $uriTemplate);
+        }
+
+        foreach (self::PROMPTS as [$class, $method, $name]) {
+            $builder->addPrompt([$class, $method], $name);
         }
 
         return $builder->build();

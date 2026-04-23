@@ -76,6 +76,8 @@ final class McpServerFactoryTest extends TestCase
                     str_contains($id, 'RecordTranslateTool') => new ($id)($dataHandlerService, $tcaSchemaService, $logger),
                     str_contains($id, 'SiteLanguagesTool') => new ($id)($siteLanguageService, $logger),
                     str_contains($id, 'CacheClearTool') => new ($id)($cacheService, $logger),
+                    str_contains($id, 'TranslatePageContentPrompt') => new ($id)($siteLanguageService),
+                    str_contains($id, 'Prompt') => new ($id)(),
                     str_contains($id, 'SystemInfoResource') => new ($id)($typo3Version, $logger),
                     str_contains($id, 'SiteConfigurationResource') => new ($id)($siteFinder, $logger),
                     str_contains($id, 'TcaTableSchemaResource') => new ($id)($tcaSchemaService, $logger),
