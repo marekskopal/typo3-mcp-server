@@ -16,6 +16,17 @@ parameters:
     checkTooWideReturnTypesInProtectedAndPublicMethods: true
     reportAnyTypeWideningInVarTag: true
 
+    ignoreErrors:
+        -
+            identifier: parameter.internalClass
+            message: '#BackendLayoutView#'
+        -
+            identifier: property.internalClass
+            message: '#BackendLayoutView#'
+        -
+            identifier: method.internalClass
+            message: '#BackendLayoutView#'
+
     shipmonkRules:
         allowComparingOnlyComparableTypes:
             enabled: false

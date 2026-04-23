@@ -7,6 +7,7 @@ namespace MarekSkopal\MsMcpServer\Server;
 use MarekSkopal\MsMcpServer\Prompt\AuditPageSeoPrompt;
 use MarekSkopal\MsMcpServer\Prompt\SummarizePagePrompt;
 use MarekSkopal\MsMcpServer\Prompt\TranslatePageContentPrompt;
+use MarekSkopal\MsMcpServer\Resource\BackendLayoutResource;
 use MarekSkopal\MsMcpServer\Resource\BackendUserResource;
 use MarekSkopal\MsMcpServer\Resource\SiteConfigurationResource;
 use MarekSkopal\MsMcpServer\Resource\SystemInfoResource;
@@ -84,6 +85,7 @@ readonly class McpServerFactory
 
     private const array RESOURCE_TEMPLATES = [
         [TcaTableSchemaResource::class, 'execute', 'typo3://schema/tables/{tableName}'],
+        [BackendLayoutResource::class, 'execute', 'typo3://pages/{pageId}/backend-layout'],
     ];
 
     private const array PROMPTS = [
