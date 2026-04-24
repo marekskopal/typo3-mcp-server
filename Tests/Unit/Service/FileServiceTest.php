@@ -237,6 +237,39 @@ final class FileServiceTest extends TestCase
         $service->deleteFile(1, '/nonexistent.txt');
     }
 
+    public function testMoveDirectoryCallsStorageMoveFolder(): void
+    {
+        $folder = $this->createStub(Folder::class);
+        $targetFolder = $this->createStub(Folder::class);
+
+        $storage = $this->createMock(ResourceStorage::class);
+        $storage->method('getFolder')->willReturnCallback(
+            fn (string $path): Folder => $path === '/source/' ? $folder : $targetFolder,
+        );
+        $storage->expects(self::once())->method('moveFolder')->with($folder, $targetFolder);
+
+        $storageRepository = $this->createStub(StorageRepository::class);
+        $storageRepository->method('findByUid')->willReturn($storage);
+
+        $service = new FileService($storageRepository);
+        $service->moveDirectory(1, '/source/', '/target/');
+    }
+
+    public function testRenameDirectoryCallsStorageRenameFolder(): void
+    {
+        $folder = $this->createStub(Folder::class);
+
+        $storage = $this->createMock(ResourceStorage::class);
+        $storage->method('getFolder')->with('/old-name/')->willReturn($folder);
+        $storage->expects(self::once())->method('renameFolder')->with($folder, 'new-name');
+
+        $storageRepository = $this->createStub(StorageRepository::class);
+        $storageRepository->method('findByUid')->willReturn($storage);
+
+        $service = new FileService($storageRepository);
+        $service->renameDirectory(1, '/old-name/', 'new-name');
+    }
+
     public function testDeleteDirectoryCallsStorageDeleteFolder(): void
     {
         $folder = $this->createStub(Folder::class);

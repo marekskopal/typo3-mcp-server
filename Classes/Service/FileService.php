@@ -214,6 +214,21 @@ readonly class FileService
         $storage->deleteFile($file);
     }
 
+    public function moveDirectory(int $storageUid, string $directoryIdentifier, string $targetDirectoryPath): void
+    {
+        $storage = $this->getStorage($storageUid);
+        $folder = $storage->getFolder($directoryIdentifier);
+        $targetFolder = $storage->getFolder($targetDirectoryPath);
+        $storage->moveFolder($folder, $targetFolder);
+    }
+
+    public function renameDirectory(int $storageUid, string $directoryIdentifier, string $newName): void
+    {
+        $storage = $this->getStorage($storageUid);
+        $folder = $storage->getFolder($directoryIdentifier);
+        $storage->renameFolder($folder, $newName);
+    }
+
     public function deleteDirectory(int $storageUid, string $directoryIdentifier, bool $recursive): void
     {
         $storage = $this->getStorage($storageUid);

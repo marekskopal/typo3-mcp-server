@@ -24,6 +24,8 @@ use MarekSkopal\MsMcpServer\Tool\Content\ContentUpdateTool;
 use MarekSkopal\MsMcpServer\Tool\Dynamic\DynamicToolRegistrar;
 use MarekSkopal\MsMcpServer\Tool\File\DirectoryCreateTool;
 use MarekSkopal\MsMcpServer\Tool\File\DirectoryDeleteTool;
+use MarekSkopal\MsMcpServer\Tool\File\DirectoryMoveTool;
+use MarekSkopal\MsMcpServer\Tool\File\DirectoryRenameTool;
 use MarekSkopal\MsMcpServer\Tool\File\FileDeleteTool;
 use MarekSkopal\MsMcpServer\Tool\File\FileGetInfoTool;
 use MarekSkopal\MsMcpServer\Tool\File\FileListTool;
@@ -77,6 +79,8 @@ readonly class McpServerFactory
         [FileRenameTool::class, 'execute', 'file_rename'],
         [DirectoryCreateTool::class, 'execute', 'directory_create'],
         [DirectoryDeleteTool::class, 'execute', 'directory_delete'],
+        [DirectoryMoveTool::class, 'execute', 'directory_move'],
+        [DirectoryRenameTool::class, 'execute', 'directory_rename'],
         [FileReferenceAddTool::class, 'execute', 'file_reference_add'],
         [FileReferenceListTool::class, 'execute', 'file_reference_list'],
         [FileReferenceRemoveTool::class, 'execute', 'file_reference_remove'],
