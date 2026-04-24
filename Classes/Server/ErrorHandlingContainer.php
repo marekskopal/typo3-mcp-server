@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace MarekSkopal\MsMcpServer\Server;
 
+use MarekSkopal\MsMcpServer\Logging\AuditLogger;
 use Psr\Container\ContainerInterface;
 use Psr\Log\LoggerInterface;
 
@@ -15,8 +16,12 @@ use Psr\Log\LoggerInterface;
 readonly class ErrorHandlingContainer implements ContainerInterface
 {
     /** @param array<class-string, 'tool'|'resource'> $handlerTypes */
-    public function __construct(private ContainerInterface $inner, private LoggerInterface $logger, private array $handlerTypes)
-    {
+    public function __construct(
+        private ContainerInterface $inner,
+        private LoggerInterface $logger,
+        private AuditLogger $auditLogger,
+        private array $handlerTypes,
+    ) {
     }
 
     public function get(string $id): mixed
@@ -28,7 +33,7 @@ readonly class ErrorHandlingContainer implements ContainerInterface
             return $instance;
         }
 
-        return new ErrorHandlingProxy($instance, $this->logger, $type);
+        return new ErrorHandlingProxy($instance, $this->logger, $this->auditLogger, $type);
     }
 
     public function has(string $id): bool

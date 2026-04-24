@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace MarekSkopal\MsMcpServer\Server;
 
+use MarekSkopal\MsMcpServer\Logging\AuditLogger;
 use MarekSkopal\MsMcpServer\Tool\Dynamic\DynamicToolRegistrar;
 use Mcp\Capability\Attribute\McpPrompt;
 use Mcp\Capability\Attribute\McpResource;
@@ -29,6 +30,7 @@ readonly class McpServerFactory
         private ContainerInterface $container,
         private DynamicToolRegistrar $dynamicToolRegistrar,
         private LoggerInterface $logger,
+        private AuditLogger $auditLogger,
         private iterable $tools,
         private iterable $resources,
         private iterable $prompts,
@@ -41,7 +43,7 @@ readonly class McpServerFactory
         $sessionStore = new FileSessionStore($sessionDir);
 
         $handlerTypes = $this->buildHandlerTypeMap();
-        $errorHandlingContainer = new ErrorHandlingContainer($this->container, $this->logger, $handlerTypes);
+        $errorHandlingContainer = new ErrorHandlingContainer($this->container, $this->logger, $this->auditLogger, $handlerTypes);
 
         $builder = Server::builder()
             ->setServerInfo('TYPO3 MCP Server', self::VERSION)

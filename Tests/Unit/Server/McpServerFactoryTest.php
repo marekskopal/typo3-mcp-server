@@ -171,7 +171,9 @@ final class McpServerFactoryTest extends TestCase
 
         $dynamicToolRegistrar = new DynamicToolRegistrar($recordService, $dataHandlerService, $tcaSchemaService, $logger);
 
-        $factory = new McpServerFactory($container, $dynamicToolRegistrar, $logger, $tools, $resources, $prompts);
+        $auditLogger = $this->createStub(\MarekSkopal\MsMcpServer\Logging\AuditLogger::class);
+
+        $factory = new McpServerFactory($container, $dynamicToolRegistrar, $logger, $auditLogger, $tools, $resources, $prompts);
         $server = $factory->create();
 
         self::assertInstanceOf(Server::class, $server);
