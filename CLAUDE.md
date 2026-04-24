@@ -74,6 +74,28 @@ vendor/bin/typo3 mcp:cleanup
 - `InitializedSession` implements `SessionInterface` directly instead of extending SDK's `Session` class. The SDK's `Session::readData()` uses `isset($this->data)` which is always true (property initialized to `[]`), so `createWithId()` never reads persisted data from the file store. Our implementation uses a `$loaded` flag.
 - Tool classes must be `public: true` in Services.yaml because the SDK's `ReferenceHandler` calls `container->has()` which returns false for private TYPO3 services.
 
+## Adding a New Tool
+
+1. Create a class in `Classes/Tool/<Category>/` with a `#[McpTool]` attribute on the `execute` method
+2. Inject only the services you need (no `LoggerInterface` — error handling is automatic)
+3. The tool is auto-discovered via DI tags — no changes to `McpServerFactory` or `Services.yaml` needed
+4. Add a test in `Tests/Unit/Tool/<Category>/`
+
+Example minimal tool:
+```php
+readonly class MyTool
+{
+    public function __construct(private RecordService $recordService) {}
+
+    #[McpTool(name: 'my_tool', description: 'Does something useful.')]
+    public function execute(int $uid): string
+    {
+        $record = $this->recordService->findByUid('pages', $uid, ['uid', 'title']);
+        return json_encode($record, JSON_THROW_ON_ERROR);
+    }
+}
+```
+
 ## Code Standards
 
 - PHP 8.3+ with `declare(strict_types=1)`
