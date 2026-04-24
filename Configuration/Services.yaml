@@ -9,17 +9,29 @@ services:
 
   MarekSkopal\MsMcpServer\Tool\:
     resource: '../Classes/Tool/*'
-    exclude: '../Classes/Tool/Result/*'
+    exclude: '../Classes/Tool/{Result,Dynamic}/*'
     public: true
+    tags:
+      - name: 'mcp.tool'
 
   MarekSkopal\MsMcpServer\Prompt\:
     resource: '../Classes/Prompt/*'
     public: true
+    tags:
+      - name: 'mcp.prompt'
 
   MarekSkopal\MsMcpServer\Resource\:
     resource: '../Classes/Resource/*'
     exclude: '../Classes/Resource/Result/*'
     public: true
+    tags:
+      - name: 'mcp.resource'
+
+  MarekSkopal\MsMcpServer\Server\McpServerFactory:
+    arguments:
+      $tools: !tagged_iterator mcp.tool
+      $resources: !tagged_iterator mcp.resource
+      $prompts: !tagged_iterator mcp.prompt
 
   MarekSkopal\MsMcpServer\Command\CleanupExpiredTokensCommand:
     tags:
