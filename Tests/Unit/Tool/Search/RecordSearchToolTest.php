@@ -51,7 +51,7 @@ final class RecordSearchToolTest extends TestCase
             ->method('search')
             ->with(
                 'pages',
-                ['title' => 'Hello'],
+                ['title' => ['operator' => 'like', 'value' => 'Hello']],
                 20,
                 0,
                 self::anything(),
@@ -73,7 +73,7 @@ final class RecordSearchToolTest extends TestCase
             ->method('search')
             ->with(
                 'pages',
-                ['title' => 'Test'],
+                ['title' => ['operator' => 'like', 'value' => 'Test']],
                 20,
                 0,
                 self::anything(),
@@ -138,6 +138,112 @@ final class RecordSearchToolTest extends TestCase
 
         self::assertArrayHasKey('error', $result);
         self::assertSame(['nonexistent'], $result['ignoredFields']);
+    }
+
+    public function testExecuteWithEqOperator(): void
+    {
+        $recordService = $this->createMock(RecordService::class);
+        $recordService->expects(self::once())
+            ->method('search')
+            ->with(
+                'pages',
+                ['title' => ['operator' => 'eq', 'value' => 'Home']],
+                20,
+                0,
+                self::anything(),
+                null,
+            )
+            ->willReturn(['records' => [['uid' => 1, 'title' => 'Home']], 'total' => 1]);
+
+        $tool = new RecordSearchTool($recordService, new TcaSchemaService(), new NullLogger());
+        $result = json_decode(
+            $tool->execute('pages', '{"title":{"op":"eq","value":"Home"}}'),
+            true,
+            512,
+            JSON_THROW_ON_ERROR,
+        );
+
+        self::assertSame(1, $result['total']);
+        self::assertSame('Home', $result['records'][0]['title']);
+    }
+
+    public function testExecuteWithGtOperator(): void
+    {
+        $recordService = $this->createMock(RecordService::class);
+        $recordService->expects(self::once())
+            ->method('search')
+            ->with(
+                'pages',
+                ['uid' => ['operator' => 'gt', 'value' => '10']],
+                20,
+                0,
+                self::anything(),
+                null,
+            )
+            ->willReturn(['records' => [], 'total' => 0]);
+
+        $tool = new RecordSearchTool($recordService, new TcaSchemaService(), new NullLogger());
+        $tool->execute('pages', '{"uid":{"op":"gt","value":"10"}}');
+    }
+
+    public function testExecuteWithNullOperator(): void
+    {
+        $recordService = $this->createMock(RecordService::class);
+        $recordService->expects(self::once())
+            ->method('search')
+            ->with(
+                'pages',
+                ['slug' => ['operator' => 'null', 'value' => '']],
+                20,
+                0,
+                self::anything(),
+                null,
+            )
+            ->willReturn(['records' => [], 'total' => 0]);
+
+        $tool = new RecordSearchTool($recordService, new TcaSchemaService(), new NullLogger());
+        $tool->execute('pages', '{"slug":{"op":"null"}}');
+    }
+
+    public function testExecuteWithInOperator(): void
+    {
+        $recordService = $this->createMock(RecordService::class);
+        $recordService->expects(self::once())
+            ->method('search')
+            ->with(
+                'pages',
+                ['uid' => ['operator' => 'in', 'value' => '1,2,3']],
+                20,
+                0,
+                self::anything(),
+                null,
+            )
+            ->willReturn(['records' => [], 'total' => 0]);
+
+        $tool = new RecordSearchTool($recordService, new TcaSchemaService(), new NullLogger());
+        $tool->execute('pages', '{"uid":{"op":"in","value":"1,2,3"}}');
+    }
+
+    public function testExecuteWithMixedConditions(): void
+    {
+        $recordService = $this->createMock(RecordService::class);
+        $recordService->expects(self::once())
+            ->method('search')
+            ->with(
+                'pages',
+                [
+                    'title' => ['operator' => 'like', 'value' => 'News'],
+                    'hidden' => ['operator' => 'eq', 'value' => '0'],
+                ],
+                20,
+                0,
+                self::anything(),
+                null,
+            )
+            ->willReturn(['records' => [], 'total' => 0]);
+
+        $tool = new RecordSearchTool($recordService, new TcaSchemaService(), new NullLogger());
+        $tool->execute('pages', '{"title":"News","hidden":{"op":"eq","value":"0"}}');
     }
 
     public function testExecuteThrowsToolCallExceptionOnError(): void

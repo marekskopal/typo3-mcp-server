@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace MarekSkopal\MsMcpServer\Service;
 
+use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\DBAL\ParameterType;
 use TYPO3\CMS\Core\Database\ConnectionPool;
+use TYPO3\CMS\Core\Database\Query\QueryBuilder;
 
 readonly class RecordService
 {
@@ -92,7 +94,7 @@ readonly class RecordService
 
     /**
      * @param list<string> $fields
-     * @param array<string, string> $searchConditions field => search value (LIKE %value%)
+     * @param array<string, array{operator: string, value: string}> $searchConditions field => {operator, value}
      * @return array{records: list<array<string, mixed>>, total: int}
      */
     public function search(string $table, array $searchConditions, int $limit, int $offset, array $fields, ?int $pid = null,): array
@@ -116,13 +118,9 @@ readonly class RecordService
             );
         }
 
-        foreach ($searchConditions as $field => $value) {
-            $queryBuilder->andWhere(
-                $queryBuilder->expr()->like($field, $queryBuilder->createNamedParameter('%' . $value . '%')),
-            );
-            $countQueryBuilder->andWhere(
-                $countQueryBuilder->expr()->like($field, $countQueryBuilder->createNamedParameter('%' . $value . '%')),
-            );
+        foreach ($searchConditions as $field => $condition) {
+            $this->applyCondition($queryBuilder, $field, $condition);
+            $this->applyCondition($countQueryBuilder, $field, $condition);
         }
 
         /** @var int|string $totalResult */
@@ -139,6 +137,33 @@ readonly class RecordService
             'records' => $records,
             'total' => (int) $totalResult,
         ];
+    }
+
+    /** @param array{operator: string, value: string} $condition */
+    private function applyCondition(QueryBuilder $queryBuilder, string $field, array $condition): void
+    {
+        $operator = $condition['operator'];
+        $value = $condition['value'];
+        $expr = $queryBuilder->expr();
+
+        $queryBuilder->andWhere(match ($operator) {
+            'eq' => $expr->eq($field, $queryBuilder->createNamedParameter($value)),
+            'neq' => $expr->neq($field, $queryBuilder->createNamedParameter($value)),
+            'gt' => $expr->gt($field, $queryBuilder->createNamedParameter($value)),
+            'gte' => $expr->gte($field, $queryBuilder->createNamedParameter($value)),
+            'lt' => $expr->lt($field, $queryBuilder->createNamedParameter($value)),
+            'lte' => $expr->lte($field, $queryBuilder->createNamedParameter($value)),
+            'in' => $expr->in(
+                $field,
+                $queryBuilder->createNamedParameter(
+                    array_map('trim', explode(',', $value)),
+                    ArrayParameterType::STRING,
+                ),
+            ),
+            'null' => $expr->isNull($field),
+            'notNull' => $expr->isNotNull($field),
+            default => $expr->like($field, $queryBuilder->createNamedParameter('%' . $value . '%')),
+        });
     }
 
     /**
