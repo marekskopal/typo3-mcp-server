@@ -4,6 +4,25 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.5.0] - 2026-04-24
+
+### Added
+- **New tools:** `file_move`, `file_rename`, `directory_move`, `directory_rename` for file/directory management
+- **Search sorting:** `record_search` now supports `orderBy` and `orderDirection` parameters
+- **Operator support:** `record_search` supports `eq`, `neq`, `like`, `gt`, `gte`, `lt`, `lte`, `in`, `null`, `notNull` operators
+- **OAuthClientController tests** — 14 unit tests for the backend module controller
+- `pages_copy` now supports `includeSubpages` parameter for recursive page tree copy
+- `content_copy` tool for duplicating content elements
+- `file_reference_list` and `file_reference_remove` tools for managing file references
+- Added `dg/bypass-finals` dev dependency for mocking TYPO3 final classes in tests
+
+### Changed
+- **Auto-discovery:** Tools, resources, and prompts are now auto-discovered via DI tags (`!tagged_iterator`) instead of hardcoded arrays in `McpServerFactory`. Adding a new tool no longer requires modifying the factory.
+- **Centralized error handling:** Removed try/catch boilerplate from all 33 tool classes and 6 resource classes. Error handling is now centralized in `ErrorHandlingProxy`, which wraps instances at the container level and converts exceptions to `ToolCallException`/`ResourceReadException`.
+- `LoggerInterface` removed from tool and resource constructors — logging is handled by the proxy
+- `McpServerFactory` reduced from 147 lines to ~100 lines
+- Net reduction of ~350 lines of identical error handling code
+
 ## [0.4.0] - 2026-04-23
 
 ### Added

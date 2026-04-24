@@ -124,6 +124,7 @@ Add to your Claude Desktop config (`claude_desktop_config.json`):
 | `pages_create` | Create a new page |
 | `pages_update` | Update page fields |
 | `pages_delete` | Delete a page |
+| `pages_copy` | Copy a page (optionally with all subpages) |
 | `pages_tree` | Get page tree hierarchy with configurable depth |
 
 #### Content Elements (tt_content)
@@ -135,24 +136,31 @@ Add to your Claude Desktop config (`claude_desktop_config.json`):
 | `content_update` | Update content element fields |
 | `content_delete` | Delete a content element |
 | `content_move` | Move a content element to a new position |
+| `content_copy` | Copy a content element |
 
 #### File Management (fileadmin)
 | Tool | Description |
 |------|-------------|
 | `file_list` | List files and directories with pagination |
 | `file_get_info` | Get file metadata (size, MIME type, public URL) |
-| `file_upload` | Upload a file from base64-encoded content |
+| `file_upload` | Upload a file from text or base64-encoded content |
 | `file_upload_from_url` | Download and upload a file from a URL |
 | `file_delete` | Delete a file |
+| `file_move` | Move a file to a different directory |
+| `file_rename` | Rename a file |
 | `directory_create` | Create a directory |
 | `directory_delete` | Delete a directory |
+| `directory_move` | Move a directory to a different parent |
+| `directory_rename` | Rename a directory |
 | `file_reference_add` | Attach a file to a record's image/media field |
+| `file_reference_list` | List file references for a record field |
+| `file_reference_remove` | Remove a file reference from a record |
 
 #### Schema & Search
 | Tool | Description |
 |------|-------------|
 | `table_schema` | Get TCA field definitions for any table |
-| `record_search` | Search records in any table by field values |
+| `record_search` | Search records by field conditions with operators and sorting |
 
 #### Translation
 | Tool | Description |
@@ -245,7 +253,7 @@ vendor/bin/phpstan analyse
 vendor/bin/phpcs
 vendor/bin/phpcbf
 
-# Tests (279 tests, 1000 assertions)
+# Tests (339 tests, 1290 assertions)
 vendor/bin/phpunit
 ```
 

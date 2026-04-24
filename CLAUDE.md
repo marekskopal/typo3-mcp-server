@@ -42,19 +42,21 @@ vendor/bin/typo3 mcp:cleanup
 - `OAuth/PkceVerifier` — S256 PKCE verification
 - `OAuth/OAuthTokenPair` — DTO for access/refresh token pairs
 - `Authentication/BackendUserBootstrap` — Bootstraps a `BackendUserAuthentication` from a be_users record
-- `Server/McpServerFactory` — Builds the MCP Server instance with all tools registered (25 static + dynamic)
+- `Server/McpServerFactory` — Builds the MCP Server instance; tools/resources/prompts are auto-discovered via DI tags, no hardcoded registration needed
+- `Server/ErrorHandlingContainer` — Decorating PSR-11 container that wraps tool/resource instances with centralized error handling
+- `Server/ErrorHandlingProxy` — Proxy that catches `\Throwable` from tool/resource methods, logs it, and converts to `ToolCallException`/`ResourceReadException`
 - `Server/InitializedSession` — Fixed SessionInterface implementation (workaround for SDK's `readData()` bug)
 - `Server/InitializedSessionFactory` — Factory for InitializedSession instances
 - `Service/DataHandlerService` — Wraps TYPO3 DataHandler for create/update/delete operations
 - `Service/RecordService` — Read operations via QueryBuilder (findByUid, findByPid, search with pagination capped at 500)
-- `Service/FileService` — File operations via TYPO3 ResourceStorage (list, upload, delete, directory ops)
+- `Service/FileService` — File operations via TYPO3 ResourceStorage (list, upload, delete, move, rename, directory ops)
 - `Service/TcaSchemaService` — TCA field metadata extraction for schema introspection and dynamic tools
 - `Service/BackendLayoutService` — Resolves the effective BackendLayout for a page via BackendLayoutView, returns structured DTOs with column positions and grid structure
 - `Tool/Pages/*` — CRUD tools for pages table (use `#[McpTool]` attributes)
 - `Tool/Content/*` — CRUD tools for tt_content table (use `#[McpTool]` attributes)
-- `Tool/File/*` — File management tools (list, get info, upload, upload from URL, delete, directory create/delete, file reference add)
+- `Tool/File/*` — File management tools (list, get info, upload, upload from URL, delete, move, rename, directory create/delete/move/rename, file reference add/list/remove)
 - `Tool/Schema/TableSchemaTool` — TCA field introspection for any table
-- `Tool/Search/RecordSearchTool` — Search records in any table by field values (LIKE match)
+- `Tool/Search/RecordSearchTool` — Search records in any table by field values with operators (eq, neq, like, gt, gte, lt, lte, in, null, notNull) and sorting
 - `Tool/Cache/CacheClearTool` — Flush TYPO3 caches (all, pages, or specific cache groups)
 - `Resource/BackendLayoutResource` — MCP Resource Template exposing backend layout and column positions for a page (`typo3://pages/{pageId}/backend-layout`)
 - `Tool/Dynamic/DynamicToolRegistrar` — Registers CRUD tools at runtime for tables configured via `EXTCONF`
@@ -62,7 +64,7 @@ vendor/bin/typo3 mcp:cleanup
 - `Controller/OAuthClientController` — Backend module for managing OAuth clients (create, edit, delete) and tokens (view, revoke)
 
 **Configuration:**
-- `Configuration/Services.yaml` — DI config (tool classes are `public: true` for MCP SDK container resolution, cleanup command registered)
+- `Configuration/Services.yaml` — DI config with tagged services (`mcp.tool`, `mcp.resource`, `mcp.prompt`) for auto-discovery. Tool/resource/prompt classes are `public: true` for MCP SDK container resolution.
 - `Configuration/RequestMiddlewares.php` — Registers OAuthMiddleware and McpServerMiddleware in frontend stack
 - `Configuration/Backend/Modules.php` — Backend module registration (index, create, edit, update, delete, revoke_token routes)
 - `Configuration/TCA/tx_msmcpserver_oauth_client.php` — TCA for OAuth client table
@@ -79,21 +81,22 @@ vendor/bin/typo3 mcp:cleanup
 - PHPCS with SlevomatCodingStandard (140 char line limit)
 - Classes are `readonly` where possible — do **not** use `final` (this is a library meant to be extended)
 - Supports TYPO3 v13.4 and v14.x
-- Tool descriptions use `#[McpTool]` attributes from MCP SDK
-- All tools wrap service calls in try/catch, log errors via `LoggerInterface`, and throw `ToolCallException`
+- Tool descriptions use `#[McpTool]` attributes from MCP SDK — tools are auto-discovered via DI tags
+- Error handling is centralized in `ErrorHandlingProxy` — tools do NOT need try/catch or `LoggerInterface`
 - CI runs PHPStan, PHPCS, and PHPUnit via GitHub Actions on PHP 8.3/8.4 with TYPO3 v13/v14 matrix
 
 ## Testing
 
-279 unit tests covering:
-- All 25 static MCP tools (Pages/Content/File/Schema/Search/Translation/Cache CRUD + error handling)
+339 unit tests covering:
+- All 33 static MCP tools (Pages/Content/File/Schema/Search/Translation/Cache CRUD)
 - Dynamic tool registration and execution (DynamicToolRegistrar)
 - OAuth classes (AuthorizationService incl. revocation, ClientRepository, PkceVerifier, OAuthTokenPair)
 - OAuthMiddleware (metadata, authorize, register, revoke, token endpoints)
+- OAuthClientController (create, edit, update, delete, revokeToken)
 - BackendUserBootstrap, McpServerFactory, McpServerMiddleware
 - InitializedSession and InitializedSessionFactory
 - Services (RecordService, DataHandlerService, FileService, TcaSchemaService, BackendLayoutService)
 - Resources (SystemInfo, SiteConfiguration, TcaTables, BackendUser, TcaTableSchema, BackendLayout)
 - CleanupExpiredTokensCommand
 
-Classes are not `final`, so they can be mocked with PHPUnit. Use `createStub()` (not `createMock()`) when no `expects()` is configured. `TcaSchemaService` is instantiated directly in tests with `$GLOBALS['TCA']` set up in `setUp()`.
+Classes are not `final`, so they can be mocked with PHPUnit. Uses `dg/bypass-finals` for TYPO3 final classes (ModuleTemplateFactory). Use `createStub()` (not `createMock()`) when no `expects()` is configured. `TcaSchemaService` is instantiated directly in tests with `$GLOBALS['TCA']` set up in `setUp()`.
