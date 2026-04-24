@@ -8,12 +8,10 @@ use MarekSkopal\MsMcpServer\Service\CacheService;
 use MarekSkopal\MsMcpServer\Tool\Result\CacheClearedResult;
 use MarekSkopal\MsMcpServer\Tool\Result\ErrorResult;
 use Mcp\Capability\Attribute\McpTool;
-use Mcp\Exception\ToolCallException;
-use Psr\Log\LoggerInterface;
 
 readonly class CacheClearTool
 {
-    public function __construct(private CacheService $cacheService, private LoggerInterface $logger)
+    public function __construct(private CacheService $cacheService)
     {
     }
 
@@ -32,17 +30,11 @@ readonly class CacheClearTool
             return new ErrorResult('pageId is required when scope is "page"');
         }
 
-        try {
-            match ($scope) {
-                'pages' => $this->cacheService->flushPageCaches(),
-                'all' => $this->cacheService->flushAllCaches(),
-                'page' => $this->cacheService->flushPageCache($pageId),
-            };
-        } catch (\Throwable $e) {
-            $this->logger->error('cache_clear tool failed', ['exception' => $e]);
-
-            throw new ToolCallException($e->getMessage(), (int) $e->getCode(), $e);
-        }
+        match ($scope) {
+            'pages' => $this->cacheService->flushPageCaches(),
+            'all' => $this->cacheService->flushAllCaches(),
+            'page' => $this->cacheService->flushPageCache($pageId),
+        };
 
         return new CacheClearedResult($scope);
     }

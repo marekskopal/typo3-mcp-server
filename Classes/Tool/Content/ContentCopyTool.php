@@ -7,12 +7,10 @@ namespace MarekSkopal\MsMcpServer\Tool\Content;
 use MarekSkopal\MsMcpServer\Service\DataHandlerService;
 use MarekSkopal\MsMcpServer\Tool\Result\RecordCopiedResult;
 use Mcp\Capability\Attribute\McpTool;
-use Mcp\Exception\ToolCallException;
-use Psr\Log\LoggerInterface;
 
 readonly class ContentCopyTool
 {
-    public function __construct(private DataHandlerService $dataHandlerService, private LoggerInterface $logger,)
+    public function __construct(private DataHandlerService $dataHandlerService)
     {
     }
 
@@ -24,13 +22,7 @@ readonly class ContentCopyTool
     )]
     public function execute(int $uid, int $target): RecordCopiedResult
     {
-        try {
-            $newUid = $this->dataHandlerService->copyRecord('tt_content', $uid, $target);
-        } catch (\Throwable $e) {
-            $this->logger->error('content_copy tool failed', ['exception' => $e]);
-
-            throw new ToolCallException($e->getMessage(), (int) $e->getCode(), $e);
-        }
+        $newUid = $this->dataHandlerService->copyRecord('tt_content', $uid, $target);
 
         return new RecordCopiedResult($uid, $newUid);
     }

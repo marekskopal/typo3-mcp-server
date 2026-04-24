@@ -9,16 +9,11 @@ use MarekSkopal\MsMcpServer\Service\TcaSchemaService;
 use MarekSkopal\MsMcpServer\Tool\Result\ErrorResult;
 use MarekSkopal\MsMcpServer\Tool\Result\FileReferenceListResult;
 use Mcp\Capability\Attribute\McpTool;
-use Mcp\Exception\ToolCallException;
-use Psr\Log\LoggerInterface;
 
 readonly class FileReferenceListTool
 {
-    public function __construct(
-        private RecordService $recordService,
-        private TcaSchemaService $tcaSchemaService,
-        private LoggerInterface $logger,
-    ) {
+    public function __construct(private RecordService $recordService, private TcaSchemaService $tcaSchemaService,)
+    {
     }
 
     #[McpTool(
@@ -36,13 +31,7 @@ readonly class FileReferenceListTool
             );
         }
 
-        try {
-            $references = $this->recordService->findFileReferences($table, $uid, $fieldName);
-        } catch (\Throwable $e) {
-            $this->logger->error('file_reference_list tool failed', ['exception' => $e]);
-
-            throw new ToolCallException($e->getMessage(), (int) $e->getCode(), $e);
-        }
+        $references = $this->recordService->findFileReferences($table, $uid, $fieldName);
 
         return new FileReferenceListResult($table, $uid, $fieldName, count($references), $references);
     }

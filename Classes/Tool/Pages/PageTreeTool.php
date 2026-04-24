@@ -7,8 +7,6 @@ namespace MarekSkopal\MsMcpServer\Tool\Pages;
 use MarekSkopal\MsMcpServer\Service\RecordService;
 use MarekSkopal\MsMcpServer\Service\TcaSchemaService;
 use Mcp\Capability\Attribute\McpTool;
-use Mcp\Exception\ToolCallException;
-use Psr\Log\LoggerInterface;
 use const JSON_THROW_ON_ERROR;
 
 readonly class PageTreeTool
@@ -17,11 +15,8 @@ readonly class PageTreeTool
 
     private const int MAX_NODES = 500;
 
-    public function __construct(
-        private RecordService $recordService,
-        private TcaSchemaService $tcaSchemaService,
-        private LoggerInterface $logger,
-    ) {
+    public function __construct(private RecordService $recordService, private TcaSchemaService $tcaSchemaService,)
+    {
     }
 
     #[McpTool(
@@ -45,14 +40,8 @@ readonly class PageTreeTool
             $fields[] = $transOrigPointerField;
         }
 
-        try {
-            $nodeCount = 0;
-            $tree = $this->buildTree($pid, $depth, $nodeCount, $fields);
-        } catch (\Throwable $e) {
-            $this->logger->error('pages_tree tool failed', ['exception' => $e]);
-
-            throw new ToolCallException($e->getMessage(), (int) $e->getCode(), $e);
-        }
+        $nodeCount = 0;
+        $tree = $this->buildTree($pid, $depth, $nodeCount, $fields);
 
         return json_encode(['tree' => $tree, 'totalNodes' => $nodeCount], JSON_THROW_ON_ERROR);
     }

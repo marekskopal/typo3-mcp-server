@@ -7,10 +7,8 @@ namespace MarekSkopal\MsMcpServer\Tests\Unit\Tool\Pages;
 use MarekSkopal\MsMcpServer\Service\DataHandlerService;
 use MarekSkopal\MsMcpServer\Tool\Pages\PagesCopyTool;
 use MarekSkopal\MsMcpServer\Tool\Result\RecordCopiedResult;
-use Mcp\Exception\ToolCallException;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
-use Psr\Log\NullLogger;
 
 #[CoversClass(PagesCopyTool::class)]
 final class PagesCopyToolTest extends TestCase
@@ -23,7 +21,7 @@ final class PagesCopyToolTest extends TestCase
             ->with('pages', 42, 10, 0)
             ->willReturn(100);
 
-        $tool = new PagesCopyTool($dataHandlerService, new NullLogger());
+        $tool = new PagesCopyTool($dataHandlerService);
         $result = $tool->execute(42, 10);
 
         self::assertInstanceOf(RecordCopiedResult::class, $result);
@@ -40,7 +38,7 @@ final class PagesCopyToolTest extends TestCase
             ->with('pages', 42, -5, 0)
             ->willReturn(101);
 
-        $tool = new PagesCopyTool($dataHandlerService, new NullLogger());
+        $tool = new PagesCopyTool($dataHandlerService);
         $result = $tool->execute(42, -5);
 
         self::assertInstanceOf(RecordCopiedResult::class, $result);
@@ -56,7 +54,7 @@ final class PagesCopyToolTest extends TestCase
             ->with('pages', 42, 10, 99)
             ->willReturn(102);
 
-        $tool = new PagesCopyTool($dataHandlerService, new NullLogger());
+        $tool = new PagesCopyTool($dataHandlerService);
         $result = $tool->execute(42, 10, true);
 
         self::assertInstanceOf(RecordCopiedResult::class, $result);
@@ -72,20 +70,20 @@ final class PagesCopyToolTest extends TestCase
             ->with('pages', 42, 10, 0)
             ->willReturn(103);
 
-        $tool = new PagesCopyTool($dataHandlerService, new NullLogger());
+        $tool = new PagesCopyTool($dataHandlerService);
         $tool->execute(42, 10, false);
     }
 
-    public function testExecuteThrowsToolCallExceptionOnError(): void
+    public function testExecuteThrowsExceptionOnError(): void
     {
         $dataHandlerService = $this->createMock(DataHandlerService::class);
         $dataHandlerService->expects(self::once())
             ->method('copyRecord')
             ->willThrowException(new \RuntimeException('DataHandler error'));
 
-        $tool = new PagesCopyTool($dataHandlerService, new NullLogger());
+        $tool = new PagesCopyTool($dataHandlerService);
 
-        $this->expectException(ToolCallException::class);
+        $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('DataHandler error');
 
         $tool->execute(1, 10);

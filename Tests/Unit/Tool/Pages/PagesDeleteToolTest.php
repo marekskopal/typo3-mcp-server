@@ -7,10 +7,8 @@ namespace MarekSkopal\MsMcpServer\Tests\Unit\Tool\Pages;
 use MarekSkopal\MsMcpServer\Service\DataHandlerService;
 use MarekSkopal\MsMcpServer\Tool\Pages\PagesDeleteTool;
 use MarekSkopal\MsMcpServer\Tool\Result\RecordDeletedResult;
-use Mcp\Exception\ToolCallException;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
-use Psr\Log\NullLogger;
 
 #[CoversClass(PagesDeleteTool::class)]
 final class PagesDeleteToolTest extends TestCase
@@ -22,23 +20,23 @@ final class PagesDeleteToolTest extends TestCase
             ->method('deleteRecord')
             ->with('pages', 42);
 
-        $tool = new PagesDeleteTool($dataHandlerService, new NullLogger());
+        $tool = new PagesDeleteTool($dataHandlerService);
         $result = $tool->execute(42);
 
         self::assertInstanceOf(RecordDeletedResult::class, $result);
         self::assertSame(42, $result->uid);
     }
 
-    public function testExecuteThrowsToolCallExceptionOnError(): void
+    public function testExecuteThrowsExceptionOnError(): void
     {
         $dataHandlerService = $this->createMock(DataHandlerService::class);
         $dataHandlerService->expects(self::once())
             ->method('deleteRecord')
             ->willThrowException(new \RuntimeException('DataHandler error'));
 
-        $tool = new PagesDeleteTool($dataHandlerService, new NullLogger());
+        $tool = new PagesDeleteTool($dataHandlerService);
 
-        $this->expectException(ToolCallException::class);
+        $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('DataHandler error');
 
         $tool->execute(1);

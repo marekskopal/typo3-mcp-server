@@ -9,10 +9,8 @@ use MarekSkopal\MsMcpServer\Service\TcaSchemaService;
 use MarekSkopal\MsMcpServer\Tool\Content\ContentCreateTool;
 use MarekSkopal\MsMcpServer\Tool\Result\ErrorResult;
 use MarekSkopal\MsMcpServer\Tool\Result\RecordCreatedResult;
-use Mcp\Exception\ToolCallException;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
-use Psr\Log\NullLogger;
 use const JSON_THROW_ON_ERROR;
 
 #[CoversClass(ContentCreateTool::class)]
@@ -54,7 +52,7 @@ final class ContentCreateToolTest extends TestCase
             )
             ->willReturn(100);
 
-        $tool = new ContentCreateTool($dataHandlerService, new TcaSchemaService(), new NullLogger());
+        $tool = new ContentCreateTool($dataHandlerService, new TcaSchemaService());
         $result = $tool->execute(10, json_encode(['CType' => 'text', 'header' => 'My Header'], JSON_THROW_ON_ERROR));
 
         self::assertInstanceOf(RecordCreatedResult::class, $result);
@@ -78,7 +76,7 @@ final class ContentCreateToolTest extends TestCase
             )
             ->willReturn(200);
 
-        $tool = new ContentCreateTool($dataHandlerService, new TcaSchemaService(), new NullLogger());
+        $tool = new ContentCreateTool($dataHandlerService, new TcaSchemaService());
         $result = $tool->execute(5, json_encode([
             'CType' => 'html',
             'header' => 'My Header',
@@ -107,7 +105,7 @@ final class ContentCreateToolTest extends TestCase
             )
             ->willReturn(300);
 
-        $tool = new ContentCreateTool($dataHandlerService, new TcaSchemaService(), new NullLogger());
+        $tool = new ContentCreateTool($dataHandlerService, new TcaSchemaService());
         $result = $tool->execute(10, json_encode([
             'CType' => 'list',
             'header' => 'News Plugin',
@@ -126,7 +124,7 @@ final class ContentCreateToolTest extends TestCase
             ->method('createRecord')
             ->willReturn(100);
 
-        $tool = new ContentCreateTool($dataHandlerService, new TcaSchemaService(), new NullLogger());
+        $tool = new ContentCreateTool($dataHandlerService, new TcaSchemaService());
         $result = $tool->execute(10, json_encode(['header' => 'Test', 'unknown_field' => 'x'], JSON_THROW_ON_ERROR));
 
         self::assertInstanceOf(RecordCreatedResult::class, $result);
@@ -141,7 +139,7 @@ final class ContentCreateToolTest extends TestCase
             ->method('createRecord')
             ->willReturn(100);
 
-        $tool = new ContentCreateTool($dataHandlerService, new TcaSchemaService(), new NullLogger());
+        $tool = new ContentCreateTool($dataHandlerService, new TcaSchemaService());
         $result = $tool->execute(10, json_encode(['header' => 'Test'], JSON_THROW_ON_ERROR));
 
         self::assertInstanceOf(RecordCreatedResult::class, $result);
@@ -155,7 +153,7 @@ final class ContentCreateToolTest extends TestCase
         $dataHandlerService->expects(self::never())
             ->method('createRecord');
 
-        $tool = new ContentCreateTool($dataHandlerService, new TcaSchemaService(), new NullLogger());
+        $tool = new ContentCreateTool($dataHandlerService, new TcaSchemaService());
         $result = $tool->execute(10, json_encode(['bad_field' => 'x'], JSON_THROW_ON_ERROR));
 
         self::assertInstanceOf(ErrorResult::class, $result);
@@ -179,7 +177,7 @@ final class ContentCreateToolTest extends TestCase
             )
             ->willReturn(100);
 
-        $tool = new ContentCreateTool($dataHandlerService, new TcaSchemaService(), new NullLogger());
+        $tool = new ContentCreateTool($dataHandlerService, new TcaSchemaService());
         $result = $tool->execute(10, json_encode(['header' => 'Test'], JSON_THROW_ON_ERROR), -1);
 
         self::assertInstanceOf(RecordCreatedResult::class, $result);
@@ -202,20 +200,20 @@ final class ContentCreateToolTest extends TestCase
             )
             ->willReturn(100);
 
-        $tool = new ContentCreateTool($dataHandlerService, new TcaSchemaService(), new NullLogger());
+        $tool = new ContentCreateTool($dataHandlerService, new TcaSchemaService());
         $tool->execute(10, json_encode(['header' => 'Test'], JSON_THROW_ON_ERROR));
     }
 
-    public function testExecuteThrowsToolCallExceptionOnError(): void
+    public function testExecuteThrowsExceptionOnError(): void
     {
         $dataHandlerService = $this->createMock(DataHandlerService::class);
         $dataHandlerService->expects(self::once())
             ->method('createRecord')
             ->willThrowException(new \RuntimeException('DataHandler error'));
 
-        $tool = new ContentCreateTool($dataHandlerService, new TcaSchemaService(), new NullLogger());
+        $tool = new ContentCreateTool($dataHandlerService, new TcaSchemaService());
 
-        $this->expectException(ToolCallException::class);
+        $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('DataHandler error');
 
         $tool->execute(1, json_encode(['header' => 'Test'], JSON_THROW_ON_ERROR));

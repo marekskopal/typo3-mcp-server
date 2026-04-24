@@ -6,10 +6,8 @@ namespace MarekSkopal\MsMcpServer\Tests\Unit\Tool\File;
 
 use MarekSkopal\MsMcpServer\Service\FileService;
 use MarekSkopal\MsMcpServer\Tool\File\FileListTool;
-use Mcp\Exception\ToolCallException;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
-use Psr\Log\NullLogger;
 use const JSON_THROW_ON_ERROR;
 
 #[CoversClass(FileListTool::class)]
@@ -30,7 +28,7 @@ final class FileListToolTest extends TestCase
             ->with(1, '/', 20, 0)
             ->willReturn($expectedResult);
 
-        $tool = new FileListTool($fileService, new NullLogger());
+        $tool = new FileListTool($fileService);
         $result = json_decode($tool->execute(), true, 512, JSON_THROW_ON_ERROR);
 
         self::assertSame(1, $result['totalFiles']);
@@ -45,19 +43,19 @@ final class FileListToolTest extends TestCase
             ->with(2, '/uploads/', 10, 5)
             ->willReturn(['files' => [], 'directories' => [], 'totalFiles' => 0, 'totalDirectories' => 0]);
 
-        $tool = new FileListTool($fileService, new NullLogger());
+        $tool = new FileListTool($fileService);
         $tool->execute('/uploads/', 2, 10, 5);
     }
 
-    public function testExecuteThrowsToolCallExceptionOnError(): void
+    public function testExecuteThrowsExceptionOnError(): void
     {
         $fileService = $this->createStub(FileService::class);
         $fileService->method('listDirectory')
             ->willThrowException(new \RuntimeException('Storage not found'));
 
-        $tool = new FileListTool($fileService, new NullLogger());
+        $tool = new FileListTool($fileService);
 
-        $this->expectException(ToolCallException::class);
+        $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('Storage not found');
 
         $tool->execute();

@@ -7,10 +7,8 @@ namespace MarekSkopal\MsMcpServer\Tests\Unit\Tool\Pages;
 use MarekSkopal\MsMcpServer\Service\RecordService;
 use MarekSkopal\MsMcpServer\Service\TcaSchemaService;
 use MarekSkopal\MsMcpServer\Tool\Pages\PagesListTool;
-use Mcp\Exception\ToolCallException;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
-use Psr\Log\NullLogger;
 use const JSON_THROW_ON_ERROR;
 
 #[CoversClass(PagesListTool::class)]
@@ -58,7 +56,7 @@ final class PagesListToolTest extends TestCase
             )
             ->willReturn($expectedResult);
 
-        $tool = new PagesListTool($recordService, new TcaSchemaService(), new NullLogger());
+        $tool = new PagesListTool($recordService, new TcaSchemaService());
         $result = json_decode($tool->execute(), true, 512, JSON_THROW_ON_ERROR);
 
         self::assertSame(1, $result['total']);
@@ -79,7 +77,7 @@ final class PagesListToolTest extends TestCase
             )
             ->willReturn(['records' => [], 'total' => 0]);
 
-        $tool = new PagesListTool($recordService, new TcaSchemaService(), new NullLogger());
+        $tool = new PagesListTool($recordService, new TcaSchemaService());
         $tool->execute(5, 10, 30);
     }
 
@@ -99,7 +97,7 @@ final class PagesListToolTest extends TestCase
             )
             ->willReturn(['records' => [], 'total' => 0]);
 
-        $tool = new PagesListTool($recordService, new TcaSchemaService(), new NullLogger());
+        $tool = new PagesListTool($recordService, new TcaSchemaService());
         $tool->execute(0, 20, 0, 0);
     }
 
@@ -122,20 +120,20 @@ final class PagesListToolTest extends TestCase
             )
             ->willReturn(['records' => [], 'total' => 0]);
 
-        $tool = new PagesListTool($recordService, new TcaSchemaService(), new NullLogger());
+        $tool = new PagesListTool($recordService, new TcaSchemaService());
         $tool->execute(0, 20, 0, -1, 'title,slug');
     }
 
-    public function testExecuteThrowsToolCallExceptionOnError(): void
+    public function testExecuteThrowsExceptionOnError(): void
     {
         $recordService = $this->createMock(RecordService::class);
         $recordService->expects(self::once())
             ->method('findByPid')
             ->willThrowException(new \RuntimeException('Database error'));
 
-        $tool = new PagesListTool($recordService, new TcaSchemaService(), new NullLogger());
+        $tool = new PagesListTool($recordService, new TcaSchemaService());
 
-        $this->expectException(ToolCallException::class);
+        $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('Database error');
 
         $tool->execute();

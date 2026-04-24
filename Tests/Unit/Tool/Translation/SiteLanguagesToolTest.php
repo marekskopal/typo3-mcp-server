@@ -6,10 +6,8 @@ namespace MarekSkopal\MsMcpServer\Tests\Unit\Tool\Translation;
 
 use MarekSkopal\MsMcpServer\Service\SiteLanguageService;
 use MarekSkopal\MsMcpServer\Tool\Translation\SiteLanguagesTool;
-use Mcp\Exception\ToolCallException;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
-use Psr\Log\NullLogger;
 use TYPO3\CMS\Core\Exception\SiteNotFoundException;
 use TYPO3\CMS\Core\Http\Uri;
 use TYPO3\CMS\Core\Site\Entity\Site;
@@ -42,7 +40,7 @@ final class SiteLanguagesToolTest extends TestCase
         $siteFinder->method('getSiteByPageId')->willReturn($site);
 
         $service = new SiteLanguageService($siteFinder);
-        $tool = new SiteLanguagesTool($service, new NullLogger());
+        $tool = new SiteLanguagesTool($service);
         $result = json_decode($tool->execute(1), true, 512, JSON_THROW_ON_ERROR);
 
         self::assertCount(2, $result);
@@ -51,15 +49,15 @@ final class SiteLanguagesToolTest extends TestCase
         self::assertSame(1, $result[1]['languageId']);
     }
 
-    public function testExecuteThrowsToolCallExceptionOnError(): void
+    public function testExecuteThrowsExceptionOnError(): void
     {
         $siteFinder = $this->createStub(SiteFinder::class);
         $siteFinder->method('getSiteByPageId')->willThrowException(new SiteNotFoundException('Site not found'));
 
         $service = new SiteLanguageService($siteFinder);
-        $tool = new SiteLanguagesTool($service, new NullLogger());
+        $tool = new SiteLanguagesTool($service);
 
-        $this->expectException(ToolCallException::class);
+        $this->expectException(SiteNotFoundException::class);
         $this->expectExceptionMessage('Site not found');
 
         $tool->execute(999);

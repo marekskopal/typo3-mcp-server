@@ -7,10 +7,8 @@ namespace MarekSkopal\MsMcpServer\Tests\Unit\Tool\File;
 use MarekSkopal\MsMcpServer\Service\FileService;
 use MarekSkopal\MsMcpServer\Tool\File\FileRenameTool;
 use MarekSkopal\MsMcpServer\Tool\Result\FileRenamedResult;
-use Mcp\Exception\ToolCallException;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
-use Psr\Log\NullLogger;
 
 #[CoversClass(FileRenameTool::class)]
 final class FileRenameToolTest extends TestCase
@@ -22,7 +20,7 @@ final class FileRenameToolTest extends TestCase
             ->method('renameFile')
             ->with(1, '/test.txt', 'new-name.txt');
 
-        $tool = new FileRenameTool($fileService, new NullLogger());
+        $tool = new FileRenameTool($fileService);
         $result = $tool->execute('/test.txt', 'new-name.txt');
 
         self::assertInstanceOf(FileRenamedResult::class, $result);
@@ -31,15 +29,15 @@ final class FileRenameToolTest extends TestCase
         self::assertTrue($result->renamed);
     }
 
-    public function testExecuteThrowsToolCallExceptionOnError(): void
+    public function testExecuteThrowsExceptionOnError(): void
     {
         $fileService = $this->createStub(FileService::class);
         $fileService->method('renameFile')
             ->willThrowException(new \RuntimeException('File not found'));
 
-        $tool = new FileRenameTool($fileService, new NullLogger());
+        $tool = new FileRenameTool($fileService);
 
-        $this->expectException(ToolCallException::class);
+        $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('File not found');
 
         $tool->execute('/nonexistent.txt', 'new-name.txt');

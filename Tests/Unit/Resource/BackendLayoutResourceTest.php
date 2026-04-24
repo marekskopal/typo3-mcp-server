@@ -10,10 +10,8 @@ use MarekSkopal\MsMcpServer\Resource\Result\BackendLayoutColumnResult;
 use MarekSkopal\MsMcpServer\Resource\Result\BackendLayoutResult;
 use MarekSkopal\MsMcpServer\Resource\Result\BackendLayoutStructureResult;
 use MarekSkopal\MsMcpServer\Service\BackendLayoutService;
-use Mcp\Exception\ResourceReadException;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
-use Psr\Log\NullLogger;
 
 use const JSON_THROW_ON_ERROR;
 
@@ -41,7 +39,7 @@ final class BackendLayoutResourceTest extends TestCase
         $service = $this->createStub(BackendLayoutService::class);
         $service->method('getBackendLayoutForPage')->willReturn($result);
 
-        $resource = new BackendLayoutResource($service, new NullLogger());
+        $resource = new BackendLayoutResource($service);
         $json = json_decode($resource->execute('42'), true, 512, JSON_THROW_ON_ERROR);
 
         self::assertSame('default', $json['identifier']);
@@ -54,14 +52,14 @@ final class BackendLayoutResourceTest extends TestCase
         self::assertCount(1, $json['structure']['rows']);
     }
 
-    public function testExecuteThrowsResourceReadExceptionOnError(): void
+    public function testExecuteThrowsExceptionOnError(): void
     {
         $service = $this->createStub(BackendLayoutService::class);
         $service->method('getBackendLayoutForPage')->willThrowException(new \RuntimeException('Page not found'));
 
-        $resource = new BackendLayoutResource($service, new NullLogger());
+        $resource = new BackendLayoutResource($service);
 
-        $this->expectException(ResourceReadException::class);
+        $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('Page not found');
 
         $resource->execute('99');

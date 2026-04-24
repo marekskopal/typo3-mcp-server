@@ -7,12 +7,10 @@ namespace MarekSkopal\MsMcpServer\Tool\Pages;
 use MarekSkopal\MsMcpServer\Service\DataHandlerService;
 use MarekSkopal\MsMcpServer\Tool\Result\RecordCopiedResult;
 use Mcp\Capability\Attribute\McpTool;
-use Mcp\Exception\ToolCallException;
-use Psr\Log\LoggerInterface;
 
 readonly class PagesCopyTool
 {
-    public function __construct(private DataHandlerService $dataHandlerService, private LoggerInterface $logger,)
+    public function __construct(private DataHandlerService $dataHandlerService)
     {
     }
 
@@ -25,13 +23,7 @@ readonly class PagesCopyTool
     )]
     public function execute(int $uid, int $target, bool $includeSubpages = false): RecordCopiedResult
     {
-        try {
-            $newUid = $this->dataHandlerService->copyRecord('pages', $uid, $target, $includeSubpages ? 99 : 0);
-        } catch (\Throwable $e) {
-            $this->logger->error('pages_copy tool failed', ['exception' => $e]);
-
-            throw new ToolCallException($e->getMessage(), (int) $e->getCode(), $e);
-        }
+        $newUid = $this->dataHandlerService->copyRecord('pages', $uid, $target, $includeSubpages ? 99 : 0);
 
         return new RecordCopiedResult($uid, $newUid);
     }

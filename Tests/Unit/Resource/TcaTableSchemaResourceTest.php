@@ -9,7 +9,6 @@ use MarekSkopal\MsMcpServer\Service\TcaSchemaService;
 use Mcp\Exception\ResourceReadException;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
-use Psr\Log\NullLogger;
 use const JSON_THROW_ON_ERROR;
 
 #[CoversClass(TcaTableSchemaResource::class)]
@@ -37,7 +36,7 @@ final class TcaTableSchemaResourceTest extends TestCase
             ],
         ];
 
-        $resource = new TcaTableSchemaResource(new TcaSchemaService(), new NullLogger());
+        $resource = new TcaTableSchemaResource(new TcaSchemaService());
         $result = json_decode($resource->execute('tx_test'), true, 512, JSON_THROW_ON_ERROR);
 
         self::assertSame('tx_test', $result['table']);
@@ -48,7 +47,7 @@ final class TcaTableSchemaResourceTest extends TestCase
 
     public function testExecuteThrowsResourceReadExceptionWhenTableNotFound(): void
     {
-        $resource = new TcaTableSchemaResource(new TcaSchemaService(), new NullLogger());
+        $resource = new TcaTableSchemaResource(new TcaSchemaService());
 
         $this->expectException(ResourceReadException::class);
         $this->expectExceptionMessage('Table not found or has no readable fields: nonexistent_table');

@@ -9,16 +9,11 @@ use MarekSkopal\MsMcpServer\Service\TcaSchemaService;
 use MarekSkopal\MsMcpServer\Tool\Result\ErrorResult;
 use MarekSkopal\MsMcpServer\Tool\Result\FileReferenceAddedResult;
 use Mcp\Capability\Attribute\McpTool;
-use Mcp\Exception\ToolCallException;
-use Psr\Log\LoggerInterface;
 
 readonly class FileReferenceAddTool
 {
-    public function __construct(
-        private DataHandlerService $dataHandlerService,
-        private TcaSchemaService $tcaSchemaService,
-        private LoggerInterface $logger,
-    ) {
+    public function __construct(private DataHandlerService $dataHandlerService, private TcaSchemaService $tcaSchemaService,)
+    {
     }
 
     #[McpTool(
@@ -44,13 +39,7 @@ readonly class FileReferenceAddTool
             );
         }
 
-        try {
-            $referenceUids = $this->dataHandlerService->createFileReferences($table, $uid, $fieldName, $parsedUids);
-        } catch (\Throwable $e) {
-            $this->logger->error('file_reference_add tool failed', ['exception' => $e]);
-
-            throw new ToolCallException($e->getMessage(), (int) $e->getCode(), $e);
-        }
+        $referenceUids = $this->dataHandlerService->createFileReferences($table, $uid, $fieldName, $parsedUids);
 
         return new FileReferenceAddedResult($table, $uid, $fieldName, count($referenceUids), $referenceUids);
     }

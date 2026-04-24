@@ -10,6 +10,7 @@ use Mcp\Capability\Attribute\McpResourceTemplate;
 use Mcp\Server;
 use Mcp\Server\Session\FileSessionStore;
 use Psr\Container\ContainerInterface;
+use Psr\Log\LoggerInterface;
 use ReflectionMethod;
 use TYPO3\CMS\Core\Core\Environment;
 
@@ -25,6 +26,7 @@ readonly class McpServerFactory
     public function __construct(
         private ContainerInterface $container,
         private DynamicToolRegistrar $dynamicToolRegistrar,
+        private LoggerInterface $logger,
         private iterable $tools,
         private iterable $resources,
         private iterable $prompts,
@@ -36,9 +38,12 @@ readonly class McpServerFactory
         $sessionDir = Environment::getVarPath() . '/mcp-sessions';
         $sessionStore = new FileSessionStore($sessionDir);
 
+        $handlerTypes = $this->buildHandlerTypeMap();
+        $errorHandlingContainer = new ErrorHandlingContainer($this->container, $this->logger, $handlerTypes);
+
         $builder = Server::builder()
             ->setServerInfo('TYPO3 MCP Server', self::VERSION)
-            ->setContainer($this->container)
+            ->setContainer($errorHandlingContainer)
             ->setSession($sessionStore, new InitializedSessionFactory());
 
         foreach ($this->tools as $tool) {
@@ -82,5 +87,21 @@ readonly class McpServerFactory
         }
 
         return $attributes[0]->newInstance();
+    }
+
+    /** @return array<class-string, 'tool'|'resource'> */
+    private function buildHandlerTypeMap(): array
+    {
+        $map = [];
+
+        foreach ($this->tools as $tool) {
+            $map[$tool::class] = 'tool';
+        }
+
+        foreach ($this->resources as $resource) {
+            $map[$resource::class] = 'resource';
+        }
+
+        return $map;
     }
 }

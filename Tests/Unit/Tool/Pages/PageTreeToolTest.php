@@ -7,10 +7,8 @@ namespace MarekSkopal\MsMcpServer\Tests\Unit\Tool\Pages;
 use MarekSkopal\MsMcpServer\Service\RecordService;
 use MarekSkopal\MsMcpServer\Service\TcaSchemaService;
 use MarekSkopal\MsMcpServer\Tool\Pages\PageTreeTool;
-use Mcp\Exception\ToolCallException;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
-use Psr\Log\NullLogger;
 use const JSON_THROW_ON_ERROR;
 
 #[CoversClass(PageTreeTool::class)]
@@ -53,7 +51,7 @@ final class PageTreeToolTest extends TestCase
                 };
             });
 
-        $tool = new PageTreeTool($recordService, new TcaSchemaService(), new NullLogger());
+        $tool = new PageTreeTool($recordService, new TcaSchemaService());
         $result = json_decode($tool->execute(0, 3), true, 512, JSON_THROW_ON_ERROR);
 
         self::assertSame(2, $result['totalNodes']);
@@ -72,7 +70,7 @@ final class PageTreeToolTest extends TestCase
             ->with('pages', 0, 500, 0, self::anything())
             ->willReturn(['records' => [['uid' => 1, 'pid' => 0, 'title' => 'Root']], 'total' => 1]);
 
-        $tool = new PageTreeTool($recordService, new TcaSchemaService(), new NullLogger());
+        $tool = new PageTreeTool($recordService, new TcaSchemaService());
         $result = json_decode($tool->execute(0, 1), true, 512, JSON_THROW_ON_ERROR);
 
         self::assertSame(1, $result['totalNodes']);
@@ -86,23 +84,23 @@ final class PageTreeToolTest extends TestCase
             ->method('findByPid')
             ->willReturn(['records' => [], 'total' => 0]);
 
-        $tool = new PageTreeTool($recordService, new TcaSchemaService(), new NullLogger());
+        $tool = new PageTreeTool($recordService, new TcaSchemaService());
         $result = json_decode($tool->execute(999), true, 512, JSON_THROW_ON_ERROR);
 
         self::assertSame([], $result['tree']);
         self::assertSame(0, $result['totalNodes']);
     }
 
-    public function testExecuteThrowsToolCallExceptionOnError(): void
+    public function testExecuteThrowsExceptionOnError(): void
     {
         $recordService = $this->createMock(RecordService::class);
         $recordService->expects(self::once())
             ->method('findByPid')
             ->willThrowException(new \RuntimeException('Database error'));
 
-        $tool = new PageTreeTool($recordService, new TcaSchemaService(), new NullLogger());
+        $tool = new PageTreeTool($recordService, new TcaSchemaService());
 
-        $this->expectException(ToolCallException::class);
+        $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('Database error');
 
         $tool->execute();
@@ -114,7 +112,7 @@ final class PageTreeToolTest extends TestCase
         $recordService->method('findByPid')
             ->willReturn(['records' => [], 'total' => 0]);
 
-        $tool = new PageTreeTool($recordService, new TcaSchemaService(), new NullLogger());
+        $tool = new PageTreeTool($recordService, new TcaSchemaService());
 
         // Depth 99 should be clamped to 10, but with empty results it just returns empty
         $result = json_decode($tool->execute(0, 99), true, 512, JSON_THROW_ON_ERROR);

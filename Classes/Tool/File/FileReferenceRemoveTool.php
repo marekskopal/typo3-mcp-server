@@ -8,12 +8,10 @@ use MarekSkopal\MsMcpServer\Service\DataHandlerService;
 use MarekSkopal\MsMcpServer\Tool\Result\ErrorResult;
 use MarekSkopal\MsMcpServer\Tool\Result\FileReferenceRemovedResult;
 use Mcp\Capability\Attribute\McpTool;
-use Mcp\Exception\ToolCallException;
-use Psr\Log\LoggerInterface;
 
 readonly class FileReferenceRemoveTool
 {
-    public function __construct(private DataHandlerService $dataHandlerService, private LoggerInterface $logger,)
+    public function __construct(private DataHandlerService $dataHandlerService)
     {
     }
 
@@ -33,14 +31,8 @@ readonly class FileReferenceRemoveTool
             return new ErrorResult('No valid reference UIDs provided');
         }
 
-        try {
-            foreach ($parsedUids as $referenceUid) {
-                $this->dataHandlerService->deleteRecord('sys_file_reference', $referenceUid);
-            }
-        } catch (\Throwable $e) {
-            $this->logger->error('file_reference_remove tool failed', ['exception' => $e]);
-
-            throw new ToolCallException($e->getMessage(), (int) $e->getCode(), $e);
+        foreach ($parsedUids as $referenceUid) {
+            $this->dataHandlerService->deleteRecord('sys_file_reference', $referenceUid);
         }
 
         return new FileReferenceRemovedResult(count($parsedUids), $parsedUids);

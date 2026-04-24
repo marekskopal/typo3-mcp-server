@@ -7,12 +7,11 @@ namespace MarekSkopal\MsMcpServer\Tool\File;
 use MarekSkopal\MsMcpServer\Service\FileService;
 use Mcp\Capability\Attribute\McpTool;
 use Mcp\Exception\ToolCallException;
-use Psr\Log\LoggerInterface;
 use const JSON_THROW_ON_ERROR;
 
 readonly class FileUploadTool
 {
-    public function __construct(private FileService $fileService, private LoggerInterface $logger)
+    public function __construct(private FileService $fileService)
     {
     }
 
@@ -27,16 +26,8 @@ readonly class FileUploadTool
         string $directoryPath = '/',
         int $storageUid = 1,
     ): string {
-        try {
-            $fileContent = $this->resolveContent($base64Content, $content);
-            $result = $this->fileService->uploadFile($storageUid, $directoryPath, $fileName, $fileContent);
-        } catch (ToolCallException $e) {
-            throw $e;
-        } catch (\Throwable $e) {
-            $this->logger->error('file_upload tool failed', ['exception' => $e]);
-
-            throw new ToolCallException($e->getMessage(), (int) $e->getCode(), $e);
-        }
+        $fileContent = $this->resolveContent($base64Content, $content);
+        $result = $this->fileService->uploadFile($storageUid, $directoryPath, $fileName, $fileContent);
 
         return json_encode($result, JSON_THROW_ON_ERROR);
     }

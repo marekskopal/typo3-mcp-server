@@ -7,17 +7,12 @@ namespace MarekSkopal\MsMcpServer\Tool\Search;
 use MarekSkopal\MsMcpServer\Service\RecordService;
 use MarekSkopal\MsMcpServer\Service\TcaSchemaService;
 use Mcp\Capability\Attribute\McpTool;
-use Mcp\Exception\ToolCallException;
-use Psr\Log\LoggerInterface;
 use const JSON_THROW_ON_ERROR;
 
 readonly class RecordSearchTool
 {
-    public function __construct(
-        private RecordService $recordService,
-        private TcaSchemaService $tcaSchemaService,
-        private LoggerInterface $logger,
-    ) {
+    public function __construct(private RecordService $recordService, private TcaSchemaService $tcaSchemaService,)
+    {
     }
 
     #[McpTool(
@@ -87,22 +82,16 @@ readonly class RecordSearchTool
             $orderDirection = 'ASC';
         }
 
-        try {
-            $result = $this->recordService->search(
-                $tableName,
-                $validSearch,
-                $limit,
-                $offset,
-                $readFields,
-                $pid >= 0 ? $pid : null,
-                $resolvedOrderBy,
-                $orderDirection,
-            );
-        } catch (\Throwable $e) {
-            $this->logger->error('record_search tool failed', ['exception' => $e]);
-
-            throw new ToolCallException($e->getMessage(), (int) $e->getCode(), $e);
-        }
+        $result = $this->recordService->search(
+            $tableName,
+            $validSearch,
+            $limit,
+            $offset,
+            $readFields,
+            $pid >= 0 ? $pid : null,
+            $resolvedOrderBy,
+            $orderDirection,
+        );
 
         $response = $result;
         if ($ignoredFields !== []) {

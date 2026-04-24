@@ -7,10 +7,8 @@ namespace MarekSkopal\MsMcpServer\Tests\Unit\Tool\File;
 use MarekSkopal\MsMcpServer\Service\FileService;
 use MarekSkopal\MsMcpServer\Tool\File\DirectoryMoveTool;
 use MarekSkopal\MsMcpServer\Tool\Result\DirectoryMovedResult;
-use Mcp\Exception\ToolCallException;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
-use Psr\Log\NullLogger;
 
 #[CoversClass(DirectoryMoveTool::class)]
 final class DirectoryMoveToolTest extends TestCase
@@ -22,7 +20,7 @@ final class DirectoryMoveToolTest extends TestCase
             ->method('moveDirectory')
             ->with(1, '/source/', '/target/');
 
-        $tool = new DirectoryMoveTool($fileService, new NullLogger());
+        $tool = new DirectoryMoveTool($fileService);
         $result = $tool->execute('/source/', '/target/');
 
         self::assertInstanceOf(DirectoryMovedResult::class, $result);
@@ -31,15 +29,15 @@ final class DirectoryMoveToolTest extends TestCase
         self::assertTrue($result->moved);
     }
 
-    public function testExecuteThrowsToolCallExceptionOnError(): void
+    public function testExecuteThrowsExceptionOnError(): void
     {
         $fileService = $this->createStub(FileService::class);
         $fileService->method('moveDirectory')
             ->willThrowException(new \RuntimeException('Folder not found'));
 
-        $tool = new DirectoryMoveTool($fileService, new NullLogger());
+        $tool = new DirectoryMoveTool($fileService);
 
-        $this->expectException(ToolCallException::class);
+        $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('Folder not found');
 
         $tool->execute('/nonexistent/', '/target/');

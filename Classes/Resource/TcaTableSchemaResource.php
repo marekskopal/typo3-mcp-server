@@ -8,12 +8,11 @@ use MarekSkopal\MsMcpServer\Resource\Result\TcaTableSchemaResult;
 use MarekSkopal\MsMcpServer\Service\TcaSchemaService;
 use Mcp\Capability\Attribute\McpResourceTemplate;
 use Mcp\Exception\ResourceReadException;
-use Psr\Log\LoggerInterface;
 use const JSON_THROW_ON_ERROR;
 
 readonly class TcaTableSchemaResource
 {
-    public function __construct(private TcaSchemaService $tcaSchemaService, private LoggerInterface $logger)
+    public function __construct(private TcaSchemaService $tcaSchemaService)
     {
     }
 
@@ -25,13 +24,7 @@ readonly class TcaTableSchemaResource
     )]
     public function execute(string $tableName): string
     {
-        try {
-            $schema = $this->tcaSchemaService->getFieldsSchema($tableName);
-        } catch (\Throwable $e) {
-            $this->logger->error('tca_table_schema resource failed', ['exception' => $e]);
-
-            throw new ResourceReadException($e->getMessage(), (int) $e->getCode(), $e);
-        }
+        $schema = $this->tcaSchemaService->getFieldsSchema($tableName);
 
         if ($schema['fields'] === []) {
             throw new ResourceReadException('Table not found or has no readable fields: ' . $tableName);
@@ -39,12 +32,6 @@ readonly class TcaTableSchemaResource
 
         $result = new TcaTableSchemaResult(table: $schema['table'], fields: $schema['fields']);
 
-        try {
-            return json_encode($result, JSON_THROW_ON_ERROR);
-        } catch (\Throwable $e) {
-            $this->logger->error('tca_table_schema resource failed', ['exception' => $e]);
-
-            throw new ResourceReadException($e->getMessage(), (int) $e->getCode(), $e);
-        }
+        return json_encode($result, JSON_THROW_ON_ERROR);
     }
 }

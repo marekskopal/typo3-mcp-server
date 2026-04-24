@@ -8,7 +8,6 @@ use MarekSkopal\MsMcpServer\Service\TcaSchemaService;
 use MarekSkopal\MsMcpServer\Tool\Schema\TableSchemaTool;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
-use Psr\Log\NullLogger;
 use const JSON_THROW_ON_ERROR;
 
 #[CoversClass(TableSchemaTool::class)]
@@ -47,7 +46,7 @@ final class TableSchemaToolTest extends TestCase
             ],
         ];
 
-        $tool = new TableSchemaTool(new TcaSchemaService(), new NullLogger());
+        $tool = new TableSchemaTool(new TcaSchemaService());
         $result = json_decode($tool->execute('tx_test'), true, 512, JSON_THROW_ON_ERROR);
 
         self::assertSame('tx_test', $result['table']);
@@ -61,7 +60,7 @@ final class TableSchemaToolTest extends TestCase
 
     public function testExecuteReturnsErrorWhenTableNotFound(): void
     {
-        $tool = new TableSchemaTool(new TcaSchemaService(), new NullLogger());
+        $tool = new TableSchemaTool(new TcaSchemaService());
         $result = json_decode($tool->execute('nonexistent_table'), true, 512, JSON_THROW_ON_ERROR);
 
         self::assertArrayHasKey('error', $result);

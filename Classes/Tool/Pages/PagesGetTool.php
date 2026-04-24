@@ -7,17 +7,12 @@ namespace MarekSkopal\MsMcpServer\Tool\Pages;
 use MarekSkopal\MsMcpServer\Service\RecordService;
 use MarekSkopal\MsMcpServer\Service\TcaSchemaService;
 use Mcp\Capability\Attribute\McpTool;
-use Mcp\Exception\ToolCallException;
-use Psr\Log\LoggerInterface;
 use const JSON_THROW_ON_ERROR;
 
 readonly class PagesGetTool
 {
-    public function __construct(
-        private RecordService $recordService,
-        private TcaSchemaService $tcaSchemaService,
-        private LoggerInterface $logger,
-    ) {
+    public function __construct(private RecordService $recordService, private TcaSchemaService $tcaSchemaService,)
+    {
     }
 
     #[McpTool(name: 'pages_get', description: 'Get a single page by its uid.')]
@@ -36,13 +31,7 @@ readonly class PagesGetTool
             $fields[] = $transOrigPointerField;
         }
 
-        try {
-            $record = $this->recordService->findByUid('pages', $uid, $fields);
-        } catch (\Throwable $e) {
-            $this->logger->error('pages_get tool failed', ['exception' => $e]);
-
-            throw new ToolCallException($e->getMessage(), (int) $e->getCode(), $e);
-        }
+        $record = $this->recordService->findByUid('pages', $uid, $fields);
 
         if ($record === null) {
             return json_encode(['error' => 'Page not found'], JSON_THROW_ON_ERROR);

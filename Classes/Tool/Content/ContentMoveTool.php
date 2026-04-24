@@ -7,12 +7,10 @@ namespace MarekSkopal\MsMcpServer\Tool\Content;
 use MarekSkopal\MsMcpServer\Service\DataHandlerService;
 use MarekSkopal\MsMcpServer\Tool\Result\RecordMovedResult;
 use Mcp\Capability\Attribute\McpTool;
-use Mcp\Exception\ToolCallException;
-use Psr\Log\LoggerInterface;
 
 readonly class ContentMoveTool
 {
-    public function __construct(private DataHandlerService $dataHandlerService, private LoggerInterface $logger)
+    public function __construct(private DataHandlerService $dataHandlerService)
     {
     }
 
@@ -24,13 +22,7 @@ readonly class ContentMoveTool
     )]
     public function execute(int $uid, int $target): RecordMovedResult
     {
-        try {
-            $this->dataHandlerService->moveRecord('tt_content', $uid, $target);
-        } catch (\Throwable $e) {
-            $this->logger->error('content_move tool failed', ['exception' => $e]);
-
-            throw new ToolCallException($e->getMessage(), (int) $e->getCode(), $e);
-        }
+        $this->dataHandlerService->moveRecord('tt_content', $uid, $target);
 
         return new RecordMovedResult($uid, $target);
     }

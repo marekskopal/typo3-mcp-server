@@ -7,10 +7,8 @@ namespace MarekSkopal\MsMcpServer\Tests\Unit\Tool\Content;
 use MarekSkopal\MsMcpServer\Service\DataHandlerService;
 use MarekSkopal\MsMcpServer\Tool\Content\ContentMoveTool;
 use MarekSkopal\MsMcpServer\Tool\Result\RecordMovedResult;
-use Mcp\Exception\ToolCallException;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
-use Psr\Log\NullLogger;
 
 #[CoversClass(ContentMoveTool::class)]
 final class ContentMoveToolTest extends TestCase
@@ -22,7 +20,7 @@ final class ContentMoveToolTest extends TestCase
             ->method('moveRecord')
             ->with('tt_content', 42, 10);
 
-        $tool = new ContentMoveTool($dataHandlerService, new NullLogger());
+        $tool = new ContentMoveTool($dataHandlerService);
         $result = $tool->execute(42, 10);
 
         self::assertInstanceOf(RecordMovedResult::class, $result);
@@ -37,7 +35,7 @@ final class ContentMoveToolTest extends TestCase
             ->method('moveRecord')
             ->with('tt_content', 42, -5);
 
-        $tool = new ContentMoveTool($dataHandlerService, new NullLogger());
+        $tool = new ContentMoveTool($dataHandlerService);
         $result = $tool->execute(42, -5);
 
         self::assertInstanceOf(RecordMovedResult::class, $result);
@@ -45,16 +43,16 @@ final class ContentMoveToolTest extends TestCase
         self::assertSame(-5, $result->target);
     }
 
-    public function testExecuteThrowsToolCallExceptionOnError(): void
+    public function testExecuteThrowsExceptionOnError(): void
     {
         $dataHandlerService = $this->createMock(DataHandlerService::class);
         $dataHandlerService->expects(self::once())
             ->method('moveRecord')
             ->willThrowException(new \RuntimeException('DataHandler error'));
 
-        $tool = new ContentMoveTool($dataHandlerService, new NullLogger());
+        $tool = new ContentMoveTool($dataHandlerService);
 
-        $this->expectException(ToolCallException::class);
+        $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('DataHandler error');
 
         $tool->execute(1, 10);

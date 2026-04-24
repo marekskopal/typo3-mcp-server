@@ -7,10 +7,8 @@ namespace MarekSkopal\MsMcpServer\Tests\Unit\Tool\Content;
 use MarekSkopal\MsMcpServer\Service\RecordService;
 use MarekSkopal\MsMcpServer\Service\TcaSchemaService;
 use MarekSkopal\MsMcpServer\Tool\Content\ContentListTool;
-use Mcp\Exception\ToolCallException;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
-use Psr\Log\NullLogger;
 use const JSON_THROW_ON_ERROR;
 
 #[CoversClass(ContentListTool::class)]
@@ -61,7 +59,7 @@ final class ContentListToolTest extends TestCase
             )
             ->willReturn($expectedResult);
 
-        $tool = new ContentListTool($recordService, new TcaSchemaService(), new NullLogger());
+        $tool = new ContentListTool($recordService, new TcaSchemaService());
         $result = json_decode($tool->execute(10), true, 512, JSON_THROW_ON_ERROR);
 
         self::assertSame(1, $result['total']);
@@ -82,7 +80,7 @@ final class ContentListToolTest extends TestCase
             )
             ->willReturn(['records' => [], 'total' => 0]);
 
-        $tool = new ContentListTool($recordService, new TcaSchemaService(), new NullLogger());
+        $tool = new ContentListTool($recordService, new TcaSchemaService());
         $tool->execute(5, 10, 30);
     }
 
@@ -102,7 +100,7 @@ final class ContentListToolTest extends TestCase
             )
             ->willReturn(['records' => [], 'total' => 0]);
 
-        $tool = new ContentListTool($recordService, new TcaSchemaService(), new NullLogger());
+        $tool = new ContentListTool($recordService, new TcaSchemaService());
         $tool->execute(10, 20, 0, 0);
     }
 
@@ -122,7 +120,7 @@ final class ContentListToolTest extends TestCase
             )
             ->willReturn(['records' => [], 'total' => 0]);
 
-        $tool = new ContentListTool($recordService, new TcaSchemaService(), new NullLogger());
+        $tool = new ContentListTool($recordService, new TcaSchemaService());
         $tool->execute(10, 20, 0, -1);
     }
 
@@ -145,7 +143,7 @@ final class ContentListToolTest extends TestCase
             )
             ->willReturn(['records' => [], 'total' => 0]);
 
-        $tool = new ContentListTool($recordService, new TcaSchemaService(), new NullLogger());
+        $tool = new ContentListTool($recordService, new TcaSchemaService());
         $tool->execute(10, 20, 0, -1, 'header,bodytext');
     }
 
@@ -163,20 +161,20 @@ final class ContentListToolTest extends TestCase
             )
             ->willReturn(['records' => [], 'total' => 0]);
 
-        $tool = new ContentListTool($recordService, new TcaSchemaService(), new NullLogger());
+        $tool = new ContentListTool($recordService, new TcaSchemaService());
         $tool->execute(10, 20, 0, -1, 'nonexistent_field,another_bad');
     }
 
-    public function testExecuteThrowsToolCallExceptionOnError(): void
+    public function testExecuteThrowsExceptionOnError(): void
     {
         $recordService = $this->createMock(RecordService::class);
         $recordService->expects(self::once())
             ->method('findByPid')
             ->willThrowException(new \RuntimeException('Database error'));
 
-        $tool = new ContentListTool($recordService, new TcaSchemaService(), new NullLogger());
+        $tool = new ContentListTool($recordService, new TcaSchemaService());
 
-        $this->expectException(ToolCallException::class);
+        $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('Database error');
 
         $tool->execute(1);

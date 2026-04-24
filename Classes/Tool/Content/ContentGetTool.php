@@ -7,17 +7,12 @@ namespace MarekSkopal\MsMcpServer\Tool\Content;
 use MarekSkopal\MsMcpServer\Service\RecordService;
 use MarekSkopal\MsMcpServer\Service\TcaSchemaService;
 use Mcp\Capability\Attribute\McpTool;
-use Mcp\Exception\ToolCallException;
-use Psr\Log\LoggerInterface;
 use const JSON_THROW_ON_ERROR;
 
 readonly class ContentGetTool
 {
-    public function __construct(
-        private RecordService $recordService,
-        private TcaSchemaService $tcaSchemaService,
-        private LoggerInterface $logger,
-    ) {
+    public function __construct(private RecordService $recordService, private TcaSchemaService $tcaSchemaService,)
+    {
     }
 
     #[McpTool(name: 'content_get', description: 'Get a single content element by its uid.')]
@@ -36,13 +31,7 @@ readonly class ContentGetTool
             $fields[] = $transOrigPointerField;
         }
 
-        try {
-            $record = $this->recordService->findByUid('tt_content', $uid, $fields);
-        } catch (\Throwable $e) {
-            $this->logger->error('content_get tool failed', ['exception' => $e]);
-
-            throw new ToolCallException($e->getMessage(), (int) $e->getCode(), $e);
-        }
+        $record = $this->recordService->findByUid('tt_content', $uid, $fields);
 
         if ($record === null) {
             return json_encode(['error' => 'Content element not found'], JSON_THROW_ON_ERROR);

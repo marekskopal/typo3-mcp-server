@@ -8,10 +8,8 @@ use MarekSkopal\MsMcpServer\Service\DataHandlerService;
 use MarekSkopal\MsMcpServer\Tool\File\FileReferenceRemoveTool;
 use MarekSkopal\MsMcpServer\Tool\Result\ErrorResult;
 use MarekSkopal\MsMcpServer\Tool\Result\FileReferenceRemovedResult;
-use Mcp\Exception\ToolCallException;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
-use Psr\Log\NullLogger;
 
 #[CoversClass(FileReferenceRemoveTool::class)]
 final class FileReferenceRemoveToolTest extends TestCase
@@ -23,7 +21,7 @@ final class FileReferenceRemoveToolTest extends TestCase
             ->method('deleteRecord')
             ->with('sys_file_reference', 201);
 
-        $tool = new FileReferenceRemoveTool($dataHandlerService, new NullLogger());
+        $tool = new FileReferenceRemoveTool($dataHandlerService);
         $result = $tool->execute('201');
 
         self::assertInstanceOf(FileReferenceRemovedResult::class, $result);
@@ -41,7 +39,7 @@ final class FileReferenceRemoveToolTest extends TestCase
                 self::assertContains($uid, [201, 202, 203]);
             });
 
-        $tool = new FileReferenceRemoveTool($dataHandlerService, new NullLogger());
+        $tool = new FileReferenceRemoveTool($dataHandlerService);
         $result = $tool->execute('201, 202, 203');
 
         self::assertInstanceOf(FileReferenceRemovedResult::class, $result);
@@ -54,7 +52,7 @@ final class FileReferenceRemoveToolTest extends TestCase
         $dataHandlerService = $this->createMock(DataHandlerService::class);
         $dataHandlerService->expects(self::never())->method('deleteRecord');
 
-        $tool = new FileReferenceRemoveTool($dataHandlerService, new NullLogger());
+        $tool = new FileReferenceRemoveTool($dataHandlerService);
         $result = $tool->execute('0,');
 
         self::assertInstanceOf(ErrorResult::class, $result);
@@ -68,7 +66,7 @@ final class FileReferenceRemoveToolTest extends TestCase
             ->method('deleteRecord')
             ->with('sys_file_reference', 42);
 
-        $tool = new FileReferenceRemoveTool($dataHandlerService, new NullLogger());
+        $tool = new FileReferenceRemoveTool($dataHandlerService);
         $result = $tool->execute('0, 42, -1');
 
         self::assertInstanceOf(FileReferenceRemovedResult::class, $result);
@@ -76,15 +74,15 @@ final class FileReferenceRemoveToolTest extends TestCase
         self::assertSame([42], $result->referenceUids);
     }
 
-    public function testExecuteThrowsToolCallExceptionOnError(): void
+    public function testExecuteThrowsExceptionOnError(): void
     {
         $dataHandlerService = $this->createStub(DataHandlerService::class);
         $dataHandlerService->method('deleteRecord')
             ->willThrowException(new \RuntimeException('DataHandler error'));
 
-        $tool = new FileReferenceRemoveTool($dataHandlerService, new NullLogger());
+        $tool = new FileReferenceRemoveTool($dataHandlerService);
 
-        $this->expectException(ToolCallException::class);
+        $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('DataHandler error');
 
         $tool->execute('201');

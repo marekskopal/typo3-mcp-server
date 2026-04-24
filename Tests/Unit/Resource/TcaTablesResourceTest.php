@@ -7,7 +7,6 @@ namespace MarekSkopal\MsMcpServer\Tests\Unit\Resource;
 use MarekSkopal\MsMcpServer\Resource\TcaTablesResource;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
-use Psr\Log\NullLogger;
 use const JSON_THROW_ON_ERROR;
 
 #[CoversClass(TcaTablesResource::class)]
@@ -31,7 +30,7 @@ final class TcaTablesResourceTest extends TestCase
             'sys_file' => ['ctrl' => ['title' => 'Files']],
         ];
 
-        $resource = new TcaTablesResource(new NullLogger());
+        $resource = new TcaTablesResource();
         $result = json_decode($resource->execute(), true, 512, JSON_THROW_ON_ERROR);
 
         self::assertCount(3, $result);
@@ -47,7 +46,7 @@ final class TcaTablesResourceTest extends TestCase
     {
         $GLOBALS['TCA'] = [];
 
-        $resource = new TcaTablesResource(new NullLogger());
+        $resource = new TcaTablesResource();
         $result = json_decode($resource->execute(), true, 512, JSON_THROW_ON_ERROR);
 
         self::assertSame([], $result);
@@ -59,7 +58,7 @@ final class TcaTablesResourceTest extends TestCase
             'tx_custom' => ['ctrl' => []],
         ];
 
-        $resource = new TcaTablesResource(new NullLogger());
+        $resource = new TcaTablesResource();
         $result = json_decode($resource->execute(), true, 512, JSON_THROW_ON_ERROR);
 
         self::assertCount(1, $result);

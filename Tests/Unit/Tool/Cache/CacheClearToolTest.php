@@ -8,10 +8,8 @@ use MarekSkopal\MsMcpServer\Service\CacheService;
 use MarekSkopal\MsMcpServer\Tool\Cache\CacheClearTool;
 use MarekSkopal\MsMcpServer\Tool\Result\CacheClearedResult;
 use MarekSkopal\MsMcpServer\Tool\Result\ErrorResult;
-use Mcp\Exception\ToolCallException;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
-use Psr\Log\NullLogger;
 
 #[CoversClass(CacheClearTool::class)]
 final class CacheClearToolTest extends TestCase
@@ -21,7 +19,7 @@ final class CacheClearToolTest extends TestCase
         $cacheService = $this->createMock(CacheService::class);
         $cacheService->expects(self::once())->method('flushPageCaches');
 
-        $tool = new CacheClearTool($cacheService, new NullLogger());
+        $tool = new CacheClearTool($cacheService);
         $result = $tool->execute('pages');
 
         self::assertInstanceOf(CacheClearedResult::class, $result);
@@ -34,7 +32,7 @@ final class CacheClearToolTest extends TestCase
         $cacheService = $this->createMock(CacheService::class);
         $cacheService->expects(self::once())->method('flushPageCaches');
 
-        $tool = new CacheClearTool($cacheService, new NullLogger());
+        $tool = new CacheClearTool($cacheService);
         $result = $tool->execute();
 
         self::assertInstanceOf(CacheClearedResult::class, $result);
@@ -46,7 +44,7 @@ final class CacheClearToolTest extends TestCase
         $cacheService = $this->createMock(CacheService::class);
         $cacheService->expects(self::once())->method('flushAllCaches');
 
-        $tool = new CacheClearTool($cacheService, new NullLogger());
+        $tool = new CacheClearTool($cacheService);
         $result = $tool->execute('all');
 
         self::assertInstanceOf(CacheClearedResult::class, $result);
@@ -58,7 +56,7 @@ final class CacheClearToolTest extends TestCase
         $cacheService = $this->createMock(CacheService::class);
         $cacheService->expects(self::once())->method('flushPageCache')->with(42);
 
-        $tool = new CacheClearTool($cacheService, new NullLogger());
+        $tool = new CacheClearTool($cacheService);
         $result = $tool->execute('page', 42);
 
         self::assertInstanceOf(CacheClearedResult::class, $result);
@@ -69,7 +67,7 @@ final class CacheClearToolTest extends TestCase
     {
         $cacheService = $this->createStub(CacheService::class);
 
-        $tool = new CacheClearTool($cacheService, new NullLogger());
+        $tool = new CacheClearTool($cacheService);
         $result = $tool->execute('page');
 
         self::assertInstanceOf(ErrorResult::class, $result);
@@ -80,23 +78,23 @@ final class CacheClearToolTest extends TestCase
     {
         $cacheService = $this->createStub(CacheService::class);
 
-        $tool = new CacheClearTool($cacheService, new NullLogger());
+        $tool = new CacheClearTool($cacheService);
         $result = $tool->execute('invalid');
 
         self::assertInstanceOf(ErrorResult::class, $result);
         self::assertStringContainsString('Invalid scope', $result->error);
     }
 
-    public function testExecuteThrowsToolCallExceptionOnError(): void
+    public function testExecuteThrowsExceptionOnError(): void
     {
         $cacheService = $this->createMock(CacheService::class);
         $cacheService->expects(self::once())
             ->method('flushPageCaches')
             ->willThrowException(new \RuntimeException('Cache flush failed'));
 
-        $tool = new CacheClearTool($cacheService, new NullLogger());
+        $tool = new CacheClearTool($cacheService);
 
-        $this->expectException(ToolCallException::class);
+        $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('Cache flush failed');
 
         $tool->execute('pages');

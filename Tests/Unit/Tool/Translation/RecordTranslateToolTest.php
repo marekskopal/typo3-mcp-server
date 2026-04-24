@@ -10,10 +10,8 @@ use MarekSkopal\MsMcpServer\Service\TcaSchemaService;
 use MarekSkopal\MsMcpServer\Tool\Result\ErrorResult;
 use MarekSkopal\MsMcpServer\Tool\Result\RecordTranslatedResult;
 use MarekSkopal\MsMcpServer\Tool\Translation\RecordTranslateTool;
-use Mcp\Exception\ToolCallException;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
-use Psr\Log\NullLogger;
 
 #[CoversClass(RecordTranslateTool::class)]
 final class RecordTranslateToolTest extends TestCase
@@ -41,7 +39,7 @@ final class RecordTranslateToolTest extends TestCase
             ->with('pages', 1, 2)
             ->willReturn(99);
 
-        $tool = new RecordTranslateTool($dataHandlerService, $recordService, new TcaSchemaService(), new NullLogger());
+        $tool = new RecordTranslateTool($dataHandlerService, $recordService, new TcaSchemaService());
         $result = $tool->execute('pages', 1, 2);
 
         self::assertInstanceOf(RecordTranslatedResult::class, $result);
@@ -62,7 +60,7 @@ final class RecordTranslateToolTest extends TestCase
 
         $recordService = $this->createStub(RecordService::class);
 
-        $tool = new RecordTranslateTool($dataHandlerService, $recordService, new TcaSchemaService(), new NullLogger());
+        $tool = new RecordTranslateTool($dataHandlerService, $recordService, new TcaSchemaService());
         $result = $tool->execute('sys_file', 1, 1);
 
         self::assertInstanceOf(ErrorResult::class, $result);
@@ -79,7 +77,7 @@ final class RecordTranslateToolTest extends TestCase
         $dataHandlerService = $this->createMock(DataHandlerService::class);
         $dataHandlerService->expects(self::never())->method('localizeRecord');
 
-        $tool = new RecordTranslateTool($dataHandlerService, $recordService, new TcaSchemaService(), new NullLogger());
+        $tool = new RecordTranslateTool($dataHandlerService, $recordService, new TcaSchemaService());
         $result = $tool->execute('pages', 999, 1);
 
         self::assertInstanceOf(ErrorResult::class, $result);
@@ -96,7 +94,7 @@ final class RecordTranslateToolTest extends TestCase
         $dataHandlerService = $this->createMock(DataHandlerService::class);
         $dataHandlerService->expects(self::never())->method('localizeRecord');
 
-        $tool = new RecordTranslateTool($dataHandlerService, $recordService, new TcaSchemaService(), new NullLogger());
+        $tool = new RecordTranslateTool($dataHandlerService, $recordService, new TcaSchemaService());
         $result = $tool->execute('pages', 1, 1);
 
         self::assertInstanceOf(ErrorResult::class, $result);
@@ -113,14 +111,14 @@ final class RecordTranslateToolTest extends TestCase
         $dataHandlerService = $this->createMock(DataHandlerService::class);
         $dataHandlerService->expects(self::never())->method('localizeRecord');
 
-        $tool = new RecordTranslateTool($dataHandlerService, $recordService, new TcaSchemaService(), new NullLogger());
+        $tool = new RecordTranslateTool($dataHandlerService, $recordService, new TcaSchemaService());
         $result = $tool->execute('pages', 5, 1);
 
         self::assertInstanceOf(ErrorResult::class, $result);
         self::assertStringContainsString('already a translation', $result->error);
     }
 
-    public function testExecuteThrowsToolCallExceptionOnDataHandlerError(): void
+    public function testExecuteThrowsExceptionOnDataHandlerError(): void
     {
         $GLOBALS['TCA']['tt_content'] = [
             'ctrl' => [
@@ -137,9 +135,9 @@ final class RecordTranslateToolTest extends TestCase
         $dataHandlerService->method('localizeRecord')
             ->willThrowException(new \RuntimeException('Translation already exists'));
 
-        $tool = new RecordTranslateTool($dataHandlerService, $recordService, new TcaSchemaService(), new NullLogger());
+        $tool = new RecordTranslateTool($dataHandlerService, $recordService, new TcaSchemaService());
 
-        $this->expectException(ToolCallException::class);
+        $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('Translation already exists');
 
         $tool->execute('tt_content', 42, 1);

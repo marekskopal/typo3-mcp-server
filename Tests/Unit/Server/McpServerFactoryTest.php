@@ -105,48 +105,48 @@ final class McpServerFactoryTest extends TestCase
         $typo3Version->method('getVersion')->willReturn('13.4.0');
 
         $tools = [
-            new PagesListTool($recordService, $tcaSchemaService, $logger),
-            new PagesGetTool($recordService, $tcaSchemaService, $logger),
-            new PagesCreateTool($dataHandlerService, $tcaSchemaService, $logger),
-            new PagesUpdateTool($dataHandlerService, $tcaSchemaService, $logger),
-            new PagesDeleteTool($dataHandlerService, $logger),
-            new PagesCopyTool($dataHandlerService, $logger),
-            new PageTreeTool($recordService, $tcaSchemaService, $logger),
-            new ContentListTool($recordService, $tcaSchemaService, $logger),
-            new ContentGetTool($recordService, $tcaSchemaService, $logger),
-            new ContentCreateTool($dataHandlerService, $tcaSchemaService, $logger),
-            new ContentUpdateTool($dataHandlerService, $tcaSchemaService, $logger),
-            new ContentDeleteTool($dataHandlerService, $logger),
-            new ContentMoveTool($dataHandlerService, $logger),
-            new ContentCopyTool($dataHandlerService, $logger),
-            new FileListTool($fileService, $logger),
-            new FileGetInfoTool($fileService, $logger),
-            new FileUploadTool($fileService, $logger),
-            new FileDeleteTool($fileService, $logger),
-            new FileMoveTool($fileService, $logger),
-            new FileRenameTool($fileService, $logger),
-            new DirectoryCreateTool($fileService, $logger),
-            new DirectoryDeleteTool($fileService, $logger),
-            new DirectoryMoveTool($fileService, $logger),
-            new DirectoryRenameTool($fileService, $logger),
-            new FileReferenceAddTool($dataHandlerService, $tcaSchemaService, $logger),
-            new FileReferenceListTool($recordService, $tcaSchemaService, $logger),
-            new FileReferenceRemoveTool($dataHandlerService, $logger),
-            new FileUploadFromUrlTool($fileService, $logger),
-            new TableSchemaTool($tcaSchemaService, $logger),
-            new RecordSearchTool($recordService, $tcaSchemaService, $logger),
-            new SiteLanguagesTool($siteLanguageService, $logger),
-            new RecordTranslateTool($dataHandlerService, $recordService, $tcaSchemaService, $logger),
-            new CacheClearTool($cacheService, $logger),
+            new PagesListTool($recordService, $tcaSchemaService),
+            new PagesGetTool($recordService, $tcaSchemaService),
+            new PagesCreateTool($dataHandlerService, $tcaSchemaService),
+            new PagesUpdateTool($dataHandlerService, $tcaSchemaService),
+            new PagesDeleteTool($dataHandlerService),
+            new PagesCopyTool($dataHandlerService),
+            new PageTreeTool($recordService, $tcaSchemaService),
+            new ContentListTool($recordService, $tcaSchemaService),
+            new ContentGetTool($recordService, $tcaSchemaService),
+            new ContentCreateTool($dataHandlerService, $tcaSchemaService),
+            new ContentUpdateTool($dataHandlerService, $tcaSchemaService),
+            new ContentDeleteTool($dataHandlerService),
+            new ContentMoveTool($dataHandlerService),
+            new ContentCopyTool($dataHandlerService),
+            new FileListTool($fileService),
+            new FileGetInfoTool($fileService),
+            new FileUploadTool($fileService),
+            new FileDeleteTool($fileService),
+            new FileMoveTool($fileService),
+            new FileRenameTool($fileService),
+            new DirectoryCreateTool($fileService),
+            new DirectoryDeleteTool($fileService),
+            new DirectoryMoveTool($fileService),
+            new DirectoryRenameTool($fileService),
+            new FileReferenceAddTool($dataHandlerService, $tcaSchemaService),
+            new FileReferenceListTool($recordService, $tcaSchemaService),
+            new FileReferenceRemoveTool($dataHandlerService),
+            new FileUploadFromUrlTool($fileService),
+            new TableSchemaTool($tcaSchemaService),
+            new RecordSearchTool($recordService, $tcaSchemaService),
+            new SiteLanguagesTool($siteLanguageService),
+            new RecordTranslateTool($dataHandlerService, $recordService, $tcaSchemaService),
+            new CacheClearTool($cacheService),
         ];
 
         $resources = [
-            new SystemInfoResource($typo3Version, $logger),
-            new SiteConfigurationResource($siteFinder, $logger),
-            new TcaTablesResource($logger),
-            new BackendUserResource($logger),
-            new TcaTableSchemaResource($tcaSchemaService, $logger),
-            new BackendLayoutResource($backendLayoutService, $logger),
+            new SystemInfoResource($typo3Version),
+            new SiteConfigurationResource($siteFinder),
+            new TcaTablesResource(),
+            new BackendUserResource(),
+            new TcaTableSchemaResource($tcaSchemaService),
+            new BackendLayoutResource($backendLayoutService),
         ];
 
         $prompts = [
@@ -171,7 +171,7 @@ final class McpServerFactoryTest extends TestCase
 
         $dynamicToolRegistrar = new DynamicToolRegistrar($recordService, $dataHandlerService, $tcaSchemaService, $logger);
 
-        $factory = new McpServerFactory($container, $dynamicToolRegistrar, $tools, $resources, $prompts);
+        $factory = new McpServerFactory($container, $dynamicToolRegistrar, $logger, $tools, $resources, $prompts);
         $server = $factory->create();
 
         self::assertInstanceOf(Server::class, $server);

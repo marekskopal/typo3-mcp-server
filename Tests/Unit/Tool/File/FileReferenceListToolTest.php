@@ -9,10 +9,8 @@ use MarekSkopal\MsMcpServer\Service\TcaSchemaService;
 use MarekSkopal\MsMcpServer\Tool\File\FileReferenceListTool;
 use MarekSkopal\MsMcpServer\Tool\Result\ErrorResult;
 use MarekSkopal\MsMcpServer\Tool\Result\FileReferenceListResult;
-use Mcp\Exception\ToolCallException;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
-use Psr\Log\NullLogger;
 
 #[CoversClass(FileReferenceListTool::class)]
 final class FileReferenceListToolTest extends TestCase
@@ -46,7 +44,7 @@ final class FileReferenceListToolTest extends TestCase
             ->with('tx_test', 100, 'image')
             ->willReturn($references);
 
-        $tool = new FileReferenceListTool($recordService, new TcaSchemaService(), new NullLogger());
+        $tool = new FileReferenceListTool($recordService, new TcaSchemaService());
         $result = $tool->execute('tx_test', 100, 'image');
 
         self::assertInstanceOf(FileReferenceListResult::class, $result);
@@ -64,7 +62,7 @@ final class FileReferenceListToolTest extends TestCase
             ->method('findFileReferences')
             ->willReturn([]);
 
-        $tool = new FileReferenceListTool($recordService, new TcaSchemaService(), new NullLogger());
+        $tool = new FileReferenceListTool($recordService, new TcaSchemaService());
         $result = $tool->execute('tx_test', 100, 'image');
 
         self::assertInstanceOf(FileReferenceListResult::class, $result);
@@ -77,22 +75,22 @@ final class FileReferenceListToolTest extends TestCase
         $recordService = $this->createMock(RecordService::class);
         $recordService->expects(self::never())->method('findFileReferences');
 
-        $tool = new FileReferenceListTool($recordService, new TcaSchemaService(), new NullLogger());
+        $tool = new FileReferenceListTool($recordService, new TcaSchemaService());
         $result = $tool->execute('tx_test', 100, 'title');
 
         self::assertInstanceOf(ErrorResult::class, $result);
         self::assertStringContainsString('not a file field', $result->error);
     }
 
-    public function testExecuteThrowsToolCallExceptionOnError(): void
+    public function testExecuteThrowsExceptionOnError(): void
     {
         $recordService = $this->createStub(RecordService::class);
         $recordService->method('findFileReferences')
             ->willThrowException(new \RuntimeException('Database error'));
 
-        $tool = new FileReferenceListTool($recordService, new TcaSchemaService(), new NullLogger());
+        $tool = new FileReferenceListTool($recordService, new TcaSchemaService());
 
-        $this->expectException(ToolCallException::class);
+        $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('Database error');
 
         $tool->execute('tx_test', 100, 'image');

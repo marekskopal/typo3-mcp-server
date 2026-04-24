@@ -6,17 +6,11 @@ namespace MarekSkopal\MsMcpServer\Resource;
 
 use MarekSkopal\MsMcpServer\Resource\Result\BackendUserResult;
 use Mcp\Capability\Attribute\McpResource;
-use Mcp\Exception\ResourceReadException;
-use Psr\Log\LoggerInterface;
 use TYPO3\CMS\Core\Authentication\BackendUserAuthentication;
 use const JSON_THROW_ON_ERROR;
 
 readonly class BackendUserResource
 {
-    public function __construct(private LoggerInterface $logger)
-    {
-    }
-
     #[McpResource(
         uri: 'typo3://user/me',
         name: 'backend_user',
@@ -25,27 +19,21 @@ readonly class BackendUserResource
     )]
     public function execute(): string
     {
-        try {
-            $user = $this->getAuthenticatedUserData();
+        $user = $this->getAuthenticatedUserData();
 
-            $uid = $user['uid'] ?? 0;
-            $admin = $user['admin'] ?? 0;
+        $uid = $user['uid'] ?? 0;
+        $admin = $user['admin'] ?? 0;
 
-            $result = new BackendUserResult(
-                uid: is_int($uid) ? $uid : (is_string($uid) ? (int) $uid : 0),
-                username: $this->getString($user, 'username'),
-                email: $this->getString($user, 'email'),
-                isAdmin: (is_int($admin) ? $admin : (is_string($admin) ? (int) $admin : 0)) === 1,
-                lang: $this->getString($user, 'lang'),
-                usergroups: $this->getString($user, 'usergroup'),
-            );
+        $result = new BackendUserResult(
+            uid: is_int($uid) ? $uid : (is_string($uid) ? (int) $uid : 0),
+            username: $this->getString($user, 'username'),
+            email: $this->getString($user, 'email'),
+            isAdmin: (is_int($admin) ? $admin : (is_string($admin) ? (int) $admin : 0)) === 1,
+            lang: $this->getString($user, 'lang'),
+            usergroups: $this->getString($user, 'usergroup'),
+        );
 
-            return json_encode($result, JSON_THROW_ON_ERROR);
-        } catch (\Throwable $e) {
-            $this->logger->error('backend_user resource failed', ['exception' => $e]);
-
-            throw new ResourceReadException($e->getMessage(), (int) $e->getCode(), $e);
-        }
+        return json_encode($result, JSON_THROW_ON_ERROR);
     }
 
     /** @param array<mixed> $data */

@@ -9,17 +9,12 @@ use MarekSkopal\MsMcpServer\Service\TcaSchemaService;
 use MarekSkopal\MsMcpServer\Tool\Result\ErrorResult;
 use MarekSkopal\MsMcpServer\Tool\Result\RecordCreatedResult;
 use Mcp\Capability\Attribute\McpTool;
-use Mcp\Exception\ToolCallException;
-use Psr\Log\LoggerInterface;
 use const JSON_THROW_ON_ERROR;
 
 readonly class PagesCreateTool
 {
-    public function __construct(
-        private DataHandlerService $dataHandlerService,
-        private TcaSchemaService $tcaSchemaService,
-        private LoggerInterface $logger,
-    ) {
+    public function __construct(private DataHandlerService $dataHandlerService, private TcaSchemaService $tcaSchemaService,)
+    {
     }
 
     #[McpTool(
@@ -48,13 +43,7 @@ readonly class PagesCreateTool
             return new ErrorResult('No valid fields provided', ['ignoredFields' => $ignoredFields]);
         }
 
-        try {
-            $uid = $this->dataHandlerService->createRecord('pages', $pid, $filteredData);
-        } catch (\Throwable $e) {
-            $this->logger->error('pages_create tool failed', ['exception' => $e]);
-
-            throw new ToolCallException($e->getMessage(), (int) $e->getCode(), $e);
-        }
+        $uid = $this->dataHandlerService->createRecord('pages', $pid, $filteredData);
 
         return new RecordCreatedResult($uid, $ignoredFields);
     }

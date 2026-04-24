@@ -10,8 +10,6 @@ use MarekSkopal\MsMcpServer\Service\TcaSchemaService;
 use MarekSkopal\MsMcpServer\Tool\Result\ErrorResult;
 use MarekSkopal\MsMcpServer\Tool\Result\RecordTranslatedResult;
 use Mcp\Capability\Attribute\McpTool;
-use Mcp\Exception\ToolCallException;
-use Psr\Log\LoggerInterface;
 
 readonly class RecordTranslateTool
 {
@@ -19,7 +17,6 @@ readonly class RecordTranslateTool
         private DataHandlerService $dataHandlerService,
         private RecordService $recordService,
         private TcaSchemaService $tcaSchemaService,
-        private LoggerInterface $logger,
     ) {
     }
 
@@ -57,13 +54,7 @@ readonly class RecordTranslateTool
             );
         }
 
-        try {
-            $newUid = $this->dataHandlerService->localizeRecord($table, $uid, $targetLanguageId);
-        } catch (\Throwable $e) {
-            $this->logger->error('record_translate tool failed', ['exception' => $e]);
-
-            throw new ToolCallException($e->getMessage(), (int) $e->getCode(), $e);
-        }
+        $newUid = $this->dataHandlerService->localizeRecord($table, $uid, $targetLanguageId);
 
         return new RecordTranslatedResult($newUid, $table, $targetLanguageId);
     }

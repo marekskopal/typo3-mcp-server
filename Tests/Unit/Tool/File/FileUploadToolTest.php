@@ -9,7 +9,6 @@ use MarekSkopal\MsMcpServer\Tool\File\FileUploadTool;
 use Mcp\Exception\ToolCallException;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
-use Psr\Log\NullLogger;
 use const JSON_THROW_ON_ERROR;
 
 #[CoversClass(FileUploadTool::class)]
@@ -31,7 +30,7 @@ final class FileUploadToolTest extends TestCase
             ->with(1, '/', 'upload.txt', 'Hello, World!')
             ->willReturn($expectedResult);
 
-        $tool = new FileUploadTool($fileService, new NullLogger());
+        $tool = new FileUploadTool($fileService);
         $result = json_decode(
             $tool->execute('upload.txt', base64_encode('Hello, World!')),
             true,
@@ -60,7 +59,7 @@ final class FileUploadToolTest extends TestCase
             ->with(1, '/', 'page.html', '<h1>Hello World</h1>')
             ->willReturn($expectedResult);
 
-        $tool = new FileUploadTool($fileService, new NullLogger());
+        $tool = new FileUploadTool($fileService);
         $result = json_decode(
             $tool->execute('page.html', content: '<h1>Hello World</h1>'),
             true,
@@ -86,14 +85,14 @@ final class FileUploadToolTest extends TestCase
                 'mimeType' => 'application/pdf',
             ]);
 
-        $tool = new FileUploadTool($fileService, new NullLogger());
+        $tool = new FileUploadTool($fileService);
         $tool->execute('file.pdf', base64_encode('abc'), directoryPath: '/uploads/', storageUid: 2);
     }
 
     public function testExecuteThrowsWhenBothContentAndBase64Provided(): void
     {
         $fileService = $this->createStub(FileService::class);
-        $tool = new FileUploadTool($fileService, new NullLogger());
+        $tool = new FileUploadTool($fileService);
 
         $this->expectException(ToolCallException::class);
         $this->expectExceptionMessage('Provide either "content" or "base64Content", not both');
@@ -104,7 +103,7 @@ final class FileUploadToolTest extends TestCase
     public function testExecuteThrowsWhenNeitherContentNorBase64Provided(): void
     {
         $fileService = $this->createStub(FileService::class);
-        $tool = new FileUploadTool($fileService, new NullLogger());
+        $tool = new FileUploadTool($fileService);
 
         $this->expectException(ToolCallException::class);
         $this->expectExceptionMessage('Either "content" or "base64Content" must be provided');
@@ -115,7 +114,7 @@ final class FileUploadToolTest extends TestCase
     public function testExecuteThrowsOnInvalidBase64(): void
     {
         $fileService = $this->createStub(FileService::class);
-        $tool = new FileUploadTool($fileService, new NullLogger());
+        $tool = new FileUploadTool($fileService);
 
         $this->expectException(ToolCallException::class);
         $this->expectExceptionMessage('Invalid base64 content');
@@ -123,15 +122,15 @@ final class FileUploadToolTest extends TestCase
         $tool->execute('test.txt', '!!!invalid!!!');
     }
 
-    public function testExecuteThrowsToolCallExceptionOnServiceError(): void
+    public function testExecuteThrowsExceptionOnServiceError(): void
     {
         $fileService = $this->createStub(FileService::class);
         $fileService->method('uploadFile')
             ->willThrowException(new \RuntimeException('Storage not found'));
 
-        $tool = new FileUploadTool($fileService, new NullLogger());
+        $tool = new FileUploadTool($fileService);
 
-        $this->expectException(ToolCallException::class);
+        $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('Storage not found');
 
         $tool->execute('test.txt', content: 'some content');

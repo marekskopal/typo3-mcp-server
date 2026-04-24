@@ -9,10 +9,8 @@ use MarekSkopal\MsMcpServer\Service\TcaSchemaService;
 use MarekSkopal\MsMcpServer\Tool\Pages\PagesUpdateTool;
 use MarekSkopal\MsMcpServer\Tool\Result\ErrorResult;
 use MarekSkopal\MsMcpServer\Tool\Result\RecordUpdatedResult;
-use Mcp\Exception\ToolCallException;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
-use Psr\Log\NullLogger;
 use const JSON_THROW_ON_ERROR;
 
 #[CoversClass(PagesUpdateTool::class)]
@@ -51,7 +49,7 @@ final class PagesUpdateToolTest extends TestCase
                 ['title' => 'New Title', 'slug' => '/new'],
             );
 
-        $tool = new PagesUpdateTool($dataHandlerService, new TcaSchemaService(), new NullLogger());
+        $tool = new PagesUpdateTool($dataHandlerService, new TcaSchemaService());
         $result = $tool->execute(42, json_encode(['title' => 'New Title', 'slug' => '/new'], JSON_THROW_ON_ERROR));
 
         self::assertInstanceOf(RecordUpdatedResult::class, $result);
@@ -70,7 +68,7 @@ final class PagesUpdateToolTest extends TestCase
                 ['title' => 'T'],
             );
 
-        $tool = new PagesUpdateTool($dataHandlerService, new TcaSchemaService(), new NullLogger());
+        $tool = new PagesUpdateTool($dataHandlerService, new TcaSchemaService());
         $result = $tool->execute(10, json_encode(['title' => 'T', 'invalid_field' => 'x'], JSON_THROW_ON_ERROR));
 
         self::assertInstanceOf(RecordUpdatedResult::class, $result);
@@ -85,7 +83,7 @@ final class PagesUpdateToolTest extends TestCase
         $dataHandlerService->expects(self::once())
             ->method('updateRecord');
 
-        $tool = new PagesUpdateTool($dataHandlerService, new TcaSchemaService(), new NullLogger());
+        $tool = new PagesUpdateTool($dataHandlerService, new TcaSchemaService());
         $result = $tool->execute(10, json_encode(['title' => 'T'], JSON_THROW_ON_ERROR));
 
         self::assertInstanceOf(RecordUpdatedResult::class, $result);
@@ -98,7 +96,7 @@ final class PagesUpdateToolTest extends TestCase
         $dataHandlerService->expects(self::never())
             ->method('updateRecord');
 
-        $tool = new PagesUpdateTool($dataHandlerService, new TcaSchemaService(), new NullLogger());
+        $tool = new PagesUpdateTool($dataHandlerService, new TcaSchemaService());
         $result = $tool->execute(1, json_encode(['bad_field' => 'x'], JSON_THROW_ON_ERROR));
 
         self::assertInstanceOf(ErrorResult::class, $result);
@@ -106,16 +104,16 @@ final class PagesUpdateToolTest extends TestCase
         self::assertSame(['bad_field'], $result->context['ignoredFields']);
     }
 
-    public function testExecuteThrowsToolCallExceptionOnError(): void
+    public function testExecuteThrowsExceptionOnError(): void
     {
         $dataHandlerService = $this->createMock(DataHandlerService::class);
         $dataHandlerService->expects(self::once())
             ->method('updateRecord')
             ->willThrowException(new \RuntimeException('DataHandler error'));
 
-        $tool = new PagesUpdateTool($dataHandlerService, new TcaSchemaService(), new NullLogger());
+        $tool = new PagesUpdateTool($dataHandlerService, new TcaSchemaService());
 
-        $this->expectException(ToolCallException::class);
+        $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('DataHandler error');
 
         $tool->execute(1, json_encode(['title' => 'Test'], JSON_THROW_ON_ERROR));

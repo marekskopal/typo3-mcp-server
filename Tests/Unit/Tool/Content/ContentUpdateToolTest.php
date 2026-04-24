@@ -9,10 +9,8 @@ use MarekSkopal\MsMcpServer\Service\TcaSchemaService;
 use MarekSkopal\MsMcpServer\Tool\Content\ContentUpdateTool;
 use MarekSkopal\MsMcpServer\Tool\Result\ErrorResult;
 use MarekSkopal\MsMcpServer\Tool\Result\RecordUpdatedResult;
-use Mcp\Exception\ToolCallException;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
-use Psr\Log\NullLogger;
 use const JSON_THROW_ON_ERROR;
 
 #[CoversClass(ContentUpdateTool::class)]
@@ -59,7 +57,7 @@ final class ContentUpdateToolTest extends TestCase
                 ],
             );
 
-        $tool = new ContentUpdateTool($dataHandlerService, new TcaSchemaService(), new NullLogger());
+        $tool = new ContentUpdateTool($dataHandlerService, new TcaSchemaService());
         $fields = json_encode(['header' => 'Updated Header', 'bodytext' => 'Updated Body'], JSON_THROW_ON_ERROR);
         $result = $tool->execute(42, $fields);
 
@@ -81,7 +79,7 @@ final class ContentUpdateToolTest extends TestCase
                 ],
             );
 
-        $tool = new ContentUpdateTool($dataHandlerService, new TcaSchemaService(), new NullLogger());
+        $tool = new ContentUpdateTool($dataHandlerService, new TcaSchemaService());
         $fields = json_encode(['header' => 'Valid', 'invalid_field' => 'Ignored', 'uid' => 999], JSON_THROW_ON_ERROR);
         $result = $tool->execute(10, $fields);
 
@@ -97,7 +95,7 @@ final class ContentUpdateToolTest extends TestCase
         $dataHandlerService->expects(self::once())
             ->method('updateRecord');
 
-        $tool = new ContentUpdateTool($dataHandlerService, new TcaSchemaService(), new NullLogger());
+        $tool = new ContentUpdateTool($dataHandlerService, new TcaSchemaService());
         $fields = json_encode(['header' => 'Valid'], JSON_THROW_ON_ERROR);
         $result = $tool->execute(10, $fields);
 
@@ -111,7 +109,7 @@ final class ContentUpdateToolTest extends TestCase
         $dataHandlerService->expects(self::never())
             ->method('updateRecord');
 
-        $tool = new ContentUpdateTool($dataHandlerService, new TcaSchemaService(), new NullLogger());
+        $tool = new ContentUpdateTool($dataHandlerService, new TcaSchemaService());
         $fields = json_encode(['invalid_field' => 'value', 'another_bad' => 'value'], JSON_THROW_ON_ERROR);
         $result = $tool->execute(10, $fields);
 
@@ -134,7 +132,7 @@ final class ContentUpdateToolTest extends TestCase
                 ],
             );
 
-        $tool = new ContentUpdateTool($dataHandlerService, new TcaSchemaService(), new NullLogger());
+        $tool = new ContentUpdateTool($dataHandlerService, new TcaSchemaService());
         $fields = json_encode(
             ['list_type' => 'news_pi1', 'pi_flexform' => '<xml>config</xml>'],
             JSON_THROW_ON_ERROR,
@@ -146,16 +144,16 @@ final class ContentUpdateToolTest extends TestCase
         self::assertSame(['list_type', 'pi_flexform'], $result->updated);
     }
 
-    public function testExecuteThrowsToolCallExceptionOnError(): void
+    public function testExecuteThrowsExceptionOnError(): void
     {
         $dataHandlerService = $this->createMock(DataHandlerService::class);
         $dataHandlerService->expects(self::once())
             ->method('updateRecord')
             ->willThrowException(new \RuntimeException('DataHandler error'));
 
-        $tool = new ContentUpdateTool($dataHandlerService, new TcaSchemaService(), new NullLogger());
+        $tool = new ContentUpdateTool($dataHandlerService, new TcaSchemaService());
 
-        $this->expectException(ToolCallException::class);
+        $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('DataHandler error');
 
         $fields = json_encode(['header' => 'Test'], JSON_THROW_ON_ERROR);

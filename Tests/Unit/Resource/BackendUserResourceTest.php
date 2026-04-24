@@ -5,10 +5,8 @@ declare(strict_types=1);
 namespace MarekSkopal\MsMcpServer\Tests\Unit\Resource;
 
 use MarekSkopal\MsMcpServer\Resource\BackendUserResource;
-use Mcp\Exception\ResourceReadException;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
-use Psr\Log\NullLogger;
 use TYPO3\CMS\Core\Authentication\BackendUserAuthentication;
 use const JSON_THROW_ON_ERROR;
 
@@ -34,7 +32,7 @@ final class BackendUserResourceTest extends TestCase
 
         $GLOBALS['BE_USER'] = $backendUser;
 
-        $resource = new BackendUserResource(new NullLogger());
+        $resource = new BackendUserResource();
         $result = json_decode($resource->execute(), true, 512, JSON_THROW_ON_ERROR);
 
         self::assertSame(1, $result['uid']);
@@ -59,7 +57,7 @@ final class BackendUserResourceTest extends TestCase
 
         $GLOBALS['BE_USER'] = $backendUser;
 
-        $resource = new BackendUserResource(new NullLogger());
+        $resource = new BackendUserResource();
         $result = json_decode($resource->execute(), true, 512, JSON_THROW_ON_ERROR);
 
         self::assertSame(5, $result['uid']);
@@ -68,28 +66,28 @@ final class BackendUserResourceTest extends TestCase
         self::assertSame('de', $result['lang']);
     }
 
-    public function testExecuteThrowsResourceReadExceptionWhenNoUser(): void
+    public function testExecuteThrowsExceptionWhenNoUser(): void
     {
         unset($GLOBALS['BE_USER']);
 
-        $resource = new BackendUserResource(new NullLogger());
+        $resource = new BackendUserResource();
 
-        $this->expectException(ResourceReadException::class);
+        $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('No authenticated backend user available');
 
         $resource->execute();
     }
 
-    public function testExecuteThrowsResourceReadExceptionWhenUserIsNull(): void
+    public function testExecuteThrowsExceptionWhenUserIsNull(): void
     {
         $backendUser = $this->createStub(BackendUserAuthentication::class);
         $backendUser->user = null;
 
         $GLOBALS['BE_USER'] = $backendUser;
 
-        $resource = new BackendUserResource(new NullLogger());
+        $resource = new BackendUserResource();
 
-        $this->expectException(ResourceReadException::class);
+        $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('No authenticated backend user available');
 
         $resource->execute();

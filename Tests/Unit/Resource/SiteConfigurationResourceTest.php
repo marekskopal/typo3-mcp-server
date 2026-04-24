@@ -5,10 +5,8 @@ declare(strict_types=1);
 namespace MarekSkopal\MsMcpServer\Tests\Unit\Resource;
 
 use MarekSkopal\MsMcpServer\Resource\SiteConfigurationResource;
-use Mcp\Exception\ResourceReadException;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
-use Psr\Log\NullLogger;
 use TYPO3\CMS\Core\Http\Uri;
 use TYPO3\CMS\Core\Site\Entity\Site;
 use TYPO3\CMS\Core\Site\Entity\SiteLanguage;
@@ -42,7 +40,7 @@ final class SiteConfigurationResourceTest extends TestCase
         $siteFinder = $this->createStub(SiteFinder::class);
         $siteFinder->method('getAllSites')->willReturn(['main' => $site]);
 
-        $resource = new SiteConfigurationResource($siteFinder, new NullLogger());
+        $resource = new SiteConfigurationResource($siteFinder);
         $result = json_decode($resource->execute(), true, 512, JSON_THROW_ON_ERROR);
 
         self::assertCount(1, $result);
@@ -61,20 +59,20 @@ final class SiteConfigurationResourceTest extends TestCase
         $siteFinder = $this->createStub(SiteFinder::class);
         $siteFinder->method('getAllSites')->willReturn([]);
 
-        $resource = new SiteConfigurationResource($siteFinder, new NullLogger());
+        $resource = new SiteConfigurationResource($siteFinder);
         $result = json_decode($resource->execute(), true, 512, JSON_THROW_ON_ERROR);
 
         self::assertSame([], $result);
     }
 
-    public function testExecuteThrowsResourceReadExceptionOnError(): void
+    public function testExecuteThrowsExceptionOnError(): void
     {
         $siteFinder = $this->createStub(SiteFinder::class);
         $siteFinder->method('getAllSites')->willThrowException(new \RuntimeException('Sites unavailable'));
 
-        $resource = new SiteConfigurationResource($siteFinder, new NullLogger());
+        $resource = new SiteConfigurationResource($siteFinder);
 
-        $this->expectException(ResourceReadException::class);
+        $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('Sites unavailable');
 
         $resource->execute();

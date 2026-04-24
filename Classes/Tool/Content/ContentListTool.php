@@ -7,17 +7,12 @@ namespace MarekSkopal\MsMcpServer\Tool\Content;
 use MarekSkopal\MsMcpServer\Service\RecordService;
 use MarekSkopal\MsMcpServer\Service\TcaSchemaService;
 use Mcp\Capability\Attribute\McpTool;
-use Mcp\Exception\ToolCallException;
-use Psr\Log\LoggerInterface;
 use const JSON_THROW_ON_ERROR;
 
 readonly class ContentListTool
 {
-    public function __construct(
-        private RecordService $recordService,
-        private TcaSchemaService $tcaSchemaService,
-        private LoggerInterface $logger,
-    ) {
+    public function __construct(private RecordService $recordService, private TcaSchemaService $tcaSchemaService,)
+    {
     }
 
     #[McpTool(
@@ -51,21 +46,15 @@ readonly class ContentListTool
             $fields[] = $transOrigPointerField;
         }
 
-        try {
-            $result = $this->recordService->findByPid(
-                'tt_content',
-                $pid,
-                $limit,
-                $offset,
-                $fields,
-                $sysLanguageUid >= 0 && $languageField !== null ? $sysLanguageUid : null,
-                $sysLanguageUid >= 0 ? $languageField : null,
-            );
-        } catch (\Throwable $e) {
-            $this->logger->error('content_list tool failed', ['exception' => $e]);
-
-            throw new ToolCallException($e->getMessage(), (int) $e->getCode(), $e);
-        }
+        $result = $this->recordService->findByPid(
+            'tt_content',
+            $pid,
+            $limit,
+            $offset,
+            $fields,
+            $sysLanguageUid >= 0 && $languageField !== null ? $sysLanguageUid : null,
+            $sysLanguageUid >= 0 ? $languageField : null,
+        );
 
         return json_encode($result, JSON_THROW_ON_ERROR);
     }

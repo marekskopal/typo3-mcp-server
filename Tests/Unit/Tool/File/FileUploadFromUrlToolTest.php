@@ -6,10 +6,8 @@ namespace MarekSkopal\MsMcpServer\Tests\Unit\Tool\File;
 
 use MarekSkopal\MsMcpServer\Service\FileService;
 use MarekSkopal\MsMcpServer\Tool\File\FileUploadFromUrlTool;
-use Mcp\Exception\ToolCallException;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
-use Psr\Log\NullLogger;
 use const JSON_THROW_ON_ERROR;
 
 #[CoversClass(FileUploadFromUrlTool::class)]
@@ -31,7 +29,7 @@ final class FileUploadFromUrlToolTest extends TestCase
             ->with(1, '/', 'https://example.com/image.png', '')
             ->willReturn($expectedResult);
 
-        $tool = new FileUploadFromUrlTool($fileService, new NullLogger());
+        $tool = new FileUploadFromUrlTool($fileService);
         $result = json_decode($tool->execute('https://example.com/image.png'), true, 512, JSON_THROW_ON_ERROR);
 
         self::assertSame(42, $result['uid']);
@@ -53,19 +51,19 @@ final class FileUploadFromUrlToolTest extends TestCase
                 'mimeType' => 'application/pdf',
             ]);
 
-        $tool = new FileUploadFromUrlTool($fileService, new NullLogger());
+        $tool = new FileUploadFromUrlTool($fileService);
         $tool->execute('https://example.com/file.pdf', '/uploads/', 2, 'custom.pdf');
     }
 
-    public function testExecuteThrowsToolCallExceptionOnError(): void
+    public function testExecuteThrowsExceptionOnError(): void
     {
         $fileService = $this->createStub(FileService::class);
         $fileService->method('uploadFileFromUrl')
             ->willThrowException(new \RuntimeException('Failed to download file from URL: https://example.com/missing.txt'));
 
-        $tool = new FileUploadFromUrlTool($fileService, new NullLogger());
+        $tool = new FileUploadFromUrlTool($fileService);
 
-        $this->expectException(ToolCallException::class);
+        $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('Failed to download file from URL');
 
         $tool->execute('https://example.com/missing.txt');

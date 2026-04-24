@@ -7,12 +7,10 @@ namespace MarekSkopal\MsMcpServer\Tool\File;
 use MarekSkopal\MsMcpServer\Service\FileService;
 use MarekSkopal\MsMcpServer\Tool\Result\DirectoryMovedResult;
 use Mcp\Capability\Attribute\McpTool;
-use Mcp\Exception\ToolCallException;
-use Psr\Log\LoggerInterface;
 
 readonly class DirectoryMoveTool
 {
-    public function __construct(private FileService $fileService, private LoggerInterface $logger)
+    public function __construct(private FileService $fileService)
     {
     }
 
@@ -23,13 +21,7 @@ readonly class DirectoryMoveTool
     )]
     public function execute(string $directoryIdentifier, string $targetDirectory, int $storageUid = 1): DirectoryMovedResult
     {
-        try {
-            $this->fileService->moveDirectory($storageUid, $directoryIdentifier, $targetDirectory);
-        } catch (\Throwable $e) {
-            $this->logger->error('directory_move tool failed', ['exception' => $e]);
-
-            throw new ToolCallException($e->getMessage(), (int) $e->getCode(), $e);
-        }
+        $this->fileService->moveDirectory($storageUid, $directoryIdentifier, $targetDirectory);
 
         return new DirectoryMovedResult($directoryIdentifier, $targetDirectory);
     }

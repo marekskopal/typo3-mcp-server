@@ -7,10 +7,8 @@ namespace MarekSkopal\MsMcpServer\Tests\Unit\Tool\File;
 use MarekSkopal\MsMcpServer\Service\FileService;
 use MarekSkopal\MsMcpServer\Tool\File\FileDeleteTool;
 use MarekSkopal\MsMcpServer\Tool\Result\FileDeletedResult;
-use Mcp\Exception\ToolCallException;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
-use Psr\Log\NullLogger;
 
 #[CoversClass(FileDeleteTool::class)]
 final class FileDeleteToolTest extends TestCase
@@ -22,22 +20,22 @@ final class FileDeleteToolTest extends TestCase
             ->method('deleteFile')
             ->with(1, '/test.txt');
 
-        $tool = new FileDeleteTool($fileService, new NullLogger());
+        $tool = new FileDeleteTool($fileService);
         $result = $tool->execute('/test.txt');
 
         self::assertInstanceOf(FileDeletedResult::class, $result);
         self::assertSame('/test.txt', $result->identifier);
     }
 
-    public function testExecuteThrowsToolCallExceptionOnError(): void
+    public function testExecuteThrowsExceptionOnError(): void
     {
         $fileService = $this->createStub(FileService::class);
         $fileService->method('deleteFile')
             ->willThrowException(new \RuntimeException('File not found'));
 
-        $tool = new FileDeleteTool($fileService, new NullLogger());
+        $tool = new FileDeleteTool($fileService);
 
-        $this->expectException(ToolCallException::class);
+        $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('File not found');
 
         $tool->execute('/nonexistent.txt');

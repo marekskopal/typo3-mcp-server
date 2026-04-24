@@ -9,17 +9,12 @@ use MarekSkopal\MsMcpServer\Service\TcaSchemaService;
 use MarekSkopal\MsMcpServer\Tool\Result\ErrorResult;
 use MarekSkopal\MsMcpServer\Tool\Result\RecordUpdatedResult;
 use Mcp\Capability\Attribute\McpTool;
-use Mcp\Exception\ToolCallException;
-use Psr\Log\LoggerInterface;
 use const JSON_THROW_ON_ERROR;
 
 readonly class ContentUpdateTool
 {
-    public function __construct(
-        private DataHandlerService $dataHandlerService,
-        private TcaSchemaService $tcaSchemaService,
-        private LoggerInterface $logger,
-    ) {
+    public function __construct(private DataHandlerService $dataHandlerService, private TcaSchemaService $tcaSchemaService,)
+    {
     }
 
     #[McpTool(
@@ -39,13 +34,7 @@ readonly class ContentUpdateTool
             return new ErrorResult('No valid fields provided', ['ignoredFields' => $ignoredFields]);
         }
 
-        try {
-            $this->dataHandlerService->updateRecord('tt_content', $uid, $filteredData);
-        } catch (\Throwable $e) {
-            $this->logger->error('content_update tool failed', ['exception' => $e]);
-
-            throw new ToolCallException($e->getMessage(), (int) $e->getCode(), $e);
-        }
+        $this->dataHandlerService->updateRecord('tt_content', $uid, $filteredData);
 
         return new RecordUpdatedResult($uid, array_keys($filteredData), $ignoredFields);
     }

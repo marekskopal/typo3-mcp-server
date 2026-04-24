@@ -7,10 +7,8 @@ namespace MarekSkopal\MsMcpServer\Tests\Unit\Tool\Search;
 use MarekSkopal\MsMcpServer\Service\RecordService;
 use MarekSkopal\MsMcpServer\Service\TcaSchemaService;
 use MarekSkopal\MsMcpServer\Tool\Search\RecordSearchTool;
-use Mcp\Exception\ToolCallException;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
-use Psr\Log\NullLogger;
 use const JSON_THROW_ON_ERROR;
 
 #[CoversClass(RecordSearchTool::class)]
@@ -59,7 +57,7 @@ final class RecordSearchToolTest extends TestCase
             )
             ->willReturn($expectedResult);
 
-        $tool = new RecordSearchTool($recordService, new TcaSchemaService(), new NullLogger());
+        $tool = new RecordSearchTool($recordService, new TcaSchemaService());
         $result = json_decode($tool->execute('pages', '{"title":"Hello"}'), true, 512, JSON_THROW_ON_ERROR);
 
         self::assertSame(1, $result['total']);
@@ -81,7 +79,7 @@ final class RecordSearchToolTest extends TestCase
             )
             ->willReturn(['records' => [], 'total' => 0]);
 
-        $tool = new RecordSearchTool($recordService, new TcaSchemaService(), new NullLogger());
+        $tool = new RecordSearchTool($recordService, new TcaSchemaService());
         $tool->execute('pages', '{"title":"Test"}', 20, 0, 5);
     }
 
@@ -90,7 +88,7 @@ final class RecordSearchToolTest extends TestCase
         $recordService = $this->createStub(RecordService::class);
         $recordService->method('search')->willReturn(['records' => [], 'total' => 0]);
 
-        $tool = new RecordSearchTool($recordService, new TcaSchemaService(), new NullLogger());
+        $tool = new RecordSearchTool($recordService, new TcaSchemaService());
         $result = json_decode(
             $tool->execute('pages', '{"title":"Test","nonexistent":"value"}'),
             true,
@@ -106,7 +104,7 @@ final class RecordSearchToolTest extends TestCase
     {
         $recordService = $this->createStub(RecordService::class);
 
-        $tool = new RecordSearchTool($recordService, new TcaSchemaService(), new NullLogger());
+        $tool = new RecordSearchTool($recordService, new TcaSchemaService());
         $result = json_decode($tool->execute('unknown_table', '{"title":"Test"}'), true, 512, JSON_THROW_ON_ERROR);
 
         self::assertArrayHasKey('error', $result);
@@ -117,7 +115,7 @@ final class RecordSearchToolTest extends TestCase
     {
         $recordService = $this->createStub(RecordService::class);
 
-        $tool = new RecordSearchTool($recordService, new TcaSchemaService(), new NullLogger());
+        $tool = new RecordSearchTool($recordService, new TcaSchemaService());
         $result = json_decode($tool->execute('pages', 'not-json'), true, 512, JSON_THROW_ON_ERROR);
 
         self::assertArrayHasKey('error', $result);
@@ -128,7 +126,7 @@ final class RecordSearchToolTest extends TestCase
     {
         $recordService = $this->createStub(RecordService::class);
 
-        $tool = new RecordSearchTool($recordService, new TcaSchemaService(), new NullLogger());
+        $tool = new RecordSearchTool($recordService, new TcaSchemaService());
         $result = json_decode(
             $tool->execute('pages', '{"nonexistent":"value"}'),
             true,
@@ -155,7 +153,7 @@ final class RecordSearchToolTest extends TestCase
             )
             ->willReturn(['records' => [['uid' => 1, 'title' => 'Home']], 'total' => 1]);
 
-        $tool = new RecordSearchTool($recordService, new TcaSchemaService(), new NullLogger());
+        $tool = new RecordSearchTool($recordService, new TcaSchemaService());
         $result = json_decode(
             $tool->execute('pages', '{"title":{"op":"eq","value":"Home"}}'),
             true,
@@ -182,7 +180,7 @@ final class RecordSearchToolTest extends TestCase
             )
             ->willReturn(['records' => [], 'total' => 0]);
 
-        $tool = new RecordSearchTool($recordService, new TcaSchemaService(), new NullLogger());
+        $tool = new RecordSearchTool($recordService, new TcaSchemaService());
         $tool->execute('pages', '{"uid":{"op":"gt","value":"10"}}');
     }
 
@@ -201,7 +199,7 @@ final class RecordSearchToolTest extends TestCase
             )
             ->willReturn(['records' => [], 'total' => 0]);
 
-        $tool = new RecordSearchTool($recordService, new TcaSchemaService(), new NullLogger());
+        $tool = new RecordSearchTool($recordService, new TcaSchemaService());
         $tool->execute('pages', '{"slug":{"op":"null"}}');
     }
 
@@ -220,7 +218,7 @@ final class RecordSearchToolTest extends TestCase
             )
             ->willReturn(['records' => [], 'total' => 0]);
 
-        $tool = new RecordSearchTool($recordService, new TcaSchemaService(), new NullLogger());
+        $tool = new RecordSearchTool($recordService, new TcaSchemaService());
         $tool->execute('pages', '{"uid":{"op":"in","value":"1,2,3"}}');
     }
 
@@ -242,7 +240,7 @@ final class RecordSearchToolTest extends TestCase
             )
             ->willReturn(['records' => [], 'total' => 0]);
 
-        $tool = new RecordSearchTool($recordService, new TcaSchemaService(), new NullLogger());
+        $tool = new RecordSearchTool($recordService, new TcaSchemaService());
         $tool->execute('pages', '{"title":"News","hidden":{"op":"eq","value":"0"}}');
     }
 
@@ -263,7 +261,7 @@ final class RecordSearchToolTest extends TestCase
             )
             ->willReturn(['records' => [], 'total' => 0]);
 
-        $tool = new RecordSearchTool($recordService, new TcaSchemaService(), new NullLogger());
+        $tool = new RecordSearchTool($recordService, new TcaSchemaService());
         $tool->execute('pages', '{"title":"Test"}', 20, 0, -1, 'title', 'ASC');
     }
 
@@ -284,7 +282,7 @@ final class RecordSearchToolTest extends TestCase
             )
             ->willReturn(['records' => [], 'total' => 0]);
 
-        $tool = new RecordSearchTool($recordService, new TcaSchemaService(), new NullLogger());
+        $tool = new RecordSearchTool($recordService, new TcaSchemaService());
         $tool->execute('pages', '{"title":"Test"}', 20, 0, -1, 'title', 'DESC');
     }
 
@@ -292,7 +290,7 @@ final class RecordSearchToolTest extends TestCase
     {
         $recordService = $this->createStub(RecordService::class);
 
-        $tool = new RecordSearchTool($recordService, new TcaSchemaService(), new NullLogger());
+        $tool = new RecordSearchTool($recordService, new TcaSchemaService());
         $result = json_decode(
             $tool->execute('pages', '{"title":"Test"}', 20, 0, -1, 'nonexistent_field'),
             true,
@@ -305,14 +303,14 @@ final class RecordSearchToolTest extends TestCase
         self::assertStringContainsString('nonexistent_field', $result['error']);
     }
 
-    public function testExecuteThrowsToolCallExceptionOnError(): void
+    public function testExecuteThrowsExceptionOnError(): void
     {
         $recordService = $this->createStub(RecordService::class);
         $recordService->method('search')->willThrowException(new \RuntimeException('Database error'));
 
-        $tool = new RecordSearchTool($recordService, new TcaSchemaService(), new NullLogger());
+        $tool = new RecordSearchTool($recordService, new TcaSchemaService());
 
-        $this->expectException(ToolCallException::class);
+        $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('Database error');
 
         $tool->execute('pages', '{"title":"test"}');

@@ -7,10 +7,8 @@ namespace MarekSkopal\MsMcpServer\Tests\Unit\Tool\Content;
 use MarekSkopal\MsMcpServer\Service\RecordService;
 use MarekSkopal\MsMcpServer\Service\TcaSchemaService;
 use MarekSkopal\MsMcpServer\Tool\Content\ContentGetTool;
-use Mcp\Exception\ToolCallException;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
-use Psr\Log\NullLogger;
 use const JSON_THROW_ON_ERROR;
 
 #[CoversClass(ContentGetTool::class)]
@@ -62,7 +60,7 @@ final class ContentGetToolTest extends TestCase
             ->with('tt_content', 42, self::anything())
             ->willReturn($expectedRecord);
 
-        $tool = new ContentGetTool($recordService, new TcaSchemaService(), new NullLogger());
+        $tool = new ContentGetTool($recordService, new TcaSchemaService());
         $result = json_decode($tool->execute(42), true, 512, JSON_THROW_ON_ERROR);
 
         self::assertSame(42, $result['uid']);
@@ -90,7 +88,7 @@ final class ContentGetToolTest extends TestCase
             ->with('tt_content', 42, 'sys_language_uid', 'l18n_parent')
             ->willReturn($translations);
 
-        $tool = new ContentGetTool($recordService, new TcaSchemaService(), new NullLogger());
+        $tool = new ContentGetTool($recordService, new TcaSchemaService());
         $result = json_decode($tool->execute(42), true, 512, JSON_THROW_ON_ERROR);
 
         self::assertSame($translations, $result['translations']);
@@ -111,7 +109,7 @@ final class ContentGetToolTest extends TestCase
         $recordService->method('findByUid')->willReturn($record);
         $recordService->expects(self::never())->method('findTranslations');
 
-        $tool = new ContentGetTool($recordService, new TcaSchemaService(), new NullLogger());
+        $tool = new ContentGetTool($recordService, new TcaSchemaService());
         $result = json_decode($tool->execute(87), true, 512, JSON_THROW_ON_ERROR);
 
         self::assertArrayNotHasKey('translations', $result);
@@ -125,22 +123,22 @@ final class ContentGetToolTest extends TestCase
             ->with('tt_content', 999, self::anything())
             ->willReturn(null);
 
-        $tool = new ContentGetTool($recordService, new TcaSchemaService(), new NullLogger());
+        $tool = new ContentGetTool($recordService, new TcaSchemaService());
         $result = json_decode($tool->execute(999), true, 512, JSON_THROW_ON_ERROR);
 
         self::assertSame('Content element not found', $result['error']);
     }
 
-    public function testExecuteThrowsToolCallExceptionOnError(): void
+    public function testExecuteThrowsExceptionOnError(): void
     {
         $recordService = $this->createMock(RecordService::class);
         $recordService->expects(self::once())
             ->method('findByUid')
             ->willThrowException(new \RuntimeException('Database error'));
 
-        $tool = new ContentGetTool($recordService, new TcaSchemaService(), new NullLogger());
+        $tool = new ContentGetTool($recordService, new TcaSchemaService());
 
-        $this->expectException(ToolCallException::class);
+        $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('Database error');
 
         $tool->execute(1);
