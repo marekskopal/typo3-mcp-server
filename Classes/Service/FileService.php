@@ -177,6 +177,31 @@ readonly class FileService
         ];
     }
 
+    public function moveFile(int $storageUid, string $fileIdentifier, string $targetDirectoryPath): void
+    {
+        $storage = $this->getStorage($storageUid);
+        $file = $storage->getFileByIdentifier($fileIdentifier);
+
+        if (!$file instanceof File) {
+            throw new \RuntimeException('File not found: ' . $fileIdentifier, 1712002005);
+        }
+
+        $targetFolder = $storage->getFolder($targetDirectoryPath);
+        $storage->moveFile($file, $targetFolder);
+    }
+
+    public function renameFile(int $storageUid, string $fileIdentifier, string $newName): void
+    {
+        $storage = $this->getStorage($storageUid);
+        $file = $storage->getFileByIdentifier($fileIdentifier);
+
+        if (!$file instanceof File) {
+            throw new \RuntimeException('File not found: ' . $fileIdentifier, 1712002006);
+        }
+
+        $storage->renameFile($file, $newName);
+    }
+
     public function deleteFile(int $storageUid, string $fileIdentifier): void
     {
         $storage = $this->getStorage($storageUid);

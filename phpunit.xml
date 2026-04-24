@@ -5,6 +5,9 @@
          cacheDirectory=".phpunit.cache"
          colors="true"
 >
+    <extensions>
+        <bootstrap class="DG\BypassFinals\PHPUnitExtension"/>
+    </extensions>
     <testsuites>
         <testsuite name="Unit">
             <directory>Tests/Unit</directory>

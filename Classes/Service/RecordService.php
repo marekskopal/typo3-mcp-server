@@ -97,9 +97,22 @@ readonly class RecordService
      * @param array<string, array{operator: string, value: string}> $searchConditions field => {operator, value}
      * @return array{records: list<array<string, mixed>>, total: int}
      */
-    public function search(string $table, array $searchConditions, int $limit, int $offset, array $fields, ?int $pid = null,): array
+    public function search(
+        string $table,
+        array $searchConditions,
+        int $limit,
+        int $offset,
+        array $fields,
+        ?int $pid = null,
+        ?string $orderBy = null,
+        string $orderDirection = 'ASC',
+    ): array
     {
         $limit = min(max($limit, 1), 500);
+
+        if (!in_array($orderDirection, ['ASC', 'DESC'], true)) {
+            $orderDirection = 'ASC';
+        }
 
         $queryBuilder = $this->connectionPool->getQueryBuilderForTable($table);
         $queryBuilder->getRestrictions()->removeAll();
@@ -129,7 +142,7 @@ readonly class RecordService
         $records = $queryBuilder
             ->setMaxResults($limit)
             ->setFirstResult($offset)
-            ->orderBy('uid', 'ASC')
+            ->orderBy($orderBy ?? 'uid', $orderDirection)
             ->executeQuery()
             ->fetchAllAssociative();
 

@@ -246,6 +246,65 @@ final class RecordSearchToolTest extends TestCase
         $tool->execute('pages', '{"title":"News","hidden":{"op":"eq","value":"0"}}');
     }
 
+    public function testExecuteWithOrderByPassesSortingToService(): void
+    {
+        $recordService = $this->createMock(RecordService::class);
+        $recordService->expects(self::once())
+            ->method('search')
+            ->with(
+                'pages',
+                ['title' => ['operator' => 'like', 'value' => 'Test']],
+                20,
+                0,
+                self::anything(),
+                null,
+                'title',
+                'ASC',
+            )
+            ->willReturn(['records' => [], 'total' => 0]);
+
+        $tool = new RecordSearchTool($recordService, new TcaSchemaService(), new NullLogger());
+        $tool->execute('pages', '{"title":"Test"}', 20, 0, -1, 'title', 'ASC');
+    }
+
+    public function testExecuteWithOrderByDescPassesSortingToService(): void
+    {
+        $recordService = $this->createMock(RecordService::class);
+        $recordService->expects(self::once())
+            ->method('search')
+            ->with(
+                'pages',
+                ['title' => ['operator' => 'like', 'value' => 'Test']],
+                20,
+                0,
+                self::anything(),
+                null,
+                'title',
+                'DESC',
+            )
+            ->willReturn(['records' => [], 'total' => 0]);
+
+        $tool = new RecordSearchTool($recordService, new TcaSchemaService(), new NullLogger());
+        $tool->execute('pages', '{"title":"Test"}', 20, 0, -1, 'title', 'DESC');
+    }
+
+    public function testExecuteWithInvalidOrderByFieldReturnsError(): void
+    {
+        $recordService = $this->createStub(RecordService::class);
+
+        $tool = new RecordSearchTool($recordService, new TcaSchemaService(), new NullLogger());
+        $result = json_decode(
+            $tool->execute('pages', '{"title":"Test"}', 20, 0, -1, 'nonexistent_field'),
+            true,
+            512,
+            JSON_THROW_ON_ERROR,
+        );
+
+        self::assertArrayHasKey('error', $result);
+        self::assertStringContainsString('Invalid orderBy field', $result['error']);
+        self::assertStringContainsString('nonexistent_field', $result['error']);
+    }
+
     public function testExecuteThrowsToolCallExceptionOnError(): void
     {
         $recordService = $this->createStub(RecordService::class);

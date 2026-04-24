@@ -348,6 +348,104 @@ final class RecordServiceTest extends TestCase
         self::assertSame(2, $result['total']);
     }
 
+    public function testSearchWithCustomOrderBy(): void
+    {
+        $expectedRecords = [['uid' => 2, 'title' => 'Alpha'], ['uid' => 1, 'title' => 'Beta']];
+
+        $countResult = $this->createStub(Result::class);
+        $countResult->method('fetchOne')->willReturn(2);
+
+        $listResult = $this->createStub(Result::class);
+        $listResult->method('fetchAllAssociative')->willReturn($expectedRecords);
+
+        $countQueryBuilder = $this->createQueryBuilderStub();
+        $countQueryBuilder->method('count')->willReturnSelf();
+        $countQueryBuilder->method('from')->willReturnSelf();
+        $countQueryBuilder->method('andWhere')->willReturnSelf();
+        $countQueryBuilder->method('executeQuery')->willReturn($countResult);
+
+        $listQueryBuilder = $this->createQueryBuilderStub();
+        $listQueryBuilder->method('select')->willReturnSelf();
+        $listQueryBuilder->method('from')->willReturnSelf();
+        $listQueryBuilder->method('andWhere')->willReturnSelf();
+        $listQueryBuilder->method('setMaxResults')->willReturnSelf();
+        $listQueryBuilder->method('setFirstResult')->willReturnSelf();
+        $listQueryBuilder->method('orderBy')->willReturnSelf();
+        $listQueryBuilder->method('executeQuery')->willReturn($listResult);
+
+        $callCount = 0;
+        $connectionPool = $this->createStub(ConnectionPool::class);
+        $connectionPool->method('getQueryBuilderForTable')
+            ->willReturnCallback(function () use (&$callCount, $listQueryBuilder, $countQueryBuilder): QueryBuilder {
+                $callCount++;
+
+                return $callCount === 1 ? $listQueryBuilder : $countQueryBuilder;
+            });
+
+        $service = new RecordService($connectionPool);
+        $result = $service->search(
+            'pages',
+            ['title' => ['operator' => 'like', 'value' => '']],
+            20,
+            0,
+            ['uid', 'title'],
+            null,
+            'title',
+            'DESC',
+        );
+
+        self::assertSame($expectedRecords, $result['records']);
+        self::assertSame(2, $result['total']);
+    }
+
+    public function testSearchWithInvalidOrderDirectionDefaultsToAsc(): void
+    {
+        $countResult = $this->createStub(Result::class);
+        $countResult->method('fetchOne')->willReturn(0);
+
+        $listResult = $this->createStub(Result::class);
+        $listResult->method('fetchAllAssociative')->willReturn([]);
+
+        $countQueryBuilder = $this->createQueryBuilderStub();
+        $countQueryBuilder->method('count')->willReturnSelf();
+        $countQueryBuilder->method('from')->willReturnSelf();
+        $countQueryBuilder->method('andWhere')->willReturnSelf();
+        $countQueryBuilder->method('executeQuery')->willReturn($countResult);
+
+        $listQueryBuilder = $this->createQueryBuilderStub();
+        $listQueryBuilder->method('select')->willReturnSelf();
+        $listQueryBuilder->method('from')->willReturnSelf();
+        $listQueryBuilder->method('andWhere')->willReturnSelf();
+        $listQueryBuilder->method('setMaxResults')->willReturnSelf();
+        $listQueryBuilder->method('setFirstResult')->willReturnSelf();
+        $listQueryBuilder->method('orderBy')->willReturnSelf();
+        $listQueryBuilder->method('executeQuery')->willReturn($listResult);
+
+        $callCount = 0;
+        $connectionPool = $this->createStub(ConnectionPool::class);
+        $connectionPool->method('getQueryBuilderForTable')
+            ->willReturnCallback(function () use (&$callCount, $listQueryBuilder, $countQueryBuilder): QueryBuilder {
+                $callCount++;
+
+                return $callCount === 1 ? $listQueryBuilder : $countQueryBuilder;
+            });
+
+        $service = new RecordService($connectionPool);
+        $result = $service->search(
+            'pages',
+            ['title' => ['operator' => 'like', 'value' => 'Test']],
+            20,
+            0,
+            ['uid', 'title'],
+            null,
+            null,
+            'INVALID',
+        );
+
+        self::assertSame([], $result['records']);
+        self::assertSame(0, $result['total']);
+    }
+
     public function testFindFileReferencesReturnsReferences(): void
     {
         $expectedRows = [

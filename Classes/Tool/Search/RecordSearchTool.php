@@ -26,9 +26,18 @@ readonly class RecordSearchTool
             . ' Values can be a plain string for LIKE matching (e.g. {"title":"hello"}) or an object with "op" and "value"'
             . ' for advanced operators (e.g. {"uid":{"op":"gt","value":"10"}, "title":{"op":"eq","value":"Home"}}).'
             . ' Supported operators: eq, neq, like, gt, gte, lt, lte, in (comma-separated), null, notNull.'
-            . ' Optionally filter by pid. Returns matching records with pagination.',
+            . ' Optionally filter by pid. Use orderBy to sort results by a field name and orderDirection (ASC or DESC).'
+            . ' Returns matching records with pagination.',
     )]
-    public function execute(string $tableName, string $search, int $limit = 20, int $offset = 0, int $pid = -1): string
+    public function execute(
+        string $tableName,
+        string $search,
+        int $limit = 20,
+        int $offset = 0,
+        int $pid = -1,
+        string $orderBy = '',
+        string $orderDirection = 'ASC',
+    ): string
     {
         $readFields = $this->tcaSchemaService->getReadFields($tableName);
         if ($readFields === ['uid', 'pid']) {
@@ -63,8 +72,32 @@ readonly class RecordSearchTool
             );
         }
 
+        $resolvedOrderBy = null;
+        if ($orderBy !== '') {
+            if (!in_array($orderBy, $allowedFields, true)) {
+                return json_encode(
+                    ['error' => 'Invalid orderBy field: ' . $orderBy, 'allowedFields' => $allowedFields],
+                    JSON_THROW_ON_ERROR,
+                );
+            }
+            $resolvedOrderBy = $orderBy;
+        }
+
+        if (!in_array($orderDirection, ['ASC', 'DESC'], true)) {
+            $orderDirection = 'ASC';
+        }
+
         try {
-            $result = $this->recordService->search($tableName, $validSearch, $limit, $offset, $readFields, $pid >= 0 ? $pid : null);
+            $result = $this->recordService->search(
+                $tableName,
+                $validSearch,
+                $limit,
+                $offset,
+                $readFields,
+                $pid >= 0 ? $pid : null,
+                $resolvedOrderBy,
+                $orderDirection,
+            );
         } catch (\Throwable $e) {
             $this->logger->error('record_search tool failed', ['exception' => $e]);
 
