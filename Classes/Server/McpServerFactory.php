@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace MarekSkopal\MsMcpServer\Server;
 
 use MarekSkopal\MsMcpServer\Tool\Dynamic\DynamicToolRegistrar;
+use Mcp\Capability\Attribute\McpPrompt;
 use Mcp\Capability\Attribute\McpResource;
 use Mcp\Capability\Attribute\McpResourceTemplate;
+use Mcp\Capability\Attribute\McpTool;
 use Mcp\Server;
 use Mcp\Server\Session\FileSessionStore;
 use Psr\Container\ContainerInterface;
@@ -47,7 +49,8 @@ readonly class McpServerFactory
             ->setSession($sessionStore, new InitializedSessionFactory());
 
         foreach ($this->tools as $tool) {
-            $builder->addTool([$tool::class, 'execute']);
+            $attribute = $this->getMethodAttribute($tool, McpTool::class);
+            $builder->addTool([$tool::class, 'execute'], $attribute?->name);
         }
 
         $this->dynamicToolRegistrar->register($builder);
@@ -55,18 +58,19 @@ readonly class McpServerFactory
         foreach ($this->resources as $resource) {
             $attribute = $this->getMethodAttribute($resource, McpResource::class);
             if ($attribute !== null) {
-                $builder->addResource([$resource::class, 'execute'], $attribute->uri);
+                $builder->addResource([$resource::class, 'execute'], $attribute->uri, $attribute->name);
                 continue;
             }
 
             $templateAttribute = $this->getMethodAttribute($resource, McpResourceTemplate::class);
             if ($templateAttribute !== null) {
-                $builder->addResourceTemplate([$resource::class, 'execute'], $templateAttribute->uriTemplate);
+                $builder->addResourceTemplate([$resource::class, 'execute'], $templateAttribute->uriTemplate, $templateAttribute->name);
             }
         }
 
         foreach ($this->prompts as $prompt) {
-            $builder->addPrompt([$prompt::class, 'execute']);
+            $attribute = $this->getMethodAttribute($prompt, McpPrompt::class);
+            $builder->addPrompt([$prompt::class, 'execute'], $attribute?->name);
         }
 
         return $builder->build();
