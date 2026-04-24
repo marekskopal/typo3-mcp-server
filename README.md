@@ -77,33 +77,37 @@ Add to your Claude Desktop config file:
 - macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
 - Windows: `%APPDATA%\Claude\claude_desktop_config.json`
 
-```json
-{
-  "mcpServers": {
-    "typo3": {
-      "command": "php",
-      "args": ["vendor/bin/typo3", "mcp:server"],
-      "cwd": "/path/to/your/typo3/project"
-    }
-  }
-}
-```
-
-To run as a specific backend user:
+**stdio (local):**
 
 ```json
 {
   "mcpServers": {
     "typo3": {
       "command": "php",
-      "args": ["vendor/bin/typo3", "mcp:server", "--user", "editor"],
+      "args": ["vendor/bin/typo3", "mcp:server", "--user", "admin"],
       "cwd": "/path/to/your/typo3/project"
     }
   }
 }
 ```
+
+**HTTP (remote):**
+
+```json
+{
+  "mcpServers": {
+    "typo3": {
+      "url": "https://your-typo3-site.com/mcp"
+    }
+  }
+}
+```
+
+OAuth authentication is handled automatically — Claude Desktop will open a browser window for the authorization flow.
 
 ### Claude Code (CLI)
+
+**stdio (local):**
 
 ```bash
 claude mcp add typo3 -- php vendor/bin/typo3 mcp:server
@@ -122,9 +126,29 @@ Or add to your project's `.mcp.json`:
 }
 ```
 
+**HTTP (remote):**
+
+```bash
+claude mcp add --transport http typo3 https://your-typo3-site.com/mcp
+```
+
+Or in `.mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "typo3": {
+      "url": "https://your-typo3-site.com/mcp"
+    }
+  }
+}
+```
+
 ### Cursor
 
 Add to `.cursor/mcp.json` in your project root:
+
+**stdio (local):**
 
 ```json
 {
@@ -133,6 +157,18 @@ Add to `.cursor/mcp.json` in your project root:
       "command": "php",
       "args": ["vendor/bin/typo3", "mcp:server"],
       "cwd": "/path/to/your/typo3/project"
+    }
+  }
+}
+```
+
+**HTTP (remote):**
+
+```json
+{
+  "mcpServers": {
+    "typo3": {
+      "url": "https://your-typo3-site.com/mcp"
     }
   }
 }
@@ -142,6 +178,8 @@ Add to `.cursor/mcp.json` in your project root:
 
 Add to `~/.codeium/windsurf/mcp_config.json`:
 
+**stdio (local):**
+
 ```json
 {
   "mcpServers": {
@@ -154,9 +192,23 @@ Add to `~/.codeium/windsurf/mcp_config.json`:
 }
 ```
 
+**HTTP (remote):**
+
+```json
+{
+  "mcpServers": {
+    "typo3": {
+      "url": "https://your-typo3-site.com/mcp"
+    }
+  }
+}
+```
+
 ### VS Code (Copilot)
 
 Add to your VS Code settings (`.vscode/settings.json`):
+
+**stdio (local):**
 
 ```json
 {
@@ -172,15 +224,26 @@ Add to your VS Code settings (`.vscode/settings.json`):
 }
 ```
 
-### HTTP Transport (Remote)
+**HTTP (remote):**
 
-For remote connections using the HTTP transport, point your MCP client to:
-
+```json
+{
+  "mcp": {
+    "servers": {
+      "typo3": {
+        "url": "https://your-typo3-site.com/mcp"
+      }
+    }
+  }
+}
 ```
-https://your-typo3-site.com/mcp
-```
 
-The client must support OAuth 2.1 with PKCE. Server metadata is available at `/.well-known/oauth-authorization-server`.
+### Other MCP Clients
+
+Any MCP-compatible client can connect via either transport:
+
+- **stdio:** Run `php vendor/bin/typo3 mcp:server` — communicates via stdin/stdout, no auth needed
+- **HTTP:** Connect to `https://your-typo3-site.com/mcp` — requires OAuth 2.1 with PKCE. Server metadata is available at `/.well-known/oauth-authorization-server` for auto-discovery.
 
 ## Authentication
 
