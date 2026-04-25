@@ -142,6 +142,39 @@ final class FileServiceTest extends TestCase
         self::assertSame('/newdir/', $result['identifier']);
     }
 
+    public function testCopyFileCallsStorageCopyFile(): void
+    {
+        $file = $this->createStub(File::class);
+        $targetFolder = $this->createStub(Folder::class);
+
+        $storage = $this->createMock(ResourceStorage::class);
+        $storage->method('getFileByIdentifier')->with('/test.txt')->willReturn($file);
+        $storage->method('getFolder')->with('/target/')->willReturn($targetFolder);
+        $storage->expects(self::once())->method('copyFile')->with($file, $targetFolder);
+
+        $storageRepository = $this->createStub(StorageRepository::class);
+        $storageRepository->method('findByUid')->willReturn($storage);
+
+        $service = new FileService($storageRepository);
+        $service->copyFile(1, '/test.txt', '/target/');
+    }
+
+    public function testCopyFileThrowsWhenFileNotFound(): void
+    {
+        $storage = $this->createStub(ResourceStorage::class);
+        $storage->method('getFileByIdentifier')->willReturn(null);
+
+        $storageRepository = $this->createStub(StorageRepository::class);
+        $storageRepository->method('findByUid')->willReturn($storage);
+
+        $service = new FileService($storageRepository);
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionCode(1712002007);
+
+        $service->copyFile(1, '/nonexistent.txt', '/target/');
+    }
+
     public function testMoveFileCallsStorageMoveFile(): void
     {
         $file = $this->createStub(File::class);
