@@ -2,7 +2,7 @@
 
 > **Beta** — This extension is under active development. APIs and behavior may change between releases.
 
-TYPO3 CMS extension that implements an [MCP (Model Context Protocol)](https://modelcontextprotocol.io/) server for TYPO3 administration. It exposes 33 tools for managing pages, content elements, files, and custom extension records via the MCP protocol, allowing AI assistants to interact with your TYPO3 instance.
+TYPO3 CMS extension that implements an [MCP (Model Context Protocol)](https://modelcontextprotocol.io/) server for TYPO3 administration. It exposes 42 tools for managing pages, content elements, files, and custom extension records via the MCP protocol, allowing AI assistants to interact with your TYPO3 instance.
 
 **This extension is designed for fully autonomous AI operation — no workspaces, no approval queues.** Unlike workspace-based approaches that require human review before changes go live, this server lets AI agents manage your TYPO3 site directly. Changes take effect immediately. This is intentional: the goal is to enable AI agents to build, update, and maintain TYPO3 sites end-to-end without human intervention.
 
@@ -301,6 +301,7 @@ The **System > MCP Server** backend module provides:
 | `pages_delete` | Delete a page by UID. |
 | `pages_copy` | Copy a page. Set `includeSubpages: true` to copy the entire subtree. |
 | `pages_tree` | Get the page tree hierarchy with configurable depth (1-10, default 3). |
+| `pages_search` | Search pages by title (plain text) or advanced conditions (JSON). Supports sorting. |
 
 **Target positioning** (for `pages_copy`): Use a positive target to place as child of that page. Use a negative target to place after a specific page (e.g., `target: -42` means "after page 42").
 
@@ -315,6 +316,7 @@ The **System > MCP Server** backend module provides:
 | `content_delete` | Delete a content element by UID. |
 | `content_move` | Move a content element to a new position. |
 | `content_copy` | Copy a content element to a new position. |
+| `content_search` | Search content by header (plain text) or advanced conditions (JSON). Supports language filtering and sorting. |
 
 **Target positioning** (for `content_move`, `content_copy`): Positive target = place at top of that page. Negative target = place after element with that UID.
 
@@ -326,6 +328,7 @@ The **System > MCP Server** backend module provides:
 | `file_get_info` | Get file metadata: UID, name, size, MIME type, public URL. |
 | `file_upload` | Upload a file from text content or base64-encoded binary data. |
 | `file_upload_from_url` | Download a file from URL and store it (max 100 MB). |
+| `file_copy` | Copy a file to a directory. |
 | `file_delete` | Delete a file by identifier. |
 | `file_move` | Move a file to a different directory. |
 | `file_rename` | Rename a file. |
@@ -372,6 +375,16 @@ orderBy: "title", orderDirection: "DESC"
 | `site_languages` | List available languages for a site. Pass any page ID belonging to the site. |
 | `record_translate` | Create a translation of a record. Source must be in default language. Uses TYPO3 connected mode. |
 
+### Batch Operations
+
+| Tool | Description |
+|------|-------------|
+| `record_delete_batch` | Delete multiple records by comma-separated UIDs. Single atomic DataHandler operation. |
+| `record_update_batch` | Update same fields on multiple records (e.g., `{"hidden":1}` on UIDs `1,2,3`). |
+| `record_move_batch` | Move multiple records to a target position. |
+
+All batch tools work on any TCA table.
+
 ### Cache
 
 | Tool | Description |
@@ -415,6 +428,9 @@ Prompts provide guided multi-step workflows that instruct the AI through complex
 | `translate_page_content` | `pageId`, `targetLanguageId` (0 = all) | Translate a page and all its content elements to one or all available languages. |
 | `audit_page_seo` | `pageId` | Audit SEO metadata, check for missing titles/descriptions/alt text, report findings. |
 | `summarize_page` | `pageId` | Generate a content inventory with all elements, translations, and statistics. |
+| `check_translation_status` | `pageId`, `depth` (default 3) | Scan page subtree, report missing translations per language with coverage percentages. |
+| `audit_content_structure` | `pageId`, `depth` (default 3) | Find content in non-existent backend layout columns (orphaned after layout changes). |
+| `migrate_content` | `sourcePageId`, `targetPageId` | Move all content between pages with layout compatibility check. |
 
 ## Adding Support for Other Extensions
 
@@ -465,6 +481,8 @@ Tools, resources, and prompts are **auto-discovered** via DI container tags — 
 
 Error handling is **centralized** in `ErrorHandlingProxy`. Tool classes contain only business logic — no try/catch boilerplate, no logger injection.
 
+**Audit logging** records every tool and resource invocation to TYPO3's `sys_log` table — visible in the backend log module with user ID, tool name, execution time, and outcome.
+
 ## Development
 
 ```bash
@@ -477,7 +495,7 @@ vendor/bin/phpstan analyse
 vendor/bin/phpcs
 vendor/bin/phpcbf
 
-# Tests (339 tests, 1290 assertions)
+# Tests (374 tests, 1465 assertions)
 vendor/bin/phpunit
 ```
 

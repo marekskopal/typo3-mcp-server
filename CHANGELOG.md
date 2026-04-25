@@ -4,6 +4,22 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.6.0] - 2026-04-25
+
+### Added
+- **Audit logging:** All tool and resource invocations are logged to TYPO3's `sys_log` table with backend user ID, tool name, execution time, and success/failure status. Visible in TYPO3 backend log module.
+- **Batch operations:** `record_delete_batch`, `record_update_batch`, `record_move_batch` — process multiple records atomically in a single DataHandler cycle
+- **New tools:** `file_copy`, `pages_search`, `content_search`
+- **New prompts:**
+  - `check_translation_status` — scan page subtree, report missing translations per language
+  - `audit_content_structure` — find content in non-existent backend layout columns
+  - `migrate_content` — move all content between pages with layout compatibility check
+- `pages_search` and `content_search` accept plain text for LIKE matching or JSON for advanced conditions
+- Shared `SearchConditionParser` extracted from `RecordSearchTool` for reuse
+
+### Fixed
+- Tool auto-discovery: SDK's `ArrayLoader` was falling back to method name `execute` instead of reading `#[McpTool]` attribute names. All tools now pass names explicitly.
+
 ## [0.5.0] - 2026-04-24
 
 ### Added

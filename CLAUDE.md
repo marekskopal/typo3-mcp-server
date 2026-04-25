@@ -47,17 +47,22 @@ vendor/bin/typo3 mcp:cleanup
 - `Server/ErrorHandlingProxy` — Proxy that catches `\Throwable` from tool/resource methods, logs it, and converts to `ToolCallException`/`ResourceReadException`
 - `Server/InitializedSession` — Fixed SessionInterface implementation (workaround for SDK's `readData()` bug)
 - `Server/InitializedSessionFactory` — Factory for InitializedSession instances
-- `Service/DataHandlerService` — Wraps TYPO3 DataHandler for create/update/delete operations
+- `Service/DataHandlerService` — Wraps TYPO3 DataHandler for create/update/delete operations (single and batch)
 - `Service/RecordService` — Read operations via QueryBuilder (findByUid, findByPid, search with pagination capped at 500)
-- `Service/FileService` — File operations via TYPO3 ResourceStorage (list, upload, delete, move, rename, directory ops)
+- `Service/FileService` — File operations via TYPO3 ResourceStorage (list, upload, copy, delete, move, rename, directory ops)
 - `Service/TcaSchemaService` — TCA field metadata extraction for schema introspection and dynamic tools
 - `Service/BackendLayoutService` — Resolves the effective BackendLayout for a page via BackendLayoutView, returns structured DTOs with column positions and grid structure
 - `Tool/Pages/*` — CRUD tools for pages table (use `#[McpTool]` attributes)
 - `Tool/Content/*` — CRUD tools for tt_content table (use `#[McpTool]` attributes)
-- `Tool/File/*` — File management tools (list, get info, upload, upload from URL, delete, move, rename, directory create/delete/move/rename, file reference add/list/remove)
+- `Tool/File/*` — File management tools (list, get info, upload, upload from URL, copy, delete, move, rename, directory create/delete/move/rename, file reference add/list/remove)
 - `Tool/Schema/TableSchemaTool` — TCA field introspection for any table
 - `Tool/Search/RecordSearchTool` — Search records in any table by field values with operators (eq, neq, like, gt, gte, lt, lte, in, null, notNull) and sorting
+- `Tool/Search/PagesSearchTool` — Search pages by title (plain text LIKE) or JSON conditions
+- `Tool/Search/ContentSearchTool` — Search content elements by header with language filtering
+- `Tool/Search/SearchConditionParser` — Shared condition parsing for search tools
+- `Tool/Batch/*` — Batch operations (record_delete_batch, record_update_batch, record_move_batch) for any table
 - `Tool/Cache/CacheClearTool` — Flush TYPO3 caches (all, pages, or specific cache groups)
+- `Logging/AuditLogger` — Writes tool/resource invocations to `sys_log` table with user, timing, and outcome
 - `Resource/BackendLayoutResource` — MCP Resource Template exposing backend layout and column positions for a page (`typo3://pages/{pageId}/backend-layout`)
 - `Tool/Dynamic/DynamicToolRegistrar` — Registers CRUD tools at runtime for tables configured via `EXTCONF`
 - `Command/CleanupExpiredTokensCommand` — CLI command (`mcp:cleanup`) to purge expired OAuth tokens and stale MCP session files
@@ -109,8 +114,8 @@ readonly class MyTool
 
 ## Testing
 
-339 unit tests covering:
-- All 33 static MCP tools (Pages/Content/File/Schema/Search/Translation/Cache CRUD)
+374 unit tests covering:
+- All 39 static MCP tools + 3 batch tools (Pages/Content/File/Schema/Search/Translation/Cache/Batch CRUD)
 - Dynamic tool registration and execution (DynamicToolRegistrar)
 - OAuth classes (AuthorizationService incl. revocation, ClientRepository, PkceVerifier, OAuthTokenPair)
 - OAuthMiddleware (metadata, authorize, register, revoke, token endpoints)
