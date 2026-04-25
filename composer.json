@@ -7,12 +7,12 @@
         "mcp",
         "server"
     ],
-    "homepage": "https://marekskopal.cz",
+    "homepage": "https://marekskopal.com",
     "authors": [
         {
             "name": "Marek Skopal",
             "role": "Developer",
-            "homepage": "https://marekskopal.cz"
+            "homepage": "https://marekskopal.com"
         }
     ],
     "license": ["GPL-2.0-or-later"],
