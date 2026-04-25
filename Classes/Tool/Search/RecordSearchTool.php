@@ -48,17 +48,8 @@ readonly class RecordSearchTool
 
         // Filter search fields to only allow readable fields and parse conditions
         $allowedFields = array_merge(['uid', 'pid'], $readFields);
-        /** @var array<string, array{operator: string, value: string}> $validSearch */
-        $validSearch = [];
-        $ignoredFields = [];
-        foreach ($searchData as $field => $value) {
-            if (!in_array($field, $allowedFields, true)) {
-                $ignoredFields[] = $field;
-                continue;
-            }
-
-            $validSearch[$field] = $this->parseCondition($value);
-        }
+        $validSearch = SearchConditionParser::fromArray($searchData, $allowedFields);
+        $ignoredFields = array_values(array_diff(array_keys($searchData), $allowedFields));
 
         if ($validSearch === []) {
             return json_encode(
@@ -99,25 +90,5 @@ readonly class RecordSearchTool
         }
 
         return json_encode($response, JSON_THROW_ON_ERROR);
-    }
-
-    /** @return array{operator: string, value: string} */
-    private function parseCondition(mixed $value): array
-    {
-        if (is_array($value) && isset($value['op'])) {
-            $op = $value['op'];
-            $val = $value['value'] ?? '';
-
-            return [
-                'operator' => is_string($op) ? $op : '',
-                'value' => is_string($val) || is_int($val) || is_float($val) ? (string) $val : '',
-            ];
-        }
-
-        if (is_string($value) || is_int($value) || is_float($value)) {
-            return ['operator' => 'like', 'value' => (string) $value];
-        }
-
-        return ['operator' => 'like', 'value' => ''];
     }
 }
