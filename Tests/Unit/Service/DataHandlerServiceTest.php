@@ -25,5 +25,8 @@ final class DataHandlerServiceTest extends TestCase
         self::assertTrue(method_exists($service, 'deleteRecord'));
         self::assertTrue(method_exists($service, 'copyRecord'));
         self::assertTrue(method_exists($service, 'localizeRecord'));
+        self::assertTrue(method_exists($service, 'deleteRecords'));
+        self::assertTrue(method_exists($service, 'updateRecords'));
+        self::assertTrue(method_exists($service, 'moveRecords'));
     }
 }

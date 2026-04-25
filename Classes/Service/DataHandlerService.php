@@ -127,6 +127,54 @@ readonly class DataHandlerService
         }
     }
 
+    /** @param list<int> $uids */
+    public function deleteRecords(string $table, array $uids): void
+    {
+        $cmdmap = [];
+        foreach ($uids as $uid) {
+            $cmdmap[$uid] = ['delete' => 1];
+        }
+
+        $dataHandler = GeneralUtility::makeInstance(DataHandler::class);
+        $dataHandler->start([], [$table => $cmdmap]);
+        $dataHandler->process_cmdmap();
+
+        $this->checkErrors($dataHandler);
+    }
+
+    /**
+     * @param list<int> $uids
+     * @param array<string, mixed> $fields
+     */
+    public function updateRecords(string $table, array $uids, array $fields): void
+    {
+        $datamap = [];
+        foreach ($uids as $uid) {
+            $datamap[$uid] = $fields;
+        }
+
+        $dataHandler = GeneralUtility::makeInstance(DataHandler::class);
+        $dataHandler->start([$table => $datamap], []);
+        $dataHandler->process_datamap();
+
+        $this->checkErrors($dataHandler);
+    }
+
+    /** @param list<int> $uids */
+    public function moveRecords(string $table, array $uids, int $target): void
+    {
+        $cmdmap = [];
+        foreach ($uids as $uid) {
+            $cmdmap[$uid] = ['move' => $target];
+        }
+
+        $dataHandler = GeneralUtility::makeInstance(DataHandler::class);
+        $dataHandler->start([], [$table => $cmdmap]);
+        $dataHandler->process_cmdmap();
+
+        $this->checkErrors($dataHandler);
+    }
+
     public function deleteRecord(string $table, int $uid): void
     {
         $dataHandler = GeneralUtility::makeInstance(DataHandler::class);
