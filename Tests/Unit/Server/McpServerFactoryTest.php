@@ -39,6 +39,7 @@ use MarekSkopal\MsMcpServer\Tool\File\FileDeleteTool;
 use MarekSkopal\MsMcpServer\Tool\File\FileGetInfoTool;
 use MarekSkopal\MsMcpServer\Tool\File\FileListTool;
 use MarekSkopal\MsMcpServer\Tool\File\FileMoveTool;
+use MarekSkopal\MsMcpServer\Tool\File\FileSearchTool;
 use MarekSkopal\MsMcpServer\Tool\File\FileReferenceAddTool;
 use MarekSkopal\MsMcpServer\Tool\File\FileReferenceListTool;
 use MarekSkopal\MsMcpServer\Tool\File\FileReferenceRemoveTool;
@@ -96,7 +97,7 @@ final class McpServerFactoryTest extends TestCase
         $siteFinder = $this->createStub(SiteFinder::class);
         $recordService = new RecordService($connectionPool);
         $dataHandlerService = new DataHandlerService($this->createStub(SiteFinder::class));
-        $fileService = new FileService($storageRepository);
+        $fileService = new FileService($storageRepository, $connectionPool);
         $logger = new NullLogger();
         $tcaSchemaService = new TcaSchemaService();
         $siteLanguageService = new SiteLanguageService($siteFinder);
@@ -135,6 +136,7 @@ final class McpServerFactoryTest extends TestCase
             new FileReferenceListTool($recordService, $tcaSchemaService),
             new FileReferenceRemoveTool($dataHandlerService),
             new FileUploadFromUrlTool($fileService),
+            new FileSearchTool($fileService),
             new TableSchemaTool($tcaSchemaService),
             new RecordSearchTool($recordService, $tcaSchemaService),
             new RecordCountTool($recordService, $tcaSchemaService),

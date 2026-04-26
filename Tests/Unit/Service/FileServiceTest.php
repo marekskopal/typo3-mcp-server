@@ -7,6 +7,7 @@ namespace MarekSkopal\MsMcpServer\Tests\Unit\Service;
 use MarekSkopal\MsMcpServer\Service\FileService;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
+use TYPO3\CMS\Core\Database\ConnectionPool;
 use TYPO3\CMS\Core\Resource\File;
 use TYPO3\CMS\Core\Resource\Folder;
 use TYPO3\CMS\Core\Resource\ResourceStorage;
@@ -41,7 +42,7 @@ final class FileServiceTest extends TestCase
         $storageRepository = $this->createStub(StorageRepository::class);
         $storageRepository->method('findByUid')->willReturn($storage);
 
-        $service = new FileService($storageRepository);
+        $service = new FileService($storageRepository, $this->createStub(ConnectionPool::class));
         $result = $service->listDirectory(1, '/', 20, 0);
 
         self::assertCount(1, $result['files']);
@@ -71,7 +72,7 @@ final class FileServiceTest extends TestCase
         $storageRepository = $this->createStub(StorageRepository::class);
         $storageRepository->method('findByUid')->willReturn($storage);
 
-        $service = new FileService($storageRepository);
+        $service = new FileService($storageRepository, $this->createStub(ConnectionPool::class));
         $result = $service->getFileInfo(1, '/images/image.png');
 
         self::assertSame('image.png', $result['name']);
@@ -88,7 +89,7 @@ final class FileServiceTest extends TestCase
         $storageRepository = $this->createStub(StorageRepository::class);
         $storageRepository->method('findByUid')->willReturn($storage);
 
-        $service = new FileService($storageRepository);
+        $service = new FileService($storageRepository, $this->createStub(ConnectionPool::class));
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionCode(1712002001);
@@ -113,7 +114,7 @@ final class FileServiceTest extends TestCase
         $storageRepository = $this->createStub(StorageRepository::class);
         $storageRepository->method('findByUid')->willReturn($storage);
 
-        $service = new FileService($storageRepository);
+        $service = new FileService($storageRepository, $this->createStub(ConnectionPool::class));
         $result = $service->uploadFile(1, '/', 'upload.txt', 'Hello, World!');
 
         self::assertSame(42, $result['uid']);
@@ -135,7 +136,7 @@ final class FileServiceTest extends TestCase
         $storageRepository = $this->createStub(StorageRepository::class);
         $storageRepository->method('findByUid')->willReturn($storage);
 
-        $service = new FileService($storageRepository);
+        $service = new FileService($storageRepository, $this->createStub(ConnectionPool::class));
         $result = $service->createDirectory(1, '/', 'newdir');
 
         self::assertSame('newdir', $result['name']);
@@ -155,7 +156,7 @@ final class FileServiceTest extends TestCase
         $storageRepository = $this->createStub(StorageRepository::class);
         $storageRepository->method('findByUid')->willReturn($storage);
 
-        $service = new FileService($storageRepository);
+        $service = new FileService($storageRepository, $this->createStub(ConnectionPool::class));
         $service->copyFile(1, '/test.txt', '/target/');
     }
 
@@ -167,7 +168,7 @@ final class FileServiceTest extends TestCase
         $storageRepository = $this->createStub(StorageRepository::class);
         $storageRepository->method('findByUid')->willReturn($storage);
 
-        $service = new FileService($storageRepository);
+        $service = new FileService($storageRepository, $this->createStub(ConnectionPool::class));
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionCode(1712002007);
@@ -188,7 +189,7 @@ final class FileServiceTest extends TestCase
         $storageRepository = $this->createStub(StorageRepository::class);
         $storageRepository->method('findByUid')->willReturn($storage);
 
-        $service = new FileService($storageRepository);
+        $service = new FileService($storageRepository, $this->createStub(ConnectionPool::class));
         $service->moveFile(1, '/test.txt', '/target/');
     }
 
@@ -200,7 +201,7 @@ final class FileServiceTest extends TestCase
         $storageRepository = $this->createStub(StorageRepository::class);
         $storageRepository->method('findByUid')->willReturn($storage);
 
-        $service = new FileService($storageRepository);
+        $service = new FileService($storageRepository, $this->createStub(ConnectionPool::class));
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionCode(1712002005);
@@ -219,7 +220,7 @@ final class FileServiceTest extends TestCase
         $storageRepository = $this->createStub(StorageRepository::class);
         $storageRepository->method('findByUid')->willReturn($storage);
 
-        $service = new FileService($storageRepository);
+        $service = new FileService($storageRepository, $this->createStub(ConnectionPool::class));
         $service->renameFile(1, '/test.txt', 'new-name.txt');
     }
 
@@ -231,7 +232,7 @@ final class FileServiceTest extends TestCase
         $storageRepository = $this->createStub(StorageRepository::class);
         $storageRepository->method('findByUid')->willReturn($storage);
 
-        $service = new FileService($storageRepository);
+        $service = new FileService($storageRepository, $this->createStub(ConnectionPool::class));
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionCode(1712002006);
@@ -250,7 +251,7 @@ final class FileServiceTest extends TestCase
         $storageRepository = $this->createStub(StorageRepository::class);
         $storageRepository->method('findByUid')->willReturn($storage);
 
-        $service = new FileService($storageRepository);
+        $service = new FileService($storageRepository, $this->createStub(ConnectionPool::class));
         $service->deleteFile(1, '/test.txt');
     }
 
@@ -262,7 +263,7 @@ final class FileServiceTest extends TestCase
         $storageRepository = $this->createStub(StorageRepository::class);
         $storageRepository->method('findByUid')->willReturn($storage);
 
-        $service = new FileService($storageRepository);
+        $service = new FileService($storageRepository, $this->createStub(ConnectionPool::class));
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionCode(1712002004);
@@ -284,7 +285,7 @@ final class FileServiceTest extends TestCase
         $storageRepository = $this->createStub(StorageRepository::class);
         $storageRepository->method('findByUid')->willReturn($storage);
 
-        $service = new FileService($storageRepository);
+        $service = new FileService($storageRepository, $this->createStub(ConnectionPool::class));
         $service->moveDirectory(1, '/source/', '/target/');
     }
 
@@ -299,7 +300,7 @@ final class FileServiceTest extends TestCase
         $storageRepository = $this->createStub(StorageRepository::class);
         $storageRepository->method('findByUid')->willReturn($storage);
 
-        $service = new FileService($storageRepository);
+        $service = new FileService($storageRepository, $this->createStub(ConnectionPool::class));
         $service->renameDirectory(1, '/old-name/', 'new-name');
     }
 
@@ -314,14 +315,14 @@ final class FileServiceTest extends TestCase
         $storageRepository = $this->createStub(StorageRepository::class);
         $storageRepository->method('findByUid')->willReturn($storage);
 
-        $service = new FileService($storageRepository);
+        $service = new FileService($storageRepository, $this->createStub(ConnectionPool::class));
         $service->deleteDirectory(1, '/old/', true);
     }
 
     public function testUploadFileFromUrlRejectsNonHttpScheme(): void
     {
         $storageRepository = $this->createStub(StorageRepository::class);
-        $service = new FileService($storageRepository);
+        $service = new FileService($storageRepository, $this->createStub(ConnectionPool::class));
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionCode(1712002010);
@@ -332,7 +333,7 @@ final class FileServiceTest extends TestCase
     public function testUploadFileFromUrlRejectsInvalidUrl(): void
     {
         $storageRepository = $this->createStub(StorageRepository::class);
-        $service = new FileService($storageRepository);
+        $service = new FileService($storageRepository, $this->createStub(ConnectionPool::class));
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionCode(1712002010);
@@ -345,7 +346,7 @@ final class FileServiceTest extends TestCase
         $storageRepository = $this->createStub(StorageRepository::class);
         $storageRepository->method('findByUid')->willReturn(null);
 
-        $service = new FileService($storageRepository);
+        $service = new FileService($storageRepository, $this->createStub(ConnectionPool::class));
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionCode(1712002000);

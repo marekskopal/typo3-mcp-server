@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace MarekSkopal\MsMcpServer\Service;
 
+use Doctrine\DBAL\ParameterType;
+use TYPO3\CMS\Core\Database\ConnectionPool;
 use TYPO3\CMS\Core\Resource\File;
 use TYPO3\CMS\Core\Resource\Folder;
 use TYPO3\CMS\Core\Resource\ResourceStorage;
@@ -13,7 +15,7 @@ use const PHP_URL_SCHEME;
 
 readonly class FileService
 {
-    public function __construct(private StorageRepository $storageRepository)
+    public function __construct(private StorageRepository $storageRepository, private ConnectionPool $connectionPool)
     {
     }
 
@@ -247,6 +249,70 @@ readonly class FileService
         $storage = $this->getStorage($storageUid);
         $folder = $storage->getFolder($directoryIdentifier);
         $storage->deleteFolder($folder, $recursive);
+    }
+
+    /** @return array{files: list<array{name: string, identifier: string, size: int, mimeType: string, extension: string, storage: int}>, total: int} */
+    public function searchFiles(int $storageUid, string $namePattern, string $extension, int $limit, int $offset): array
+    {
+        $limit = min(max($limit, 1), 500);
+
+        $queryBuilder = $this->connectionPool->getQueryBuilderForTable('sys_file');
+        $queryBuilder->getRestrictions()->removeAll();
+        $countQueryBuilder = $this->connectionPool->getQueryBuilderForTable('sys_file');
+        $countQueryBuilder->getRestrictions()->removeAll();
+
+        $queryBuilder->select('name', 'identifier', 'size', 'mime_type', 'extension', 'storage')->from('sys_file');
+        $countQueryBuilder->count('uid')->from('sys_file');
+
+        $queryBuilder->andWhere(
+            $queryBuilder->expr()->eq('storage', $queryBuilder->createNamedParameter($storageUid, ParameterType::INTEGER)),
+        );
+        $countQueryBuilder->andWhere(
+            $countQueryBuilder->expr()->eq('storage', $countQueryBuilder->createNamedParameter($storageUid, ParameterType::INTEGER)),
+        );
+
+        if ($namePattern !== '') {
+            $queryBuilder->andWhere(
+                $queryBuilder->expr()->like('name', $queryBuilder->createNamedParameter('%' . $namePattern . '%')),
+            );
+            $countQueryBuilder->andWhere(
+                $countQueryBuilder->expr()->like('name', $countQueryBuilder->createNamedParameter('%' . $namePattern . '%')),
+            );
+        }
+
+        if ($extension !== '') {
+            $queryBuilder->andWhere(
+                $queryBuilder->expr()->eq('extension', $queryBuilder->createNamedParameter($extension)),
+            );
+            $countQueryBuilder->andWhere(
+                $countQueryBuilder->expr()->eq('extension', $countQueryBuilder->createNamedParameter($extension)),
+            );
+        }
+
+        /** @var int|string $totalResult */
+        $totalResult = $countQueryBuilder->executeQuery()->fetchOne();
+
+        /** @var list<array{name: string, identifier: string, size: int, mime_type: string, extension: string, storage: int}> $rows */
+        $rows = $queryBuilder
+            ->setMaxResults($limit)
+            ->setFirstResult($offset)
+            ->orderBy('name', 'ASC')
+            ->executeQuery()
+            ->fetchAllAssociative();
+
+        $files = array_map(static fn (array $row): array => [
+            'name' => $row['name'],
+            'identifier' => $row['identifier'],
+            'size' => (int) $row['size'],
+            'mimeType' => $row['mime_type'],
+            'extension' => $row['extension'],
+            'storage' => (int) $row['storage'],
+        ], $rows);
+
+        return [
+            'files' => $files,
+            'total' => (int) $totalResult,
+        ];
     }
 
     private function getStorage(int $storageUid): ResourceStorage
