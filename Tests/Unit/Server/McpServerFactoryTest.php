@@ -185,4 +185,47 @@ final class McpServerFactoryTest extends TestCase
 
         self::assertInstanceOf(Server::class, $server);
     }
+
+    /**
+     * Ensures every PHP class in Tool/ (that isn't excluded in Services.yaml) has a #[McpTool] attribute.
+     * Catches utility classes that would crash McpServerFactory at runtime if tagged as mcp.tool.
+     */
+    public function testAllToolClassesHaveMcpToolAttribute(): void
+    {
+        $toolDir = __DIR__ . '/../../../Classes/Tool';
+        $excludedDirs = ['Result', 'Dynamic'];
+        $excludedFiles = ['SearchConditionParser.php'];
+
+        $iterator = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($toolDir));
+        $missing = [];
+
+        /** @var \SplFileInfo $file */
+        foreach ($iterator as $file) {
+            if (!$file->isFile() || $file->getExtension() !== 'php') {
+                continue;
+            }
+
+            $relativePath = str_replace($toolDir . '/', '', $file->getPathname());
+
+            $skip = false;
+            foreach ($excludedDirs as $dir) {
+                if (str_starts_with($relativePath, $dir . '/')) {
+                    $skip = true;
+
+                    break;
+                }
+            }
+
+            if ($skip || in_array($file->getFilename(), $excludedFiles, true)) {
+                continue;
+            }
+
+            $content = (string) file_get_contents($file->getPathname());
+            if (!str_contains($content, '#[McpTool')) {
+                $missing[] = $relativePath;
+            }
+        }
+
+        self::assertSame([], $missing, 'Tool classes without #[McpTool] attribute (exclude in Services.yaml or add attribute): ' . implode(', ', $missing));
+    }
 }
