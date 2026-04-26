@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use MarekSkopal\MsMcpServer\Controller\ExtensionTableController;
 use MarekSkopal\MsMcpServer\Controller\OAuthClientController;
 
 return [
@@ -32,6 +33,24 @@ return [
             ],
             'revoke_token' => [
                 'target' => OAuthClientController::class . '::revokeTokenAction',
+                'methods' => ['POST'],
+            ],
+            'extensions' => [
+                'target' => ExtensionTableController::class . '::indexAction',
+            ],
+            'discover' => [
+                'target' => ExtensionTableController::class . '::discoverAction',
+                'methods' => ['POST'],
+            ],
+            'toggle' => [
+                'target' => ExtensionTableController::class . '::toggleAction',
+                'methods' => ['POST'],
+            ],
+            'edit_extension' => [
+                'target' => ExtensionTableController::class . '::editAction',
+            ],
+            'update_extension' => [
+                'target' => ExtensionTableController::class . '::updateAction',
                 'methods' => ['POST'],
             ],
         ],

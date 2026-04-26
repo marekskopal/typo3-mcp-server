@@ -7,44 +7,44 @@
 <f:section name="Content">
     <f:flashMessages queueIdentifier="msmcpserver.oauth" />
 
-    <p><a href="{f:be.uri(route: 'msmcpserver_oauth_clients')}">&larr; Back to client list</a></p>
+    <p><a href="{f:be.uri(route: 'msmcpserver_oauth_clients')}">&larr; <f:translate key="module.oauth.back_to_list" extensionName="MsMcpServer" /></a></p>
 
-    <h2>Edit OAuth Client: {client.client_name}</h2>
-    <p class="text-muted">Client ID: <code>{client.client_id}</code></p>
+    <h2><f:translate key="module.oauth.edit_title" extensionName="MsMcpServer" />: {client.client_name}</h2>
+    <p class="text-muted"><f:translate key="module.oauth.label.client_id" extensionName="MsMcpServer" />: <code>{client.client_id}</code></p>
 
     <form method="post" action="{f:be.uri(route: 'msmcpserver_oauth_clients.update')}">
         <input type="hidden" name="uid" value="{client.uid}" />
         <div class="form-group mb-3">
-            <label for="client_name" class="form-label">Client Name</label>
+            <label for="client_name" class="form-label"><f:translate key="module.oauth.label.client_name" extensionName="MsMcpServer" /></label>
             <input type="text" name="client_name" id="client_name" class="form-control" required="required" value="{client.client_name}" />
         </div>
         <div class="form-group mb-3">
-            <label for="redirect_uris" class="form-label">Redirect URIs (one per line)</label>
+            <label for="redirect_uris" class="form-label"><f:translate key="module.oauth.label.redirect_uris" extensionName="MsMcpServer" /></label>
             <textarea name="redirect_uris" id="redirect_uris" class="form-control" rows="3" required="required">{client.redirect_uris_text}</textarea>
         </div>
         <div class="form-group mb-3">
-            <label for="be_user" class="form-label">Backend User (optional)</label>
+            <label for="be_user" class="form-label"><f:translate key="module.oauth.label.be_user_optional" extensionName="MsMcpServer" /></label>
             <select name="be_user" id="be_user" class="form-select">
-                <option value="0">-- Any user --</option>
+                <option value="0"><f:translate key="module.any_user" extensionName="MsMcpServer" /></option>
                 <f:for each="{beUsers}" as="user">
                     <option value="{user.uid}" {f:if(condition: '{user.uid} == {client.be_user}', then: 'selected="selected"')}>{user.username}</option>
                 </f:for>
             </select>
         </div>
-        <button type="submit" class="btn btn-primary">Save Changes</button>
+        <button type="submit" class="btn btn-primary"><f:translate key="module.action.save" extensionName="MsMcpServer" /></button>
     </form>
 
-    <h2 class="mt-5">Active Tokens</h2>
+    <h2 class="mt-5"><f:translate key="module.oauth.tokens_title" extensionName="MsMcpServer" /></h2>
     <f:if condition="{tokens}">
         <f:then>
             <table class="table table-striped">
                 <thead>
                     <tr>
-                        <th>User</th>
-                        <th>Access Token Expires</th>
-                        <th>Refresh Token Expires</th>
-                        <th>Status</th>
-                        <th>Actions</th>
+                        <th><f:translate key="module.header.user" extensionName="MsMcpServer" /></th>
+                        <th><f:translate key="module.oauth.header.access_token_expires" extensionName="MsMcpServer" /></th>
+                        <th><f:translate key="module.oauth.header.refresh_token_expires" extensionName="MsMcpServer" /></th>
+                        <th><f:translate key="module.header.status" extensionName="MsMcpServer" /></th>
+                        <th><f:translate key="module.header.actions" extensionName="MsMcpServer" /></th>
                     </tr>
                 </thead>
                 <tbody>
@@ -53,28 +53,28 @@
                             <td>
                                 <f:if condition="{token.username}">
                                     <f:then>{token.username}</f:then>
-                                    <f:else><em>Unknown</em></f:else>
+                                    <f:else><em><f:translate key="module.oauth.unknown" extensionName="MsMcpServer" /></em></f:else>
                                 </f:if>
                             </td>
                             <td>
                                 <f:format.date format="Y-m-d H:i">{token.access_token_expires}</f:format.date>
                                 <f:if condition="{token.access_token_expires} < {now}">
-                                    <span class="badge bg-secondary">Expired</span>
+                                    <span class="badge bg-secondary"><f:translate key="module.status.expired" extensionName="MsMcpServer" /></span>
                                 </f:if>
                             </td>
                             <td>
                                 <f:format.date format="Y-m-d H:i">{token.refresh_token_expires}</f:format.date>
                                 <f:if condition="{token.refresh_token_expires} < {now}">
-                                    <span class="badge bg-secondary">Expired</span>
+                                    <span class="badge bg-secondary"><f:translate key="module.status.expired" extensionName="MsMcpServer" /></span>
                                 </f:if>
                             </td>
                             <td>
                                 <f:if condition="{token.access_token_expires} > {now}">
-                                    <f:then><span class="badge bg-success">Active</span></f:then>
+                                    <f:then><span class="badge bg-success"><f:translate key="module.status.active" extensionName="MsMcpServer" /></span></f:then>
                                     <f:else>
                                         <f:if condition="{token.refresh_token_expires} > {now}">
-                                            <f:then><span class="badge bg-warning">Refreshable</span></f:then>
-                                            <f:else><span class="badge bg-secondary">Expired</span></f:else>
+                                            <f:then><span class="badge bg-warning"><f:translate key="module.oauth.status.refreshable" extensionName="MsMcpServer" /></span></f:then>
+                                            <f:else><span class="badge bg-secondary"><f:translate key="module.status.expired" extensionName="MsMcpServer" /></span></f:else>
                                         </f:if>
                                     </f:else>
                                 </f:if>
@@ -83,7 +83,7 @@
                                 <form method="post" action="{f:be.uri(route: 'msmcpserver_oauth_clients.revoke_token')}" style="display:inline">
                                     <input type="hidden" name="uid" value="{token.uid}" />
                                     <input type="hidden" name="client_uid" value="{client.uid}" />
-                                    <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Revoke this token?')">Revoke</button>
+                                    <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('{f:translate(key: \'module.oauth.confirm_revoke\', extensionName: \'MsMcpServer\')}')">{f:translate(key: 'module.oauth.action.revoke', extensionName: 'MsMcpServer')}</button>
                                 </form>
                             </td>
                         </tr>
@@ -92,7 +92,7 @@
             </table>
         </f:then>
         <f:else>
-            <p class="text-muted">No active tokens for this client.</p>
+            <p class="text-muted"><f:translate key="module.oauth.tokens_empty" extensionName="MsMcpServer" /></p>
         </f:else>
     </f:if>
 </f:section>

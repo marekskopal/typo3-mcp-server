@@ -29,6 +29,7 @@ use MarekSkopal\MsMcpServer\Tool\Content\ContentGetTool;
 use MarekSkopal\MsMcpServer\Tool\Content\ContentListTool;
 use MarekSkopal\MsMcpServer\Tool\Content\ContentMoveTool;
 use MarekSkopal\MsMcpServer\Tool\Content\ContentUpdateTool;
+use MarekSkopal\MsMcpServer\Repository\DiscoveredTableRepository;
 use MarekSkopal\MsMcpServer\Tool\Dynamic\DynamicToolRegistrar;
 use MarekSkopal\MsMcpServer\Tool\File\DirectoryCreateTool;
 use MarekSkopal\MsMcpServer\Tool\File\DirectoryDeleteTool;
@@ -169,7 +170,9 @@ final class McpServerFactoryTest extends TestCase
             },
         );
 
-        $dynamicToolRegistrar = new DynamicToolRegistrar($recordService, $dataHandlerService, $tcaSchemaService, $logger);
+        $discoveredTableRepository = $this->createStub(DiscoveredTableRepository::class);
+        $discoveredTableRepository->method('findEnabled')->willReturn([]);
+        $dynamicToolRegistrar = new DynamicToolRegistrar($recordService, $dataHandlerService, $tcaSchemaService, $discoveredTableRepository, $logger);
 
         $auditLogger = $this->createStub(\MarekSkopal\MsMcpServer\Logging\AuditLogger::class);
 

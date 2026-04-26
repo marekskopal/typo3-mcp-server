@@ -64,14 +64,17 @@ vendor/bin/typo3 mcp:cleanup
 - `Tool/Cache/CacheClearTool` — Flush TYPO3 caches (all, pages, or specific cache groups)
 - `Logging/AuditLogger` — Writes tool/resource invocations to `sys_log` table with user, timing, and outcome
 - `Resource/BackendLayoutResource` — MCP Resource Template exposing backend layout and column positions for a page (`typo3://pages/{pageId}/backend-layout`)
-- `Tool/Dynamic/DynamicToolRegistrar` — Registers CRUD tools at runtime for tables configured via `EXTCONF`
+- `Tool/Dynamic/DynamicToolRegistrar` — Registers CRUD tools at runtime for tables configured via `EXTCONF` and discovered tables from `tx_msmcpserver_discovered_table`
+- `Service/ExtensionTableDiscoveryService` — Scans TCA for extension tables, generates label/prefix, filters system tables
+- `Repository/DiscoveredTableRepository` — CRUD for `tx_msmcpserver_discovered_table` (discovered extension tables with enable/disable)
 - `Command/CleanupExpiredTokensCommand` — CLI command (`mcp:cleanup`) to purge expired OAuth tokens and stale MCP session files
 - `Controller/OAuthClientController` — Backend module for managing OAuth clients (create, edit, delete) and tokens (view, revoke)
+- `Controller/ExtensionTableController` — Backend module for extension table discovery and management (discover, enable/disable, edit label/prefix)
 
 **Configuration:**
 - `Configuration/Services.yaml` — DI config with tagged services (`mcp.tool`, `mcp.resource`, `mcp.prompt`) for auto-discovery. Tool/resource/prompt classes are `public: true` for MCP SDK container resolution.
 - `Configuration/RequestMiddlewares.php` — Registers OAuthMiddleware and McpServerMiddleware in frontend stack
-- `Configuration/Backend/Modules.php` — Backend module registration (index, create, edit, update, delete, revoke_token routes)
+- `Configuration/Backend/Modules.php` — Backend module registration (OAuth client + extension table routes)
 - `Configuration/TCA/tx_msmcpserver_oauth_client.php` — TCA for OAuth client table
 - `ext_conf_template.txt` — Extension settings for token lifetimes (accessTokenLifetime, refreshTokenLifetime, codeLifetime)
 
@@ -114,12 +117,15 @@ readonly class MyTool
 
 ## Testing
 
-374 unit tests covering:
+414 unit tests covering:
 - All 39 static MCP tools + 3 batch tools (Pages/Content/File/Schema/Search/Translation/Cache/Batch CRUD)
-- Dynamic tool registration and execution (DynamicToolRegistrar)
+- Dynamic tool registration and execution (DynamicToolRegistrar), including merged EXTCONF + discovered tables
 - OAuth classes (AuthorizationService incl. revocation, ClientRepository, PkceVerifier, OAuthTokenPair)
 - OAuthMiddleware (metadata, authorize, register, revoke, token endpoints)
 - OAuthClientController (create, edit, update, delete, revokeToken)
+- ExtensionTableController (discover, toggle, edit, update)
+- ExtensionTableDiscoveryService (TCA scanning, label/prefix generation, system table filtering)
+- DiscoveredTableRepository (findAll, findEnabled, findByUid, insertIfNew, update, setEnabled)
 - BackendUserBootstrap, McpServerFactory, McpServerMiddleware
 - InitializedSession and InitializedSessionFactory
 - Services (RecordService, DataHandlerService, FileService, TcaSchemaService, BackendLayoutService)

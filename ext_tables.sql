@@ -33,3 +33,14 @@ CREATE TABLE tx_msmcpserver_oauth_authorization (
     KEY refresh_token_hash (refresh_token_hash),
     KEY client_id (client_id)
 );
+
+CREATE TABLE tx_msmcpserver_discovered_table (
+    table_name varchar(255) DEFAULT '' NOT NULL,
+    label varchar(255) DEFAULT '' NOT NULL,
+    prefix varchar(64) DEFAULT '' NOT NULL,
+    enabled tinyint(1) unsigned DEFAULT '0' NOT NULL,
+    crdate int(11) unsigned DEFAULT '0' NOT NULL,
+    tstamp int(11) unsigned DEFAULT '0' NOT NULL,
+
+    UNIQUE KEY table_name (table_name)
+);

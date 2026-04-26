@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace MarekSkopal\MsMcpServer\Tool\Dynamic;
 
+use MarekSkopal\MsMcpServer\Repository\DiscoveredTableRepository;
 use MarekSkopal\MsMcpServer\Service\DataHandlerService;
 use MarekSkopal\MsMcpServer\Service\RecordService;
 use MarekSkopal\MsMcpServer\Service\TcaSchemaService;
@@ -23,6 +24,7 @@ readonly class DynamicToolRegistrar
         private RecordService $recordService,
         private DataHandlerService $dataHandlerService,
         private TcaSchemaService $tcaSchemaService,
+        private DiscoveredTableRepository $discoveredTableRepository,
         private LoggerInterface $logger,
     ) {
     }
@@ -89,6 +91,16 @@ readonly class DynamicToolRegistrar
     /** @return array<mixed> */
     private function getTablesConfiguration(): array
     {
+        $extconfTables = $this->getExtconfTables();
+        $discoveredTables = $this->getDiscoveredTables();
+
+        // Merge: EXTCONF takes precedence on key collision
+        return array_merge($discoveredTables, $extconfTables);
+    }
+
+    /** @return array<mixed> */
+    private function getExtconfTables(): array
+    {
         $typo3ConfVars = $GLOBALS['TYPO3_CONF_VARS'] ?? [];
         if (!is_array($typo3ConfVars)) {
             return [];
@@ -107,6 +119,28 @@ readonly class DynamicToolRegistrar
         $tables = $msMcpServer['tables'] ?? [];
 
         return is_array($tables) ? $tables : [];
+    }
+
+    /** @return array<string, array{label: string, prefix: string}> */
+    private function getDiscoveredTables(): array
+    {
+        try {
+            $rows = $this->discoveredTableRepository->findEnabled();
+        } catch (\Throwable $e) {
+            $this->logger->warning('Failed to load discovered tables', ['exception' => $e]);
+
+            return [];
+        }
+
+        $tables = [];
+        foreach ($rows as $row) {
+            $tables[$row['table_name']] = [
+                'label' => $row['label'],
+                'prefix' => $row['prefix'],
+            ];
+        }
+
+        return $tables;
     }
 
     /** @param array{label: string, prefix: string, listFields: list<string>, readFields: list<string>, writableFields: list<string>, translationConfig: array{languageField: string|null, transOrigPointerField: string|null, translationSource: string|null}} $config */

@@ -4,16 +4,16 @@
         <header/>
         <body>
             <trans-unit id="mlang_tabs_tab" resname="mlang_tabs_tab">
-                <source>MCP Server OAuth</source>
-                <target>MCP Server OAuth</target>
+                <source>MCP Server</source>
+                <target>MCP Server</target>
             </trans-unit>
             <trans-unit id="mlang_labels_tabdescr" resname="mlang_labels_tabdescr">
-                <source>Manage MCP server OAuth clients</source>
-                <target>OAuth-Clients des MCP-Servers verwalten</target>
+                <source>Manage MCP server OAuth clients and extension tables</source>
+                <target>OAuth-Clients und Erweiterungstabellen des MCP-Servers verwalten</target>
             </trans-unit>
             <trans-unit id="mlang_labels_tablabel" resname="mlang_labels_tablabel">
-                <source>MCP Server OAuth client management</source>
-                <target>OAuth-Client-Verwaltung des MCP-Servers</target>
+                <source>MCP Server management</source>
+                <target>MCP-Server-Verwaltung</target>
             </trans-unit>
         </body>
     </file>

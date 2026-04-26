@@ -7,40 +7,42 @@
 <f:section name="Content">
     <f:flashMessages queueIdentifier="msmcpserver.oauth" />
 
-    <h2>Register New OAuth Client</h2>
+    <p><a href="{f:be.uri(route: 'msmcpserver_oauth_clients.extensions')}" class="btn btn-default"><f:translate key="module.oauth.manage_extensions" extensionName="MsMcpServer" /> &rarr;</a></p>
+
+    <h2><f:translate key="module.oauth.register_title" extensionName="MsMcpServer" /></h2>
     <form method="post" action="{f:be.uri(route: 'msmcpserver_oauth_clients.create')}">
         <div class="form-group mb-3">
-            <label for="client_name" class="form-label">Client Name</label>
+            <label for="client_name" class="form-label"><f:translate key="module.oauth.label.client_name" extensionName="MsMcpServer" /></label>
             <input type="text" name="client_name" id="client_name" class="form-control" required="required" placeholder="e.g. Claude Code" />
         </div>
         <div class="form-group mb-3">
-            <label for="redirect_uris" class="form-label">Redirect URIs (one per line)</label>
+            <label for="redirect_uris" class="form-label"><f:translate key="module.oauth.label.redirect_uris" extensionName="MsMcpServer" /></label>
             <textarea name="redirect_uris" id="redirect_uris" class="form-control" rows="3" required="required" placeholder="http://localhost:3000/callback"></textarea>
         </div>
         <div class="form-group mb-3">
-            <label for="be_user" class="form-label">Backend User (optional, restricts authorization to this user)</label>
+            <label for="be_user" class="form-label"><f:translate key="module.oauth.label.be_user" extensionName="MsMcpServer" /></label>
             <select name="be_user" id="be_user" class="form-select">
-                <option value="0">-- Any user --</option>
+                <option value="0"><f:translate key="module.any_user" extensionName="MsMcpServer" /></option>
                 <f:for each="{beUsers}" as="user">
                     <option value="{user.uid}">{user.username}</option>
                 </f:for>
             </select>
         </div>
-        <button type="submit" class="btn btn-primary">Register Client</button>
+        <button type="submit" class="btn btn-primary"><f:translate key="module.oauth.action.register" extensionName="MsMcpServer" /></button>
     </form>
 
-    <h2 class="mt-5">Registered OAuth Clients</h2>
+    <h2 class="mt-5"><f:translate key="module.oauth.list_title" extensionName="MsMcpServer" /></h2>
     <f:if condition="{clients}">
         <f:then>
             <table class="table table-striped">
                 <thead>
                     <tr>
-                        <th>Client Name</th>
-                        <th>Client ID</th>
-                        <th>User</th>
-                        <th>Created</th>
-                        <th>Status</th>
-                        <th>Actions</th>
+                        <th><f:translate key="module.oauth.header.client_name" extensionName="MsMcpServer" /></th>
+                        <th><f:translate key="module.oauth.header.client_id" extensionName="MsMcpServer" /></th>
+                        <th><f:translate key="module.header.user" extensionName="MsMcpServer" /></th>
+                        <th><f:translate key="module.oauth.header.created" extensionName="MsMcpServer" /></th>
+                        <th><f:translate key="module.header.status" extensionName="MsMcpServer" /></th>
+                        <th><f:translate key="module.header.actions" extensionName="MsMcpServer" /></th>
                     </tr>
                 </thead>
                 <tbody>
@@ -51,21 +53,21 @@
                             <td>
                                 <f:if condition="{client.username}">
                                     <f:then>{client.username}</f:then>
-                                    <f:else><em>Any</em></f:else>
+                                    <f:else><em><f:translate key="module.oauth.any" extensionName="MsMcpServer" /></em></f:else>
                                 </f:if>
                             </td>
                             <td><f:format.date format="Y-m-d H:i">{client.crdate}</f:format.date></td>
                             <td>
                                 <f:if condition="{client.hidden}">
-                                    <f:then><span class="badge bg-danger">Disabled</span></f:then>
-                                    <f:else><span class="badge bg-success">Active</span></f:else>
+                                    <f:then><span class="badge bg-danger"><f:translate key="module.status.disabled" extensionName="MsMcpServer" /></span></f:then>
+                                    <f:else><span class="badge bg-success"><f:translate key="module.status.active" extensionName="MsMcpServer" /></span></f:else>
                                 </f:if>
                             </td>
                             <td>
-                                <a href="{f:be.uri(route: 'msmcpserver_oauth_clients.edit', parameters: '{uid: client.uid}')}" class="btn btn-sm btn-default">Edit</a>
+                                <a href="{f:be.uri(route: 'msmcpserver_oauth_clients.edit', parameters: '{uid: client.uid}')}" class="btn btn-sm btn-default"><f:translate key="module.action.edit" extensionName="MsMcpServer" /></a>
                                 <form method="post" action="{f:be.uri(route: 'msmcpserver_oauth_clients.delete')}" style="display:inline">
                                     <input type="hidden" name="uid" value="{client.uid}" />
-                                    <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Delete this OAuth client?')">Delete</button>
+                                    <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('{f:translate(key: \'module.oauth.confirm_delete\', extensionName: \'MsMcpServer\')}')">{f:translate(key: 'module.action.delete', extensionName: 'MsMcpServer')}</button>
                                 </form>
                             </td>
                         </tr>
@@ -74,7 +76,7 @@
             </table>
         </f:then>
         <f:else>
-            <p class="text-muted">No OAuth clients registered.</p>
+            <p class="text-muted"><f:translate key="module.oauth.empty" extensionName="MsMcpServer" /></p>
         </f:else>
     </f:if>
 </f:section>

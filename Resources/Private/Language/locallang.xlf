@@ -18,6 +18,176 @@
             <trans-unit id="tx_msmcpserver_oauth_client.be_user" resname="tx_msmcpserver_oauth_client.be_user">
                 <source>Backend User</source>
             </trans-unit>
+            <!-- Common module labels -->
+            <trans-unit id="module.action.edit" resname="module.action.edit">
+                <source>Edit</source>
+            </trans-unit>
+            <trans-unit id="module.action.delete" resname="module.action.delete">
+                <source>Delete</source>
+            </trans-unit>
+            <trans-unit id="module.action.save" resname="module.action.save">
+                <source>Save Changes</source>
+            </trans-unit>
+            <trans-unit id="module.status.active" resname="module.status.active">
+                <source>Active</source>
+            </trans-unit>
+            <trans-unit id="module.status.disabled" resname="module.status.disabled">
+                <source>Disabled</source>
+            </trans-unit>
+            <trans-unit id="module.status.enabled" resname="module.status.enabled">
+                <source>Enabled</source>
+            </trans-unit>
+            <trans-unit id="module.status.expired" resname="module.status.expired">
+                <source>Expired</source>
+            </trans-unit>
+            <trans-unit id="module.header.status" resname="module.header.status">
+                <source>Status</source>
+            </trans-unit>
+            <trans-unit id="module.header.actions" resname="module.header.actions">
+                <source>Actions</source>
+            </trans-unit>
+            <trans-unit id="module.header.user" resname="module.header.user">
+                <source>User</source>
+            </trans-unit>
+            <trans-unit id="module.any_user" resname="module.any_user">
+                <source>-- Any user --</source>
+            </trans-unit>
+            <!-- OAuth Client Index -->
+            <trans-unit id="module.oauth.manage_extensions" resname="module.oauth.manage_extensions">
+                <source>Manage Extension Tables</source>
+            </trans-unit>
+            <trans-unit id="module.oauth.register_title" resname="module.oauth.register_title">
+                <source>Register New OAuth Client</source>
+            </trans-unit>
+            <trans-unit id="module.oauth.label.client_name" resname="module.oauth.label.client_name">
+                <source>Client Name</source>
+            </trans-unit>
+            <trans-unit id="module.oauth.label.redirect_uris" resname="module.oauth.label.redirect_uris">
+                <source>Redirect URIs (one per line)</source>
+            </trans-unit>
+            <trans-unit id="module.oauth.label.be_user" resname="module.oauth.label.be_user">
+                <source>Backend User (optional, restricts authorization to this user)</source>
+            </trans-unit>
+            <trans-unit id="module.oauth.action.register" resname="module.oauth.action.register">
+                <source>Register Client</source>
+            </trans-unit>
+            <trans-unit id="module.oauth.list_title" resname="module.oauth.list_title">
+                <source>Registered OAuth Clients</source>
+            </trans-unit>
+            <trans-unit id="module.oauth.header.client_name" resname="module.oauth.header.client_name">
+                <source>Client Name</source>
+            </trans-unit>
+            <trans-unit id="module.oauth.header.client_id" resname="module.oauth.header.client_id">
+                <source>Client ID</source>
+            </trans-unit>
+            <trans-unit id="module.oauth.header.created" resname="module.oauth.header.created">
+                <source>Created</source>
+            </trans-unit>
+            <trans-unit id="module.oauth.any" resname="module.oauth.any">
+                <source>Any</source>
+            </trans-unit>
+            <trans-unit id="module.oauth.confirm_delete" resname="module.oauth.confirm_delete">
+                <source>Delete this OAuth client?</source>
+            </trans-unit>
+            <trans-unit id="module.oauth.empty" resname="module.oauth.empty">
+                <source>No OAuth clients registered.</source>
+            </trans-unit>
+            <!-- OAuth Client Edit -->
+            <trans-unit id="module.oauth.back_to_list" resname="module.oauth.back_to_list">
+                <source>Back to client list</source>
+            </trans-unit>
+            <trans-unit id="module.oauth.edit_title" resname="module.oauth.edit_title">
+                <source>Edit OAuth Client</source>
+            </trans-unit>
+            <trans-unit id="module.oauth.label.client_id" resname="module.oauth.label.client_id">
+                <source>Client ID</source>
+            </trans-unit>
+            <trans-unit id="module.oauth.label.be_user_optional" resname="module.oauth.label.be_user_optional">
+                <source>Backend User (optional)</source>
+            </trans-unit>
+            <trans-unit id="module.oauth.tokens_title" resname="module.oauth.tokens_title">
+                <source>Active Tokens</source>
+            </trans-unit>
+            <trans-unit id="module.oauth.header.access_token_expires" resname="module.oauth.header.access_token_expires">
+                <source>Access Token Expires</source>
+            </trans-unit>
+            <trans-unit id="module.oauth.header.refresh_token_expires" resname="module.oauth.header.refresh_token_expires">
+                <source>Refresh Token Expires</source>
+            </trans-unit>
+            <trans-unit id="module.oauth.unknown" resname="module.oauth.unknown">
+                <source>Unknown</source>
+            </trans-unit>
+            <trans-unit id="module.oauth.status.refreshable" resname="module.oauth.status.refreshable">
+                <source>Refreshable</source>
+            </trans-unit>
+            <trans-unit id="module.oauth.confirm_revoke" resname="module.oauth.confirm_revoke">
+                <source>Revoke this token?</source>
+            </trans-unit>
+            <trans-unit id="module.oauth.action.revoke" resname="module.oauth.action.revoke">
+                <source>Revoke</source>
+            </trans-unit>
+            <trans-unit id="module.oauth.tokens_empty" resname="module.oauth.tokens_empty">
+                <source>No active tokens for this client.</source>
+            </trans-unit>
+            <!-- Extension Table Index -->
+            <trans-unit id="module.extensions.back_to_oauth" resname="module.extensions.back_to_oauth">
+                <source>Back to OAuth Clients</source>
+            </trans-unit>
+            <trans-unit id="module.extensions.title" resname="module.extensions.title">
+                <source>Extension Tables</source>
+            </trans-unit>
+            <trans-unit id="module.extensions.action.discover" resname="module.extensions.action.discover">
+                <source>Discover Extension Tables</source>
+            </trans-unit>
+            <trans-unit id="module.extensions.header.table_name" resname="module.extensions.header.table_name">
+                <source>Table Name</source>
+            </trans-unit>
+            <trans-unit id="module.extensions.header.label" resname="module.extensions.header.label">
+                <source>Label</source>
+            </trans-unit>
+            <trans-unit id="module.extensions.header.prefix" resname="module.extensions.header.prefix">
+                <source>Prefix</source>
+            </trans-unit>
+            <trans-unit id="module.extensions.header.source" resname="module.extensions.header.source">
+                <source>Source</source>
+            </trans-unit>
+            <trans-unit id="module.extensions.source.code" resname="module.extensions.source.code">
+                <source>Code</source>
+            </trans-unit>
+            <trans-unit id="module.extensions.source.discovered" resname="module.extensions.source.discovered">
+                <source>Discovered</source>
+            </trans-unit>
+            <trans-unit id="module.extensions.action.enable" resname="module.extensions.action.enable">
+                <source>Enable</source>
+            </trans-unit>
+            <trans-unit id="module.extensions.action.disable" resname="module.extensions.action.disable">
+                <source>Disable</source>
+            </trans-unit>
+            <trans-unit id="module.extensions.empty" resname="module.extensions.empty">
+                <source>No extension tables configured or discovered. Click "Discover Extension Tables" to scan for available tables.</source>
+            </trans-unit>
+            <!-- Extension Table Edit -->
+            <trans-unit id="module.extensions.back_to_list" resname="module.extensions.back_to_list">
+                <source>Back to Extension Tables</source>
+            </trans-unit>
+            <trans-unit id="module.extensions.edit_title" resname="module.extensions.edit_title">
+                <source>Edit Extension Table</source>
+            </trans-unit>
+            <trans-unit id="module.extensions.label.table" resname="module.extensions.label.table">
+                <source>Table</source>
+            </trans-unit>
+            <trans-unit id="module.extensions.label.label" resname="module.extensions.label.label">
+                <source>Label</source>
+            </trans-unit>
+            <trans-unit id="module.extensions.label.label_help" resname="module.extensions.label.label_help">
+                <source>Human-readable name used in MCP tool descriptions.</source>
+            </trans-unit>
+            <trans-unit id="module.extensions.label.prefix" resname="module.extensions.label.prefix">
+                <source>Prefix</source>
+            </trans-unit>
+            <trans-unit id="module.extensions.label.prefix_help" resname="module.extensions.label.prefix_help">
+                <source>Tool name prefix. Tools will be named: prefix_list, prefix_get, prefix_create, etc.</source>
+            </trans-unit>
         </body>
     </file>
 </xliff>

@@ -1,0 +1,31 @@
+<html xmlns:f="http://typo3.org/ns/TYPO3/CMS/Fluid/ViewHelpers"
+      xmlns:be="http://typo3.org/ns/TYPO3/CMS/Backend/ViewHelpers"
+      data-namespace-typo3-fluid="true">
+
+<f:layout name="Module" />
+
+<f:section name="Content">
+    <f:flashMessages queueIdentifier="msmcpserver.extensions" />
+
+    <p><a href="{f:be.uri(route: 'msmcpserver_oauth_clients.extensions')}">&larr; <f:translate key="module.extensions.back_to_list" extensionName="MsMcpServer" /></a></p>
+
+    <h2><f:translate key="module.extensions.edit_title" extensionName="MsMcpServer" /></h2>
+    <p class="text-muted"><f:translate key="module.extensions.label.table" extensionName="MsMcpServer" />: <code>{table.table_name}</code></p>
+
+    <form method="post" action="{f:be.uri(route: 'msmcpserver_oauth_clients.update_extension')}">
+        <input type="hidden" name="uid" value="{table.uid}" />
+        <div class="form-group mb-3">
+            <label for="label" class="form-label"><f:translate key="module.extensions.label.label" extensionName="MsMcpServer" /></label>
+            <input type="text" name="label" id="label" class="form-control" required="required" value="{table.label}" />
+            <div class="form-text"><f:translate key="module.extensions.label.label_help" extensionName="MsMcpServer" /></div>
+        </div>
+        <div class="form-group mb-3">
+            <label for="prefix" class="form-label"><f:translate key="module.extensions.label.prefix" extensionName="MsMcpServer" /></label>
+            <input type="text" name="prefix" id="prefix" class="form-control" required="required" value="{table.prefix}" />
+            <div class="form-text"><f:translate key="module.extensions.label.prefix_help" extensionName="MsMcpServer" /></div>
+        </div>
+        <button type="submit" class="btn btn-primary"><f:translate key="module.action.save" extensionName="MsMcpServer" /></button>
+    </form>
+</f:section>
+
+</html>

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace MarekSkopal\MsMcpServer\Tests\Unit\Tool\Dynamic;
 
+use MarekSkopal\MsMcpServer\Repository\DiscoveredTableRepository;
 use MarekSkopal\MsMcpServer\Service\DataHandlerService;
 use MarekSkopal\MsMcpServer\Service\RecordService;
 use MarekSkopal\MsMcpServer\Service\TcaSchemaService;
@@ -92,6 +93,7 @@ final class DynamicToolRegistrarTest extends TestCase
             $recordService,
             $this->createStub(DataHandlerService::class),
             new TcaSchemaService(),
+            $this->createEmptyDiscoveredTableRepository(),
             new NullLogger(),
         );
 
@@ -458,6 +460,7 @@ final class DynamicToolRegistrarTest extends TestCase
             $recordService,
             $this->createStub(DataHandlerService::class),
             new TcaSchemaService(),
+            $this->createEmptyDiscoveredTableRepository(),
             new NullLogger(),
         );
 
@@ -517,6 +520,7 @@ final class DynamicToolRegistrarTest extends TestCase
             $recordService,
             $this->createStub(DataHandlerService::class),
             new TcaSchemaService(),
+            $this->createEmptyDiscoveredTableRepository(),
             new NullLogger(),
         );
 
@@ -541,16 +545,105 @@ final class DynamicToolRegistrarTest extends TestCase
         unset($GLOBALS['TCA'][self::TABLE]);
     }
 
+    public function testRegisterIncludesDiscoveredTables(): void
+    {
+        // Clear EXTCONF tables so only discovered tables are used
+        $GLOBALS['TYPO3_CONF_VARS']['EXTCONF']['ms_mcp_server']['tables'] = [];
+
+        $GLOBALS['TCA']['tx_discovered_domain_model_item'] = [
+            'ctrl' => ['label' => 'title'],
+            'columns' => [
+                'title' => ['config' => ['type' => 'input']],
+            ],
+        ];
+
+        $repository = $this->createStub(DiscoveredTableRepository::class);
+        $repository->method('findEnabled')->willReturn([
+            ['uid' => 1, 'table_name' => 'tx_discovered_domain_model_item', 'label' => 'Discovered Item', 'prefix' => 'discovered_item', 'enabled' => 1],
+        ]);
+
+        $registrar = $this->createRegistrar(discoveredTableRepository: $repository);
+
+        $builder = Server::builder();
+        $registrar->register($builder);
+
+        $tools = $this->getRegisteredTools($builder);
+        $toolNames = array_column($tools, 'name');
+
+        self::assertContains('discovered_item_list', $toolNames);
+        self::assertContains('discovered_item_get', $toolNames);
+
+        unset($GLOBALS['TCA']['tx_discovered_domain_model_item']);
+    }
+
+    public function testExtconfTakesPrecedenceOverDiscoveredTables(): void
+    {
+        // Both EXTCONF and discovered have the same table - EXTCONF should win
+        $GLOBALS['TYPO3_CONF_VARS']['EXTCONF']['ms_mcp_server']['tables'] = [
+            self::TABLE => [
+                'label' => 'EXTCONF Item',
+                'prefix' => 'item',
+                'listFields' => ['uid', 'pid', 'title'],
+                'readFields' => ['uid', 'pid', 'title', 'description'],
+                'writableFields' => ['title', 'description'],
+            ],
+        ];
+
+        $repository = $this->createStub(DiscoveredTableRepository::class);
+        $repository->method('findEnabled')->willReturn([
+            ['uid' => 1, 'table_name' => self::TABLE, 'label' => 'Discovered Item', 'prefix' => 'discovered_item', 'enabled' => 1],
+        ]);
+
+        $registrar = $this->createRegistrar(discoveredTableRepository: $repository);
+
+        $builder = Server::builder();
+        $registrar->register($builder);
+
+        $tools = $this->getRegisteredTools($builder);
+        $toolNames = array_column($tools, 'name');
+
+        // EXTCONF prefix 'item' should be used, not 'discovered_item'
+        self::assertContains('item_list', $toolNames);
+        self::assertNotContains('discovered_item_list', $toolNames);
+    }
+
+    public function testRegisterHandlesDiscoveredTableRepositoryFailure(): void
+    {
+        $repository = $this->createStub(DiscoveredTableRepository::class);
+        $repository->method('findEnabled')->willThrowException(new \RuntimeException('DB error'));
+
+        $registrar = $this->createRegistrar(discoveredTableRepository: $repository);
+
+        $builder = Server::builder();
+        $registrar->register($builder);
+
+        // Should still register EXTCONF tools despite repository failure
+        $tools = $this->getRegisteredTools($builder);
+        $toolNames = array_column($tools, 'name');
+
+        self::assertContains('item_list', $toolNames);
+    }
+
     private function createRegistrar(
         ?RecordService $recordService = null,
         ?DataHandlerService $dataHandlerService = null,
+        ?DiscoveredTableRepository $discoveredTableRepository = null,
     ): DynamicToolRegistrar {
         return new DynamicToolRegistrar(
             $recordService ?? $this->createStub(RecordService::class),
             $dataHandlerService ?? $this->createStub(DataHandlerService::class),
             new TcaSchemaService(),
+            $discoveredTableRepository ?? $this->createEmptyDiscoveredTableRepository(),
             new NullLogger(),
         );
+    }
+
+    private function createEmptyDiscoveredTableRepository(): DiscoveredTableRepository
+    {
+        $repository = $this->createStub(DiscoveredTableRepository::class);
+        $repository->method('findEnabled')->willReturn([]);
+
+        return $repository;
     }
 
     /**
@@ -562,7 +655,7 @@ final class DynamicToolRegistrarTest extends TestCase
         DataHandlerService $dataHandlerService,
         string $toolType,
     ): \Closure {
-        $registrar = new DynamicToolRegistrar($recordService, $dataHandlerService, new TcaSchemaService(), new NullLogger());
+        $registrar = new DynamicToolRegistrar($recordService, $dataHandlerService, new TcaSchemaService(), $this->createEmptyDiscoveredTableRepository(), new NullLogger());
 
         $builder = Server::builder();
         $registrar->register($builder);

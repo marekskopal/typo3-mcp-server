@@ -1,0 +1,77 @@
+<html xmlns:f="http://typo3.org/ns/TYPO3/CMS/Fluid/ViewHelpers"
+      xmlns:be="http://typo3.org/ns/TYPO3/CMS/Backend/ViewHelpers"
+      data-namespace-typo3-fluid="true">
+
+<f:layout name="Module" />
+
+<f:section name="Content">
+    <f:flashMessages queueIdentifier="msmcpserver.extensions" />
+
+    <p><a href="{f:be.uri(route: 'msmcpserver_oauth_clients')}">&larr; <f:translate key="module.extensions.back_to_oauth" extensionName="MsMcpServer" /></a></p>
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="mb-0"><f:translate key="module.extensions.title" extensionName="MsMcpServer" /></h2>
+        <form method="post" action="{f:be.uri(route: 'msmcpserver_oauth_clients.discover')}" style="display:inline">
+            <button type="submit" class="btn btn-primary"><f:translate key="module.extensions.action.discover" extensionName="MsMcpServer" /></button>
+        </form>
+    </div>
+
+    <f:if condition="{tables}">
+        <f:then>
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th><f:translate key="module.extensions.header.table_name" extensionName="MsMcpServer" /></th>
+                        <th><f:translate key="module.extensions.header.label" extensionName="MsMcpServer" /></th>
+                        <th><f:translate key="module.extensions.header.prefix" extensionName="MsMcpServer" /></th>
+                        <th><f:translate key="module.extensions.header.source" extensionName="MsMcpServer" /></th>
+                        <th><f:translate key="module.header.status" extensionName="MsMcpServer" /></th>
+                        <th><f:translate key="module.header.actions" extensionName="MsMcpServer" /></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <f:for each="{tables}" as="table">
+                        <tr>
+                            <td><code>{table.tableName}</code></td>
+                            <td>{table.label}</td>
+                            <td><code>{table.prefix}</code></td>
+                            <td>
+                                <f:if condition="{table.source} == 'extconf'">
+                                    <f:then><span class="badge bg-info"><f:translate key="module.extensions.source.code" extensionName="MsMcpServer" /></span></f:then>
+                                    <f:else><span class="badge bg-secondary"><f:translate key="module.extensions.source.discovered" extensionName="MsMcpServer" /></span></f:else>
+                                </f:if>
+                            </td>
+                            <td>
+                                <f:if condition="{table.enabled}">
+                                    <f:then><span class="badge bg-success"><f:translate key="module.status.enabled" extensionName="MsMcpServer" /></span></f:then>
+                                    <f:else><span class="badge bg-danger"><f:translate key="module.status.disabled" extensionName="MsMcpServer" /></span></f:else>
+                                </f:if>
+                            </td>
+                            <td>
+                                <f:if condition="{table.source} == 'discovered'">
+                                    <form method="post" action="{f:be.uri(route: 'msmcpserver_oauth_clients.toggle')}" style="display:inline">
+                                        <input type="hidden" name="uid" value="{table.uid}" />
+                                        <f:if condition="{table.enabled}">
+                                            <f:then>
+                                                <button type="submit" class="btn btn-sm btn-warning"><f:translate key="module.extensions.action.disable" extensionName="MsMcpServer" /></button>
+                                            </f:then>
+                                            <f:else>
+                                                <button type="submit" class="btn btn-sm btn-success"><f:translate key="module.extensions.action.enable" extensionName="MsMcpServer" /></button>
+                                            </f:else>
+                                        </f:if>
+                                    </form>
+                                    <a href="{f:be.uri(route: 'msmcpserver_oauth_clients.edit_extension', parameters: '{uid: table.uid}')}" class="btn btn-sm btn-default"><f:translate key="module.action.edit" extensionName="MsMcpServer" /></a>
+                                </f:if>
+                            </td>
+                        </tr>
+                    </f:for>
+                </tbody>
+            </table>
+        </f:then>
+        <f:else>
+            <p class="text-muted"><f:translate key="module.extensions.empty" extensionName="MsMcpServer" /></p>
+        </f:else>
+    </f:if>
+</f:section>
+
+</html>
