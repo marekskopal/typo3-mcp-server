@@ -2,7 +2,7 @@
 
 > **Beta** — This extension is under active development. APIs and behavior may change between releases.
 
-TYPO3 CMS extension that implements an [MCP (Model Context Protocol)](https://modelcontextprotocol.io/) server for TYPO3 administration. It exposes 42 tools for managing pages, content elements, files, and custom extension records via the MCP protocol, allowing AI assistants to interact with your TYPO3 instance.
+TYPO3 CMS extension that implements an [MCP (Model Context Protocol)](https://modelcontextprotocol.io/) server for TYPO3 administration. It exposes 44 tools for managing pages, content elements, files, and custom extension records via the MCP protocol, allowing AI assistants to interact with your TYPO3 instance.
 
 **This extension is designed for fully autonomous AI operation — no workspaces, no approval queues.** Unlike workspace-based approaches that require human review before changes go live, this server lets AI agents manage your TYPO3 site directly. Changes take effect immediately. This is intentional: the goal is to enable AI agents to build, update, and maintain TYPO3 sites end-to-end without human intervention.
 
@@ -279,6 +279,21 @@ Configurable via **Settings > Extension Configuration > ms_mcp_server**:
 | `refreshTokenLifetime` | 2592000 (30 days) | Refresh token lifetime in seconds |
 | `codeLifetime` | 60 (1 minute) | Authorization code lifetime in seconds |
 
+### Rate Limiting
+
+OAuth endpoints are protected by IP-based rate limiting with configurable per-endpoint limits:
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `rateLimitEnabled` | `1` | Enable/disable rate limiting |
+| `rateLimitAuthorize` | `5` / 300s | Authorize POST (password brute-force protection) |
+| `rateLimitAuthorizeGet` | `20` / 300s | Authorize GET (form display) |
+| `rateLimitToken` | `20` / 300s | Token exchange/refresh |
+| `rateLimitRegister` | `10` / 3600s | Client registration |
+| `rateLimitRevoke` | `20` / 300s | Token revocation |
+
+Returns `429 Too Many Requests` with `Retry-After` header when exceeded.
+
 ### Backend Module
 
 The **System > MCP Server** backend module provides:
@@ -287,6 +302,7 @@ The **System > MCP Server** backend module provides:
 - Edit client settings (name, redirect URIs, linked backend user)
 - View active tokens per client with status (active/refreshable/expired)
 - Revoke individual tokens
+- **Discover extension tables** — scan installed extensions, enable/disable for MCP tool generation, customize label/prefix
 
 ## Tools Reference
 
@@ -325,6 +341,7 @@ The **System > MCP Server** backend module provides:
 | Tool | Description |
 |------|-------------|
 | `file_list` | List files and directories with pagination. |
+| `file_search` | Search files by name pattern and/or extension across storage. |
 | `file_get_info` | Get file metadata: UID, name, size, MIME type, public URL. |
 | `file_upload` | Upload a file from text content or base64-encoded binary data. |
 | `file_upload_from_url` | Download a file from URL and store it (max 100 MB). |
@@ -353,6 +370,7 @@ All file tools accept an optional `storageUid` parameter (default: `1` for filea
 |------|-------------|
 | `table_schema` | Get TCA field definitions for any table. Use before creating/updating records to discover valid fields and options. |
 | `record_search` | Search records in any table with field conditions, operators, and sorting. |
+| `record_count` | Count records in any table without fetching them. Supports pid and search condition filtering. |
 
 **Search operators:** `eq`, `neq`, `like` (default), `gt`, `gte`, `lt`, `lte`, `in` (comma-separated), `null`, `notNull`.
 
@@ -393,7 +411,7 @@ All batch tools work on any TCA table.
 
 ### Dynamic Extension Tools
 
-Additional CRUD tools are registered automatically for tables configured via `EXTCONF`. News is pre-configured and generates 6 tools:
+Additional CRUD tools are registered automatically for tables configured via `EXTCONF` or enabled through the **Extension Tables** backend module (auto-discovery). News is pre-configured and generates 6 tools:
 
 | Tool | Description |
 |------|-------------|
@@ -434,6 +452,12 @@ Prompts provide guided multi-step workflows that instruct the AI through complex
 
 ## Adding Support for Other Extensions
 
+**Option 1: Auto-discovery (no code changes)**
+
+Go to **System > MCP Server > Manage Extension Tables**, click **Discover Extension Tables**, then enable the tables you want. The extension scans TCA for installed extension tables and lets you toggle them on/off with customizable labels and prefixes.
+
+**Option 2: Code configuration**
+
 Register custom tables in your extension's `ext_localconf.php`:
 
 ```php
@@ -459,7 +483,7 @@ $GLOBALS['TYPO3_CONF_VARS']['EXTCONF']['ms_mcp_server']['tables']['tx_blog_domai
 
 ## Maintenance
 
-Clean up expired tokens and stale session files:
+Clean up expired tokens, stale session files, and rate limit entries:
 
 ```bash
 vendor/bin/typo3 mcp:cleanup
@@ -495,7 +519,7 @@ vendor/bin/phpstan analyse
 vendor/bin/phpcs
 vendor/bin/phpcbf
 
-# Tests (374 tests, 1465 assertions)
+# Tests (443 tests)
 vendor/bin/phpunit
 ```
 

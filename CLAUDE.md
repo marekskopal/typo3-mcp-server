@@ -55,9 +55,10 @@ vendor/bin/typo3 mcp:cleanup
 - `Service/BackendLayoutService` — Resolves the effective BackendLayout for a page via BackendLayoutView, returns structured DTOs with column positions and grid structure
 - `Tool/Pages/*` — CRUD tools for pages table (use `#[McpTool]` attributes)
 - `Tool/Content/*` — CRUD tools for tt_content table (use `#[McpTool]` attributes)
-- `Tool/File/*` — File management tools (list, get info, upload, upload from URL, copy, delete, move, rename, directory create/delete/move/rename, file reference add/list/remove)
+- `Tool/File/*` — File management tools (list, search, get info, upload, upload from URL, copy, delete, move, rename, directory create/delete/move/rename, file reference add/list/remove)
 - `Tool/Schema/TableSchemaTool` — TCA field introspection for any table
 - `Tool/Search/RecordSearchTool` — Search records in any table by field values with operators (eq, neq, like, gt, gte, lt, lte, in, null, notNull) and sorting
+- `Tool/Search/RecordCountTool` — Count records without fetching them, with optional pid and search condition filtering
 - `Tool/Search/PagesSearchTool` — Search pages by title (plain text LIKE) or JSON conditions
 - `Tool/Search/ContentSearchTool` — Search content elements by header with language filtering
 - `Tool/Search/SearchConditionParser` — Shared condition parsing for search tools
@@ -118,8 +119,8 @@ readonly class MyTool
 
 ## Testing
 
-437 unit tests covering:
-- All 39 static MCP tools + 3 batch tools (Pages/Content/File/Schema/Search/Translation/Cache/Batch CRUD)
+443 unit tests covering:
+- All 41 static MCP tools + 3 batch tools (Pages/Content/File/Schema/Search/Translation/Cache/Batch CRUD)
 - Dynamic tool registration and execution (DynamicToolRegistrar), including merged EXTCONF + discovered tables
 - OAuth classes (AuthorizationService incl. revocation, ClientRepository, PkceVerifier, OAuthTokenPair, RateLimitService)
 - OAuthMiddleware (metadata, authorize, register, revoke, token endpoints, rate limiting)

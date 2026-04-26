@@ -4,6 +4,26 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.7.0] - 2026-04-26
+
+### Added
+- **Extension auto-discovery:** Backend module UI to discover installed TYPO3 extensions with TCA tables, enable/disable them for MCP tool generation, and customize label/prefix — no code changes required. EXTCONF-configured tables remain always-on.
+- **`record_count` tool:** Count records in any table without fetching them, with optional pid and search condition filtering
+- **`file_search` tool:** Search files by name pattern and/or extension across storage via `sys_file` table
+- **Rate limiting:** IP-based rate limiting on all OAuth endpoints with configurable per-endpoint limits and fixed-window counters. Returns 429 Too Many Requests with Retry-After header. Expired entries cleaned up via `mcp:cleanup`.
+- Backend module fully translated (English, German, Czech) using `f:translate` ViewHelper
+- Extension table management UI: discover, enable/disable, edit label/prefix
+- `RecordService::count()` method for lightweight record counting
+
+### Fixed
+- **SSRF prevention:** `file_upload_from_url` now rejects URLs resolving to private/reserved IP ranges
+- **DoS prevention:** File downloads now stream with size check instead of loading entirely into memory
+- **PKCE hardening:** Code verifier validated for length (43-128 chars) and format per RFC 7636
+- **Open redirect prevention:** Redirect URI re-validated in authorize POST against registered client URIs
+- **Auth bypass prevention:** Soft-deleted backend users now rejected during token validation
+- **Info disclosure prevention:** Error messages no longer leak backend user UIDs; generic "Authentication failed" returned
+- **Security headers:** Added `Cache-Control: no-store` and `X-Content-Type-Options: nosniff` to OAuth and MCP responses
+
 ## [0.6.0] - 2026-04-25
 
 ### Added
