@@ -7,6 +7,7 @@ namespace MarekSkopal\MsMcpServer\Middleware;
 use Doctrine\DBAL\ParameterType;
 use MarekSkopal\MsMcpServer\OAuth\AuthorizationService;
 use MarekSkopal\MsMcpServer\OAuth\ClientRepository;
+use MarekSkopal\MsMcpServer\OAuth\RateLimitService;
 use Psr\Http\Message\ResponseFactoryInterface;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
@@ -15,6 +16,7 @@ use Psr\Http\Server\MiddlewareInterface;
 use Psr\Http\Server\RequestHandlerInterface;
 use TYPO3\CMS\Core\Crypto\PasswordHashing\PasswordHashFactory;
 use TYPO3\CMS\Core\Database\ConnectionPool;
+use TYPO3\CMS\Core\Http\NormalizedParams;
 use const ENT_QUOTES;
 use const JSON_THROW_ON_ERROR;
 
@@ -37,6 +39,7 @@ readonly class OAuthMiddleware implements MiddlewareInterface
         private ClientRepository $clientRepository,
         private ConnectionPool $connectionPool,
         private PasswordHashFactory $passwordHashFactory,
+        private RateLimitService $rateLimitService,
         private ResponseFactoryInterface $responseFactory,
         private StreamFactoryInterface $streamFactory,
     ) {
@@ -46,6 +49,25 @@ readonly class OAuthMiddleware implements MiddlewareInterface
     {
         $path = $request->getUri()->getPath();
         $method = $request->getMethod();
+
+        $rateLimitEndpoint = match (true) {
+            $path === self::AUTHORIZE_PATH && $method === 'POST' => 'authorize_post',
+            $path === self::AUTHORIZE_PATH && $method === 'GET' => 'authorize_get',
+            $path === self::TOKEN_PATH && $method === 'POST' => 'token_post',
+            $path === self::REGISTER_PATH && $method === 'POST' => 'register_post',
+            $path === self::REVOKE_PATH && $method === 'POST' => 'revoke_post',
+            default => null,
+        };
+
+        if ($rateLimitEndpoint !== null) {
+            $retryAfter = $this->rateLimitService->check($this->resolveIpAddress($request), $rateLimitEndpoint);
+            if ($retryAfter !== null) {
+                return $this->createJsonResponse(429, [
+                    'error' => 'too_many_requests',
+                    'error_description' => 'Rate limit exceeded. Try again later.',
+                ])->withHeader('Retry-After', (string) $retryAfter);
+            }
+        }
 
         return match (true) {
             $path === self::METADATA_PATH && $method === 'GET' => $this->handleMetadata($request),
@@ -405,6 +427,13 @@ readonly class OAuthMiddleware implements MiddlewareInterface
             </body>
             </html>
             HTML;
+    }
+
+    private function resolveIpAddress(ServerRequestInterface $request): string
+    {
+        $normalizedParams = $request->getAttribute('normalizedParams');
+
+        return $normalizedParams instanceof NormalizedParams ? $normalizedParams->getRemoteAddress() : '';
     }
 
     private function extractCsrfFromCookie(ServerRequestInterface $request): string

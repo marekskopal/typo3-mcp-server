@@ -6,6 +6,7 @@ namespace MarekSkopal\MsMcpServer\Command;
 
 use DirectoryIterator;
 use Doctrine\DBAL\ParameterType;
+use MarekSkopal\MsMcpServer\OAuth\RateLimitService;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
@@ -19,7 +20,7 @@ class CleanupExpiredTokensCommand extends Command
 {
     private const string AUTHORIZATION_TABLE = 'tx_msmcpserver_oauth_authorization';
 
-    public function __construct(private readonly ConnectionPool $connectionPool)
+    public function __construct(private readonly ConnectionPool $connectionPool, private readonly RateLimitService $rateLimitService)
     {
         parent::__construct();
     }
@@ -33,6 +34,9 @@ class CleanupExpiredTokensCommand extends Command
 
         $deletedSessions = $this->deleteExpiredSessionFiles();
         $io->writeln(sprintf('Deleted %d stale MCP session files.', $deletedSessions));
+
+        $deletedRateLimits = $this->rateLimitService->deleteExpiredEntries();
+        $io->writeln(sprintf('Deleted %d expired rate limit entries.', $deletedRateLimits));
 
         $io->success('Cleanup completed.');
 

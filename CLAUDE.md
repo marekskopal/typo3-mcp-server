@@ -32,13 +32,14 @@ vendor/bin/typo3 mcp:cleanup
 
 **Flow:** HTTP request to `/mcp` → `McpServerMiddleware` (Bearer token auth via OAuth) → `AuthorizationService` → `BackendUserBootstrap` → `McpServerFactory` → MCP SDK `Server` with `StreamableHttpTransport` → Tool execution → JSON response.
 
-**OAuth Flow:** `/.well-known/oauth-authorization-server` → `OAuthMiddleware` handles `/mcp/oauth/authorize`, `/mcp/oauth/token`, `/mcp/oauth/register`, `/mcp/oauth/revoke` endpoints. Uses PKCE (S256), dynamic client registration (RFC 7591), token revocation (RFC 7009), and protected resource metadata (RFC 9728).
+**OAuth Flow:** `/.well-known/oauth-authorization-server` → `OAuthMiddleware` handles `/mcp/oauth/authorize`, `/mcp/oauth/token`, `/mcp/oauth/register`, `/mcp/oauth/revoke` endpoints. Uses PKCE (S256), dynamic client registration (RFC 7591), token revocation (RFC 7009), protected resource metadata (RFC 9728), and IP-based rate limiting (configurable per-endpoint, 429 Too Many Requests with Retry-After).
 
 **Key classes (all in `Classes/`):**
 - `Middleware/McpServerMiddleware` — PSR-15 middleware intercepting `/mcp` requests, handles auth and delegates to MCP SDK
-- `Middleware/OAuthMiddleware` — Handles OAuth 2.1 flows (authorize, token, register, revoke, metadata)
+- `Middleware/OAuthMiddleware` — Handles OAuth 2.1 flows (authorize, token, register, revoke, metadata) with IP-based rate limiting
 - `OAuth/AuthorizationService` — Creates auth codes, exchanges codes for tokens, validates access tokens, refreshes tokens, revokes tokens. Token lifetimes are configurable via extension settings.
 - `OAuth/ClientRepository` — Manages OAuth clients (find, validate redirect URIs, register)
+- `OAuth/RateLimitService` — IP-based rate limiting for OAuth endpoints with configurable per-endpoint limits and fixed-window counters
 - `OAuth/PkceVerifier` — S256 PKCE verification
 - `OAuth/OAuthTokenPair` — DTO for access/refresh token pairs
 - `Authentication/BackendUserBootstrap` — Bootstraps a `BackendUserAuthentication` from a be_users record
@@ -76,7 +77,7 @@ vendor/bin/typo3 mcp:cleanup
 - `Configuration/RequestMiddlewares.php` — Registers OAuthMiddleware and McpServerMiddleware in frontend stack
 - `Configuration/Backend/Modules.php` — Backend module registration (OAuth client + extension table routes)
 - `Configuration/TCA/tx_msmcpserver_oauth_client.php` — TCA for OAuth client table
-- `ext_conf_template.txt` — Extension settings for token lifetimes (accessTokenLifetime, refreshTokenLifetime, codeLifetime)
+- `ext_conf_template.txt` — Extension settings for token lifetimes (accessTokenLifetime, refreshTokenLifetime, codeLifetime) and rate limiting (rateLimitEnabled, per-endpoint limits and windows)
 
 **SDK Workarounds:**
 - `InitializedSession` implements `SessionInterface` directly instead of extending SDK's `Session` class. The SDK's `Session::readData()` uses `isset($this->data)` which is always true (property initialized to `[]`), so `createWithId()` never reads persisted data from the file store. Our implementation uses a `$loaded` flag.
@@ -117,11 +118,11 @@ readonly class MyTool
 
 ## Testing
 
-414 unit tests covering:
+437 unit tests covering:
 - All 39 static MCP tools + 3 batch tools (Pages/Content/File/Schema/Search/Translation/Cache/Batch CRUD)
 - Dynamic tool registration and execution (DynamicToolRegistrar), including merged EXTCONF + discovered tables
-- OAuth classes (AuthorizationService incl. revocation, ClientRepository, PkceVerifier, OAuthTokenPair)
-- OAuthMiddleware (metadata, authorize, register, revoke, token endpoints)
+- OAuth classes (AuthorizationService incl. revocation, ClientRepository, PkceVerifier, OAuthTokenPair, RateLimitService)
+- OAuthMiddleware (metadata, authorize, register, revoke, token endpoints, rate limiting)
 - OAuthClientController (create, edit, update, delete, revokeToken)
 - ExtensionTableController (discover, toggle, edit, update)
 - ExtensionTableDiscoveryService (TCA scanning, label/prefix generation, system table filtering)

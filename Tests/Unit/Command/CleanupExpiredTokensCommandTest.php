@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace MarekSkopal\MsMcpServer\Tests\Unit\Command;
 
 use MarekSkopal\MsMcpServer\Command\CleanupExpiredTokensCommand;
+use MarekSkopal\MsMcpServer\OAuth\RateLimitService;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Input\ArrayInput;
@@ -55,14 +56,19 @@ final class CleanupExpiredTokensCommandTest extends TestCase
         $connectionPool = $this->createStub(ConnectionPool::class);
         $connectionPool->method('getConnectionForTable')->willReturn($connection);
 
-        $command = new CleanupExpiredTokensCommand($connectionPool);
+        $rateLimitService = $this->createStub(RateLimitService::class);
+        $rateLimitService->method('deleteExpiredEntries')->willReturn(3);
+
+        $command = new CleanupExpiredTokensCommand($connectionPool, $rateLimitService);
 
         $input = new ArrayInput([]);
         $output = new BufferedOutput();
 
         $exitCode = $command->run($input, $output);
 
+        $outputText = $output->fetch();
         self::assertSame(0, $exitCode);
-        self::assertStringContainsString('5 expired/revoked OAuth authorizations', $output->fetch());
+        self::assertStringContainsString('5 expired/revoked OAuth authorizations', $outputText);
+        self::assertStringContainsString('3 expired rate limit entries', $outputText);
     }
 }

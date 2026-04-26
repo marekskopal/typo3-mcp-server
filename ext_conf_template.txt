@@ -6,3 +6,36 @@ refreshTokenLifetime = 2592000
 
 # cat=token/enable; type=int+; label=Authorization code lifetime (seconds)
 codeLifetime = 60
+
+# cat=rateLimit/enable; type=boolean; label=Enable rate limiting on OAuth endpoints
+rateLimitEnabled = 1
+
+# cat=rateLimit/enable; type=int+; label=Authorize POST: max attempts per window
+rateLimitAuthorize = 5
+
+# cat=rateLimit/enable; type=int+; label=Authorize POST: window in seconds
+rateLimitAuthorizeWindow = 300
+
+# cat=rateLimit/enable; type=int+; label=Authorize GET: max attempts per window
+rateLimitAuthorizeGet = 20
+
+# cat=rateLimit/enable; type=int+; label=Authorize GET: window in seconds
+rateLimitAuthorizeGetWindow = 300
+
+# cat=rateLimit/enable; type=int+; label=Token POST: max attempts per window
+rateLimitToken = 20
+
+# cat=rateLimit/enable; type=int+; label=Token POST: window in seconds
+rateLimitTokenWindow = 300
+
+# cat=rateLimit/enable; type=int+; label=Register POST: max attempts per window
+rateLimitRegister = 10
+
+# cat=rateLimit/enable; type=int+; label=Register POST: window in seconds
+rateLimitRegisterWindow = 3600
+
+# cat=rateLimit/enable; type=int+; label=Revoke POST: max attempts per window
+rateLimitRevoke = 20
+
+# cat=rateLimit/enable; type=int+; label=Revoke POST: window in seconds
+rateLimitRevokeWindow = 300

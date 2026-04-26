@@ -7,6 +7,7 @@ namespace MarekSkopal\MsMcpServer\Tests\Unit\Middleware;
 use MarekSkopal\MsMcpServer\Middleware\OAuthMiddleware;
 use MarekSkopal\MsMcpServer\OAuth\AuthorizationService;
 use MarekSkopal\MsMcpServer\OAuth\ClientRepository;
+use MarekSkopal\MsMcpServer\OAuth\RateLimitService;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 use Psr\Http\Message\ResponseFactoryInterface;
@@ -167,6 +168,41 @@ final class OAuthMiddlewareTest extends TestCase
         return $request;
     }
 
+    public function testRateLimitedRequestReturns429(): void
+    {
+        $rateLimitService = $this->createStub(RateLimitService::class);
+        $rateLimitService->method('check')->willReturn(120);
+
+        $request = $this->createRequest('/mcp/oauth/authorize', 'POST');
+        $request->method('getParsedBody')->willReturn([]);
+
+        $handler = $this->createMock(RequestHandlerInterface::class);
+        $handler->expects(self::never())->method('handle');
+
+        $middleware = $this->createMiddlewareWithCapture(rateLimitService: $rateLimitService);
+        $middleware->process($request, $handler);
+
+        $body = $this->capturedBodies[0] ?? '';
+        self::assertStringContainsString('too_many_requests', $body);
+    }
+
+    public function testNonRateLimitedOAuthRequestPassesThrough(): void
+    {
+        $rateLimitService = $this->createStub(RateLimitService::class);
+        $rateLimitService->method('check')->willReturn(null);
+
+        $request = $this->createRequest('/mcp/oauth/revoke', 'POST');
+        $request->method('getParsedBody')->willReturn([]);
+
+        $handler = $this->createStub(RequestHandlerInterface::class);
+
+        $middleware = $this->createMiddlewareWithCapture(rateLimitService: $rateLimitService);
+        $middleware->process($request, $handler);
+
+        $body = $this->capturedBodies[0] ?? '';
+        self::assertStringContainsString('token parameter is required', $body);
+    }
+
     private function createMiddleware(): OAuthMiddleware
     {
         return new OAuthMiddleware(
@@ -174,12 +210,13 @@ final class OAuthMiddlewareTest extends TestCase
             $this->createStub(ClientRepository::class),
             $this->createStub(ConnectionPool::class),
             $this->createStub(PasswordHashFactory::class),
+            $this->createStub(RateLimitService::class),
             $this->createStub(ResponseFactoryInterface::class),
             $this->createStub(StreamFactoryInterface::class),
         );
     }
 
-    private function createMiddlewareWithCapture(): OAuthMiddleware
+    private function createMiddlewareWithCapture(?RateLimitService $rateLimitService = null): OAuthMiddleware
     {
         $stream = $this->createStub(StreamInterface::class);
 
@@ -204,6 +241,7 @@ final class OAuthMiddlewareTest extends TestCase
             $this->createStub(ClientRepository::class),
             $this->createStub(ConnectionPool::class),
             $this->createStub(PasswordHashFactory::class),
+            $rateLimitService ?? $this->createStub(RateLimitService::class),
             $responseFactory,
             $streamFactory,
         );
