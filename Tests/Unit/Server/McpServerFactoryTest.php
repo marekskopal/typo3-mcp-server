@@ -53,6 +53,7 @@ use MarekSkopal\MsMcpServer\Tool\Pages\PagesListTool;
 use MarekSkopal\MsMcpServer\Tool\Pages\PagesUpdateTool;
 use MarekSkopal\MsMcpServer\Tool\Pages\PageTreeTool;
 use MarekSkopal\MsMcpServer\Tool\Schema\TableSchemaTool;
+use MarekSkopal\MsMcpServer\Tool\Search\RecordCountTool;
 use MarekSkopal\MsMcpServer\Tool\Search\RecordSearchTool;
 use MarekSkopal\MsMcpServer\Tool\Translation\RecordTranslateTool;
 use MarekSkopal\MsMcpServer\Tool\Translation\SiteLanguagesTool;
@@ -136,6 +137,7 @@ final class McpServerFactoryTest extends TestCase
             new FileUploadFromUrlTool($fileService),
             new TableSchemaTool($tcaSchemaService),
             new RecordSearchTool($recordService, $tcaSchemaService),
+            new RecordCountTool($recordService, $tcaSchemaService),
             new SiteLanguagesTool($siteLanguageService),
             new RecordTranslateTool($dataHandlerService, $recordService, $tcaSchemaService),
             new CacheClearTool($cacheService),

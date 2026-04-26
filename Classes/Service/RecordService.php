@@ -180,6 +180,34 @@ readonly class RecordService
     }
 
     /**
+     * Count records matching optional conditions without fetching them.
+     *
+     * @param array<string, array{operator: string, value: string}> $searchConditions
+     */
+    public function count(string $table, ?int $pid = null, array $searchConditions = []): int
+    {
+        $queryBuilder = $this->connectionPool->getQueryBuilderForTable($table);
+        $queryBuilder->getRestrictions()->removeAll();
+
+        $queryBuilder->count('uid')->from($table);
+
+        if ($pid !== null) {
+            $queryBuilder->andWhere(
+                $queryBuilder->expr()->eq('pid', $queryBuilder->createNamedParameter($pid, ParameterType::INTEGER)),
+            );
+        }
+
+        foreach ($searchConditions as $field => $condition) {
+            $this->applyCondition($queryBuilder, $field, $condition);
+        }
+
+        /** @var int|string $result */
+        $result = $queryBuilder->executeQuery()->fetchOne();
+
+        return (int) $result;
+    }
+
+    /**
      * Find all file references for a record field.
      *
      * @return list<array<string, mixed>>
