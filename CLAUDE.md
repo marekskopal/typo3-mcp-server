@@ -46,8 +46,6 @@ vendor/bin/typo3 mcp:cleanup
 - `Server/McpServerFactory` — Builds the MCP Server instance; tools/resources/prompts are auto-discovered via DI tags, no hardcoded registration needed
 - `Server/ErrorHandlingContainer` — Decorating PSR-11 container that wraps tool/resource instances with centralized error handling
 - `Server/ErrorHandlingProxy` — Proxy that catches `\Throwable` from tool/resource methods, logs it, and converts to `ToolCallException`/`ResourceReadException`
-- `Server/InitializedSession` — Fixed SessionInterface implementation (workaround for SDK's `readData()` bug)
-- `Server/InitializedSessionFactory` — Factory for InitializedSession instances
 - `Service/DataHandlerService` — Wraps TYPO3 DataHandler for create/update/delete operations (single and batch)
 - `Service/RecordService` — Read operations via QueryBuilder (findByUid, findByPid, search with pagination capped at 500)
 - `Service/FileService` — File operations via TYPO3 ResourceStorage (list, upload, copy, delete, move, rename, directory ops)
@@ -81,7 +79,6 @@ vendor/bin/typo3 mcp:cleanup
 - `ext_conf_template.txt` — Extension settings for token lifetimes (accessTokenLifetime, refreshTokenLifetime, codeLifetime) and rate limiting (rateLimitEnabled, per-endpoint limits and windows)
 
 **SDK Workarounds:**
-- `InitializedSession` implements `SessionInterface` directly instead of extending SDK's `Session` class. The SDK's `Session::readData()` uses `isset($this->data)` which is always true (property initialized to `[]`), so `createWithId()` never reads persisted data from the file store. Our implementation uses a `$loaded` flag.
 - Tool classes must be `public: true` in Services.yaml because the SDK's `ReferenceHandler` calls `container->has()` which returns false for private TYPO3 services.
 
 ## Adding a New Tool
@@ -119,7 +116,7 @@ readonly class MyTool
 
 ## Testing
 
-443 unit tests covering:
+424 unit tests covering:
 - All 41 static MCP tools + 3 batch tools (Pages/Content/File/Schema/Search/Translation/Cache/Batch CRUD)
 - Dynamic tool registration and execution (DynamicToolRegistrar), including merged EXTCONF + discovered tables
 - OAuth classes (AuthorizationService incl. revocation, ClientRepository, PkceVerifier, OAuthTokenPair, RateLimitService)
@@ -129,7 +126,6 @@ readonly class MyTool
 - ExtensionTableDiscoveryService (TCA scanning, label/prefix generation, system table filtering)
 - DiscoveredTableRepository (findAll, findEnabled, findByUid, insertIfNew, update, setEnabled)
 - BackendUserBootstrap, McpServerFactory, McpServerMiddleware
-- InitializedSession and InitializedSessionFactory
 - Services (RecordService, DataHandlerService, FileService, TcaSchemaService, BackendLayoutService)
 - Resources (SystemInfo, SiteConfiguration, TcaTables, BackendUser, TcaTableSchema, BackendLayout)
 - CleanupExpiredTokensCommand

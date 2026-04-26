@@ -48,7 +48,7 @@ readonly class McpServerFactory
         $builder = Server::builder()
             ->setServerInfo('TYPO3 MCP Server', self::VERSION)
             ->setContainer($errorHandlingContainer)
-            ->setSession($sessionStore, new InitializedSessionFactory());
+            ->setSession($sessionStore);
 
         foreach ($this->tools as $tool) {
             $attribute = $this->getMethodAttribute($tool, McpTool::class);

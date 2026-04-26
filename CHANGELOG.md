@@ -15,6 +15,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 - Extension table management UI: discover, enable/disable, edit label/prefix
 - `RecordService::count()` method for lightweight record counting
 
+### Changed
+- **Upgraded MCP SDK to v0.5.0** — removed `InitializedSession` and `InitializedSessionFactory` workarounds (SDK's `Session::readData()` bug is fixed upstream). `SessionFactoryInterface` replaced by `SessionManagerInterface`.
+
 ### Fixed
 - **SSRF prevention:** `file_upload_from_url` now rejects URLs resolving to private/reserved IP ranges
 - **DoS prevention:** File downloads now stream with size check instead of loading entirely into memory

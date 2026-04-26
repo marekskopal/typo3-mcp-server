@@ -519,7 +519,7 @@ vendor/bin/phpstan analyse
 vendor/bin/phpcs
 vendor/bin/phpcbf
 
-# Tests (443 tests)
+# Tests (424 tests)
 vendor/bin/phpunit
 ```
 
