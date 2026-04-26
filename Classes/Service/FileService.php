@@ -10,6 +10,10 @@ use TYPO3\CMS\Core\Resource\File;
 use TYPO3\CMS\Core\Resource\Folder;
 use TYPO3\CMS\Core\Resource\ResourceStorage;
 use TYPO3\CMS\Core\Resource\StorageRepository;
+use const FILTER_FLAG_NO_PRIV_RANGE;
+use const FILTER_FLAG_NO_RES_RANGE;
+use const FILTER_VALIDATE_IP;
+use const PHP_URL_HOST;
 use const PHP_URL_PATH;
 use const PHP_URL_SCHEME;
 
@@ -107,6 +111,19 @@ readonly class FileService
             throw new \RuntimeException('Only http and https URLs are allowed', 1712002010);
         }
 
+        $host = parse_url($url, PHP_URL_HOST);
+        if (!is_string($host) || $host === '') {
+            throw new \RuntimeException('Invalid URL: missing host', 1712002014);
+        }
+
+        $resolvedIp = gethostbyname($host);
+        if (
+            $resolvedIp === $host
+            || filter_var($resolvedIp, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) === false
+        ) {
+            throw new \RuntimeException('URL resolves to a private or reserved IP address', 1712002015);
+        }
+
         if ($fileName === '') {
             $path = parse_url($url, PHP_URL_PATH);
             $fileName = is_string($path) ? basename($path) : '';
@@ -129,19 +146,8 @@ readonly class FileService
             ],
         ]);
 
-        $content = @file_get_contents($url, false, $context);
-        if ($content === false) {
-            throw new \RuntimeException('Failed to download file from URL: ' . $url, 1712002011);
-        }
-
         // 100 MB
         $maxSize = 104857600;
-        if (strlen($content) > $maxSize) {
-            throw new \RuntimeException('Downloaded file exceeds maximum allowed size of 100 MB', 1712002012);
-        }
-
-        $storage = $this->getStorage($storageUid);
-        $folder = $storage->getFolder($directoryPath);
 
         $tempFile = tempnam(sys_get_temp_dir(), 'mcp_url_upload_');
         if ($tempFile === false) {
@@ -149,7 +155,39 @@ readonly class FileService
         }
 
         try {
-            file_put_contents($tempFile, $content);
+            $stream = @fopen($url, 'r', false, $context);
+            if ($stream === false) {
+                throw new \RuntimeException('Failed to download file from URL', 1712002011);
+            }
+
+            $bytesWritten = 0;
+            $fp = fopen($tempFile, 'w');
+            if ($fp === false) {
+                fclose($stream);
+
+                throw new \RuntimeException('Failed to open temporary file for writing', 1712002016);
+            }
+
+            while (!feof($stream)) {
+                $chunk = fread($stream, 8192);
+                if ($chunk === false) {
+                    break;
+                }
+                $bytesWritten += strlen($chunk);
+                if ($bytesWritten > $maxSize) {
+                    fclose($fp);
+                    fclose($stream);
+
+                    throw new \RuntimeException('Downloaded file exceeds maximum allowed size of 100 MB', 1712002012);
+                }
+                fwrite($fp, $chunk);
+            }
+
+            fclose($fp);
+            fclose($stream);
+
+            $storage = $this->getStorage($storageUid);
+            $folder = $storage->getFolder($directoryPath);
             $file = $storage->addFile($tempFile, $folder, $fileName);
         } finally {
             if (file_exists($tempFile)) {

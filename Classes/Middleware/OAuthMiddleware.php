@@ -158,10 +158,16 @@ readonly class OAuthMiddleware implements MiddlewareInterface
             return $this->createJsonResponse(403, ['error' => 'invalid_request', 'error_description' => 'CSRF validation failed']);
         }
 
-        $username = (string) ($body['username'] ?? '');
-        $password = (string) ($body['password'] ?? '');
         $clientId = (string) ($body['client_id'] ?? '');
         $redirectUri = (string) ($body['redirect_uri'] ?? '');
+
+        // Re-validate redirect_uri against registered client URIs to prevent POST manipulation
+        if ($redirectUri === '' || !$this->clientRepository->validateRedirectUri($clientId, $redirectUri)) {
+            return $this->createJsonResponse(400, ['error' => 'invalid_request', 'error_description' => 'Invalid redirect_uri']);
+        }
+
+        $username = (string) ($body['username'] ?? '');
+        $password = (string) ($body['password'] ?? '');
         $codeChallenge = (string) ($body['code_challenge'] ?? '');
         $codeChallengeMethod = (string) ($body['code_challenge_method'] ?? '');
         $state = (string) ($body['state'] ?? '');
@@ -452,6 +458,8 @@ readonly class OAuthMiddleware implements MiddlewareInterface
             ->createResponse($statusCode)
             ->withHeader('Content-Type', 'application/json')
             ->withHeader('Access-Control-Allow-Origin', '*')
+            ->withHeader('Cache-Control', 'no-store')
+            ->withHeader('X-Content-Type-Options', 'nosniff')
             ->withBody($body);
     }
 }

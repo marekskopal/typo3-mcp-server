@@ -29,17 +29,15 @@ readonly class BackendUserBootstrap
             ->fetchAssociative();
 
         if ($userRow === false) {
-            throw new \RuntimeException(
-                sprintf('Backend user with uid %d not found', $beUserUid),
-                1712000010,
-            );
+            throw new \RuntimeException('Backend user not found', 1712000010);
+        }
+
+        if ((int) ($userRow['deleted'] ?? 0) === 1) {
+            throw new \RuntimeException('Backend user not found', 1712000010);
         }
 
         if ((int) ($userRow['disable'] ?? 0) === 1) {
-            throw new \RuntimeException(
-                sprintf('Backend user with uid %d is disabled', $beUserUid),
-                1712000011,
-            );
+            throw new \RuntimeException('Backend user not found', 1712000010);
         }
 
         $backendUser = new BackendUserAuthentication();

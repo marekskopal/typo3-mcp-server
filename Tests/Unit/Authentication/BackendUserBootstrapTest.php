@@ -44,7 +44,25 @@ final class BackendUserBootstrapTest extends TestCase
         $bootstrap = new BackendUserBootstrap($this->createConnectionPool($result), $languageServiceFactory);
 
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionCode(1712000011);
+        $this->expectExceptionCode(1712000010);
+
+        $bootstrap->bootstrap(1);
+    }
+
+    public function testBootstrapThrowsWhenUserDeleted(): void
+    {
+        $result = $this->createStub(Result::class);
+        $result->method('fetchAssociative')->willReturn([
+            'uid' => 1,
+            'username' => 'admin',
+            'deleted' => 1,
+        ]);
+
+        $languageServiceFactory = $this->createStub(LanguageServiceFactory::class);
+        $bootstrap = new BackendUserBootstrap($this->createConnectionPool($result), $languageServiceFactory);
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionCode(1712000010);
 
         $bootstrap->bootstrap(1);
     }

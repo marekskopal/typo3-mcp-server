@@ -48,8 +48,8 @@ readonly class McpServerMiddleware implements MiddlewareInterface
         try {
             $beUserUid = $this->authorizationService->validateAccessToken($token);
             $this->backendUserBootstrap->bootstrap($beUserUid);
-        } catch (\RuntimeException $e) {
-            return $this->withCorsHeaders($this->createUnauthorizedResponse($request, $e->getMessage()));
+        } catch (\RuntimeException) {
+            return $this->withCorsHeaders($this->createUnauthorizedResponse($request, 'Authentication failed'));
         }
 
         $server = $this->mcpServerFactory->create();
@@ -110,6 +110,7 @@ readonly class McpServerMiddleware implements MiddlewareInterface
                 'Access-Control-Allow-Headers',
                 'Accept, Authorization, Content-Type, Mcp-Session-Id, Mcp-Protocol-Version, Last-Event-ID',
             )
-            ->withHeader('Access-Control-Expose-Headers', 'Mcp-Session-Id');
+            ->withHeader('Access-Control-Expose-Headers', 'Mcp-Session-Id')
+            ->withHeader('X-Content-Type-Options', 'nosniff');
     }
 }
