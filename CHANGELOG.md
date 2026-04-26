@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.7.1] - 2026-04-26
+
+### Changed
+- **Upgraded MCP SDK to v0.5.0** — removed `InitializedSession` and `InitializedSessionFactory` workarounds (SDK's `Session::readData()` bug is fixed upstream). `SessionFactoryInterface` replaced by `SessionManagerInterface`.
+
+### Fixed
+- Missing `uid`/`pid` columns in `tx_msmcpserver_discovered_table` and `tx_msmcpserver_rate_limit` — tables without TCA need explicit column definitions
+- `SearchConditionParser` incorrectly tagged as `mcp.tool` causing runtime crash — excluded from auto-discovery in `Services.yaml`
+- Added test to catch future Tool classes missing `#[McpTool]` attribute
+
 ## [0.7.0] - 2026-04-26
 
 ### Added
@@ -14,9 +24,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 - Backend module fully translated (English, German, Czech) using `f:translate` ViewHelper
 - Extension table management UI: discover, enable/disable, edit label/prefix
 - `RecordService::count()` method for lightweight record counting
-
-### Changed
-- **Upgraded MCP SDK to v0.5.0** — removed `InitializedSession` and `InitializedSessionFactory` workarounds (SDK's `Session::readData()` bug is fixed upstream). `SessionFactoryInterface` replaced by `SessionManagerInterface`.
 
 ### Fixed
 - **SSRF prevention:** `file_upload_from_url` now rejects URLs resolving to private/reserved IP ranges
