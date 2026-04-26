@@ -35,6 +35,8 @@ CREATE TABLE tx_msmcpserver_oauth_authorization (
 );
 
 CREATE TABLE tx_msmcpserver_discovered_table (
+    uid int(11) unsigned NOT NULL AUTO_INCREMENT,
+    pid int(11) unsigned DEFAULT '0' NOT NULL,
     table_name varchar(255) DEFAULT '' NOT NULL,
     label varchar(255) DEFAULT '' NOT NULL,
     prefix varchar(64) DEFAULT '' NOT NULL,
@@ -42,15 +44,19 @@ CREATE TABLE tx_msmcpserver_discovered_table (
     crdate int(11) unsigned DEFAULT '0' NOT NULL,
     tstamp int(11) unsigned DEFAULT '0' NOT NULL,
 
+    PRIMARY KEY (uid),
     UNIQUE KEY table_name (table_name)
 );
 
 CREATE TABLE tx_msmcpserver_rate_limit (
+    uid int(11) unsigned NOT NULL AUTO_INCREMENT,
+    pid int(11) unsigned DEFAULT '0' NOT NULL,
     ip_address varchar(45) DEFAULT '' NOT NULL,
     endpoint varchar(64) DEFAULT '' NOT NULL,
     hit_count int(11) unsigned DEFAULT '0' NOT NULL,
     window_start int(11) unsigned DEFAULT '0' NOT NULL,
 
+    PRIMARY KEY (uid),
     UNIQUE KEY ip_endpoint_window (ip_address, endpoint, window_start),
     KEY window_start (window_start)
 );
