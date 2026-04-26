@@ -9,7 +9,10 @@ services:
 
   MarekSkopal\MsMcpServer\Tool\:
     resource: '../Classes/Tool/*'
-    exclude: '../Classes/Tool/{Result,Dynamic}/*'
+    exclude:
+      - '../Classes/Tool/Result/*'
+      - '../Classes/Tool/Dynamic/*'
+      - '../Classes/Tool/Search/SearchConditionParser.php'
     public: true
     tags:
       - name: 'mcp.tool'
