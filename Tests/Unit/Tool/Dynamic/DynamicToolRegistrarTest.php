@@ -632,7 +632,7 @@ final class DynamicToolRegistrarTest extends TestCase
 
     public function testDeleteBatchToolCallsDataHandlerService(): void
     {
-        $recordService = $this->createMock(RecordService::class);
+        $recordService = $this->createStub(RecordService::class);
         $recordService->method('findExistingUids')->willReturn([1, 2, 3]);
 
         $dataHandlerService = $this->createMock(DataHandlerService::class);
@@ -683,7 +683,7 @@ final class DynamicToolRegistrarTest extends TestCase
 
     public function testUpdateBatchToolCallsDataHandlerService(): void
     {
-        $recordService = $this->createMock(RecordService::class);
+        $recordService = $this->createStub(RecordService::class);
         $recordService->method('findExistingUids')->willReturn([1, 2]);
 
         $dataHandlerService = $this->createMock(DataHandlerService::class);
@@ -737,7 +737,7 @@ final class DynamicToolRegistrarTest extends TestCase
 
     public function testMoveBatchToolCallsDataHandlerService(): void
     {
-        $recordService = $this->createMock(RecordService::class);
+        $recordService = $this->createStub(RecordService::class);
         $recordService->method('findExistingUids')->willReturn([10, 20]);
 
         $dataHandlerService = $this->createMock(DataHandlerService::class);

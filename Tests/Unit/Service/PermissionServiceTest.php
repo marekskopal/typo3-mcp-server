@@ -20,7 +20,7 @@ final class PermissionServiceTest extends TestCase
 
     public function testCheckTableAccessReturnsSelectAndModifyForAllowedTable(): void
     {
-        $backendUser = $this->createMock(BackendUserAuthentication::class);
+        $backendUser = $this->createStub(BackendUserAuthentication::class);
         $backendUser->method('check')->willReturnMap([
             ['tables_select', 'pages', true],
             ['tables_modify', 'pages', true],
@@ -38,7 +38,7 @@ final class PermissionServiceTest extends TestCase
 
     public function testCheckTableAccessReturnsFalseForDisallowedTable(): void
     {
-        $backendUser = $this->createMock(BackendUserAuthentication::class);
+        $backendUser = $this->createStub(BackendUserAuthentication::class);
         $backendUser->method('check')->willReturn(false);
 
         $GLOBALS['BE_USER'] = $backendUser;
@@ -53,7 +53,7 @@ final class PermissionServiceTest extends TestCase
 
     public function testCheckTableAccessReturnsSelectOnlyForReadOnlyTable(): void
     {
-        $backendUser = $this->createMock(BackendUserAuthentication::class);
+        $backendUser = $this->createStub(BackendUserAuthentication::class);
         $backendUser->method('check')->willReturnMap([
             ['tables_select', 'tt_content', true],
             ['tables_modify', 'tt_content', false],
@@ -70,7 +70,7 @@ final class PermissionServiceTest extends TestCase
 
     public function testCheckPageAccessReturnsFullPermissionsForAdmin(): void
     {
-        $backendUser = $this->createMock(BackendUserAuthentication::class);
+        $backendUser = $this->createStub(BackendUserAuthentication::class);
         $backendUser->method('calcPerms')->willReturn(Permission::ALL);
 
         $GLOBALS['BE_USER'] = $backendUser;
@@ -91,7 +91,7 @@ final class PermissionServiceTest extends TestCase
     {
         $perms = Permission::PAGE_SHOW | Permission::CONTENT_EDIT;
 
-        $backendUser = $this->createMock(BackendUserAuthentication::class);
+        $backendUser = $this->createStub(BackendUserAuthentication::class);
         $backendUser->method('calcPerms')->willReturn($perms);
 
         $GLOBALS['BE_USER'] = $backendUser;
@@ -110,7 +110,7 @@ final class PermissionServiceTest extends TestCase
 
     public function testCheckPageAccessReturnsNothingForInaccessiblePage(): void
     {
-        $backendUser = $this->createMock(BackendUserAuthentication::class);
+        $backendUser = $this->createStub(BackendUserAuthentication::class);
         $backendUser->method('calcPerms')->willReturn(Permission::NOTHING);
 
         $GLOBALS['BE_USER'] = $backendUser;
@@ -128,7 +128,7 @@ final class PermissionServiceTest extends TestCase
 
     public function testGetPermissionSummaryReturnsAdminSummary(): void
     {
-        $backendUser = $this->createMock(BackendUserAuthentication::class);
+        $backendUser = $this->createStub(BackendUserAuthentication::class);
         $backendUser->method('isAdmin')->willReturn(true);
         $backendUser->method('getFilePermissions')->willReturn([
             'addFile' => true,
@@ -157,7 +157,7 @@ final class PermissionServiceTest extends TestCase
 
     public function testGetPermissionSummaryReturnsEditorSummary(): void
     {
-        $backendUser = $this->createMock(BackendUserAuthentication::class);
+        $backendUser = $this->createStub(BackendUserAuthentication::class);
         $backendUser->method('isAdmin')->willReturn(false);
         $backendUser->method('getFilePermissions')->willReturn([
             'addFile' => false,
@@ -186,7 +186,7 @@ final class PermissionServiceTest extends TestCase
 
     public function testGetPermissionSummaryHandlesWhitespaceInLists(): void
     {
-        $backendUser = $this->createMock(BackendUserAuthentication::class);
+        $backendUser = $this->createStub(BackendUserAuthentication::class);
         $backendUser->method('isAdmin')->willReturn(false);
         $backendUser->method('getFilePermissions')->willReturn([]);
         $backendUser->groupData = [
