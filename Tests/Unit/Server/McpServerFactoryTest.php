@@ -32,6 +32,7 @@ use MarekSkopal\MsMcpServer\Tool\Content\ContentUpdateTool;
 use MarekSkopal\MsMcpServer\Repository\DiscoveredTableRepository;
 use MarekSkopal\MsMcpServer\Tool\Dynamic\DynamicToolRegistrar;
 use MarekSkopal\MsMcpServer\Tool\Redirect\RedirectToolRegistrar;
+use MarekSkopal\MsMcpServer\Tool\Scheduler\SchedulerToolRegistrar;
 use MarekSkopal\MsMcpServer\Tool\File\DirectoryCreateTool;
 use MarekSkopal\MsMcpServer\Tool\File\DirectoryDeleteTool;
 use MarekSkopal\MsMcpServer\Tool\File\DirectoryMoveTool;
@@ -185,10 +186,11 @@ final class McpServerFactoryTest extends TestCase
         $discoveredTableRepository->method('findEnabled')->willReturn([]);
         $dynamicToolRegistrar = new DynamicToolRegistrar($recordService, $dataHandlerService, $tcaSchemaService, $discoveredTableRepository, $logger);
         $redirectToolRegistrar = new RedirectToolRegistrar($recordService, $dataHandlerService, $logger);
+        $schedulerToolRegistrar = new SchedulerToolRegistrar($recordService, $dataHandlerService, $logger);
 
         $auditLogger = $this->createStub(\MarekSkopal\MsMcpServer\Logging\AuditLogger::class);
 
-        $factory = new McpServerFactory($container, $dynamicToolRegistrar, $redirectToolRegistrar, $logger, $auditLogger, $tools, $resources, $prompts);
+        $factory = new McpServerFactory($container, $dynamicToolRegistrar, $redirectToolRegistrar, $schedulerToolRegistrar, $logger, $auditLogger, $tools, $resources, $prompts);
         $server = $factory->create();
 
         self::assertInstanceOf(Server::class, $server);
@@ -201,7 +203,7 @@ final class McpServerFactoryTest extends TestCase
     public function testAllToolClassesHaveMcpToolAttribute(): void
     {
         $toolDir = __DIR__ . '/../../../Classes/Tool';
-        $excludedDirs = ['Result', 'Dynamic', 'Redirect'];
+        $excludedDirs = ['Result', 'Dynamic', 'Redirect', 'Scheduler'];
         $excludedFiles = ['SearchConditionParser.php'];
 
         $iterator = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($toolDir));

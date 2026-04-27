@@ -6,5 +6,4 @@
 
 ## Nice to have
 
-- **Scheduler tools** — list/run TYPO3 scheduler tasks
 - **User/group tools** — list backend users, check permissions

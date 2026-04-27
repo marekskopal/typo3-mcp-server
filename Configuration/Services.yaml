@@ -13,6 +13,7 @@ services:
       - '../Classes/Tool/Result/*'
       - '../Classes/Tool/Dynamic/*'
       - '../Classes/Tool/Redirect/*'
+      - '../Classes/Tool/Scheduler/*'
       - '../Classes/Tool/Search/SearchConditionParser.php'
     public: true
     tags:
