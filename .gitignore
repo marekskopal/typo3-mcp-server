@@ -6,3 +6,5 @@ ray.php
 composer.lock
 /var/
 /.claude/
+Tests/Integration/node_modules/
+Tests/Integration/package-lock.json
