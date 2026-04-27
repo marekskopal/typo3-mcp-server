@@ -35,6 +35,35 @@ readonly class RecordService
     }
 
     /**
+     * Return the subset of UIDs that actually exist in the given table.
+     *
+     * @param list<int> $uids
+     * @return list<int>
+     */
+    public function findExistingUids(string $table, array $uids): array
+    {
+        if ($uids === []) {
+            return [];
+        }
+
+        $queryBuilder = $this->connectionPool->getQueryBuilderForTable($table);
+        $queryBuilder->getRestrictions()->removeAll();
+
+        /** @var list<array{uid: int|string}> $rows */
+        $rows = $queryBuilder
+            ->select('uid')
+            ->from($table)
+            ->where($queryBuilder->expr()->in(
+                'uid',
+                $queryBuilder->createNamedParameter($uids, ArrayParameterType::INTEGER),
+            ))
+            ->executeQuery()
+            ->fetchAllAssociative();
+
+        return array_map(static fn(array $row): int => (int) $row['uid'], $rows);
+    }
+
+    /**
      * @param list<string> $fields
      * @return array{records: list<array<string, mixed>>, total: int}
      */

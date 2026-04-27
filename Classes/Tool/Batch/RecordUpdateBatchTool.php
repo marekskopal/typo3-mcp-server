@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace MarekSkopal\MsMcpServer\Tool\Batch;
 
 use MarekSkopal\MsMcpServer\Service\DataHandlerService;
+use MarekSkopal\MsMcpServer\Service\RecordService;
 use MarekSkopal\MsMcpServer\Service\TcaSchemaService;
 use MarekSkopal\MsMcpServer\Tool\Result\BatchRecordsUpdatedResult;
 use Mcp\Capability\Attribute\McpTool;
@@ -13,19 +14,30 @@ use const JSON_THROW_ON_ERROR;
 
 readonly class RecordUpdateBatchTool
 {
-    public function __construct(private DataHandlerService $dataHandlerService, private TcaSchemaService $tcaSchemaService)
-    {
+    public function __construct(
+        private DataHandlerService $dataHandlerService,
+        private TcaSchemaService $tcaSchemaService,
+        private RecordService $recordService,
+    ) {
     }
 
     #[McpTool(
         name: 'record_update_batch',
         description: 'Update the same fields on multiple records in any table.'
             . ' Pass UIDs as comma-separated (e.g. "1,2,3") and fields as a JSON object (e.g. {"hidden":1}).'
-            . ' All specified records will be updated with the same field values.',
+            . ' All specified records will be updated with the same field values.'
+            . ' Non-existent UIDs are skipped and reported in skippedUids.',
     )]
     public function execute(string $tableName, string $uids, string $fields): BatchRecordsUpdatedResult
     {
         $uidList = $this->parseUids($uids);
+        $existingUids = $this->recordService->findExistingUids($tableName, $uidList);
+
+        if ($existingUids === []) {
+            throw new ToolCallException('None of the provided UIDs exist in table ' . $tableName);
+        }
+
+        $skippedUids = array_values(array_diff($uidList, $existingUids));
         $writableFields = $this->tcaSchemaService->getWritableFields($tableName);
 
         /** @var array<string, mixed> $fieldData */
@@ -45,14 +57,23 @@ readonly class RecordUpdateBatchTool
             throw new ToolCallException('No valid writable fields provided');
         }
 
-        $this->dataHandlerService->updateRecords($tableName, $uidList, $validFields);
+        $this->dataHandlerService->updateRecords($tableName, $existingUids, $validFields);
 
-        return new BatchRecordsUpdatedResult($uidList, count($uidList), array_keys($validFields), $ignoredFields);
+        return new BatchRecordsUpdatedResult(
+            $existingUids,
+            count($existingUids),
+            array_keys($validFields),
+            $ignoredFields,
+            $skippedUids,
+        );
     }
 
     /** @return list<int> */
     private function parseUids(string $uids): array
     {
-        return array_values(array_map('intval', array_filter(explode(',', $uids), static fn (string $v): bool => $v !== '')));
+        return array_values(array_filter(
+            array_map('intval', array_filter(explode(',', $uids), static fn(string $v): bool => $v !== '')),
+            static fn(int $v): bool => $v > 0,
+        ));
     }
 }

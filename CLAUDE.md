@@ -118,7 +118,7 @@ readonly class MyTool
 
 ## Testing
 
-447 unit tests covering:
+455 unit tests covering:
 - All 44 static MCP tools + 3 batch tools (Pages/Content/File/Schema/Search/Translation/Cache/Permission/Batch CRUD)
 - Dynamic tool registration and execution (DynamicToolRegistrar), including merged EXTCONF + discovered tables
 - OAuth classes (AuthorizationService incl. revocation, ClientRepository, PkceVerifier, OAuthTokenPair, RateLimitService)

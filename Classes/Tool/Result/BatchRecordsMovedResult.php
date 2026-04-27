@@ -6,8 +6,11 @@ namespace MarekSkopal\MsMcpServer\Tool\Result;
 
 readonly class BatchRecordsMovedResult
 {
-    /** @param list<int> $uids */
-    public function __construct(public array $uids, public int $count, public int $target)
+    /**
+     * @param list<int> $uids
+     * @param list<int> $skippedUids
+     */
+    public function __construct(public array $uids, public int $count, public int $target, public array $skippedUids = [])
     {
     }
 }

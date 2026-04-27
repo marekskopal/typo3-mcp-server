@@ -10,8 +10,14 @@ readonly class BatchRecordsUpdatedResult
      * @param list<int> $uids
      * @param list<string> $updatedFields
      * @param list<string> $ignoredFields
+     * @param list<int> $skippedUids
      */
-    public function __construct(public array $uids, public int $count, public array $updatedFields, public array $ignoredFields = [])
-    {
+    public function __construct(
+        public array $uids,
+        public int $count,
+        public array $updatedFields,
+        public array $ignoredFields = [],
+        public array $skippedUids = [],
+    ) {
     }
 }

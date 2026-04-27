@@ -58,6 +58,36 @@ final class RecordServiceTest extends TestCase
         self::assertNull($record);
     }
 
+    public function testFindExistingUidsReturnsOnlyExistingUids(): void
+    {
+        $result = $this->createStub(Result::class);
+        $result->method('fetchAllAssociative')->willReturn([['uid' => 1], ['uid' => 3]]);
+
+        $queryBuilder = $this->createQueryBuilderStub();
+        $queryBuilder->method('select')->willReturnSelf();
+        $queryBuilder->method('from')->willReturnSelf();
+        $queryBuilder->method('where')->willReturnSelf();
+        $queryBuilder->method('executeQuery')->willReturn($result);
+
+        $connectionPool = $this->createStub(ConnectionPool::class);
+        $connectionPool->method('getQueryBuilderForTable')->willReturn($queryBuilder);
+
+        $service = new RecordService($connectionPool);
+        $existing = $service->findExistingUids('pages', [1, 2, 3]);
+
+        self::assertSame([1, 3], $existing);
+    }
+
+    public function testFindExistingUidsReturnsEmptyArrayForEmptyInput(): void
+    {
+        $connectionPool = $this->createStub(ConnectionPool::class);
+
+        $service = new RecordService($connectionPool);
+        $existing = $service->findExistingUids('pages', []);
+
+        self::assertSame([], $existing);
+    }
+
     public function testFindByPidReturnsRecordsAndTotal(): void
     {
         $expectedRecords = [

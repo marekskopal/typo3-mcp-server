@@ -6,8 +6,11 @@ namespace MarekSkopal\MsMcpServer\Tool\Result;
 
 readonly class BatchRecordsDeletedResult
 {
-    /** @param list<int> $uids */
-    public function __construct(public array $uids, public int $count)
+    /**
+     * @param list<int> $uids
+     * @param list<int> $skippedUids
+     */
+    public function __construct(public array $uids, public int $count, public array $skippedUids = [])
     {
     }
 }
