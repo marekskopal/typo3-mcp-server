@@ -262,62 +262,64 @@ class IntegrationTestRunner {
         await this.testTool('file_list', { directoryPath: '/' });
 
         // Directory create
-        await this.testTool('directory_create', { path: '/mcp-integration-test' });
+        await this.testTool('directory_create', { directoryName: 'mcp-int-test' });
 
         // Upload
         const base64 = Buffer.from('Integration test file content').toString('base64');
         await this.testTool('file_upload', {
-            data: base64,
-            path: '/mcp-integration-test/test-file.txt',
+            fileName: 'test-file.txt',
+            base64Content: base64,
+            directoryPath: '/mcp-int-test',
         });
 
         // Upload from URL
         await this.testTool('file_upload_from_url', {
-            url: 'https://example.com/',
-            path: '/mcp-integration-test/from-url.html',
+            url: 'https://raw.githubusercontent.com/typo3/typo3/main/LICENSE.txt',
+            directoryPath: '/mcp-int-test',
+            fileName: 'from-url.txt',
         });
-        await this.callToolSafe('file_delete', { path: '/mcp-integration-test/from-url.html' });
+        await this.callToolSafe('file_delete', { fileIdentifier: '/mcp-int-test/from-url.txt' });
 
         // File info & search
-        await this.testTool('file_get_info', { path: '/mcp-integration-test/test-file.txt' });
-        await this.testTool('file_search', { path: '/', pattern: 'test-file' });
+        await this.testTool('file_get_info', { fileIdentifier: '/mcp-int-test/test-file.txt' });
+        await this.testTool('file_search', { namePattern: 'test-file' });
 
-        // Copy
+        // Copy (to a subdirectory so name doesn't conflict)
+        await this.testTool('directory_create', { directoryName: 'sub', parentPath: '/mcp-int-test' });
         await this.testTool('file_copy', {
-            sourcePath: '/mcp-integration-test/test-file.txt',
-            targetPath: '/mcp-integration-test/copy.txt',
+            fileIdentifier: '/mcp-int-test/test-file.txt',
+            targetDirectory: '/mcp-int-test/sub',
         });
 
-        // Rename
+        // Rename the copy
         await this.testTool('file_rename', {
-            path: '/mcp-integration-test/copy.txt',
+            fileIdentifier: '/mcp-int-test/sub/test-file.txt',
             newName: 'renamed.txt',
         });
 
-        // Move
+        // Move the renamed file back
         await this.testTool('file_move', {
-            sourcePath: '/mcp-integration-test/renamed.txt',
-            targetPath: '/mcp-integration-test/moved.txt',
+            fileIdentifier: '/mcp-int-test/sub/renamed.txt',
+            targetDirectory: '/mcp-int-test',
         });
 
         // Delete files
-        await this.testTool('file_delete', { path: '/mcp-integration-test/moved.txt' });
-        await this.testTool('file_delete', { path: '/mcp-integration-test/test-file.txt' });
+        await this.testTool('file_delete', { fileIdentifier: '/mcp-int-test/renamed.txt' });
+        await this.testTool('file_delete', { fileIdentifier: '/mcp-int-test/test-file.txt' });
 
         // Directory rename
-        await this.testTool('directory_create', { path: '/mcp-int-rename-test' });
-        await this.testTool('directory_rename', { path: '/mcp-int-rename-test', newName: 'mcp-int-renamed' });
-        await this.testTool('directory_delete', { path: '/mcp-int-renamed' });
+        await this.testTool('directory_rename', { directoryIdentifier: '/mcp-int-test/sub', newName: 'renamed-sub' });
+        await this.testTool('directory_delete', { directoryIdentifier: '/mcp-int-test/renamed-sub' });
 
         // Directory move
-        await this.testTool('directory_create', { path: '/mcp-int-move-src' });
+        await this.testTool('directory_create', { directoryName: 'move-src' });
         await this.testTool('directory_move', {
-            sourcePath: '/mcp-int-move-src',
-            targetPath: '/mcp-integration-test',
+            directoryIdentifier: '/move-src',
+            targetDirectory: '/mcp-int-test',
         });
 
-        // Clean up remaining directory
-        await this.testTool('directory_delete', { path: '/mcp-integration-test' });
+        // Clean up
+        await this.testTool('directory_delete', { directoryIdentifier: '/mcp-int-test', recursive: true });
     }
 
     async testFileReferences(contentUid) {
@@ -333,10 +335,11 @@ class IntegrationTestRunner {
 
         // Upload a file for referencing
         const base64 = Buffer.from('File for reference test').toString('base64');
-        await this.callToolSafe('directory_create', { path: '/mcp-ref-test' });
+        await this.callToolSafe('directory_create', { directoryName: 'mcp-ref-test' });
         await this.callToolSafe('file_upload', {
-            data: base64,
-            path: '/mcp-ref-test/ref-file.txt',
+            fileName: 'ref-file.txt',
+            base64Content: base64,
+            directoryPath: '/mcp-ref-test',
         });
 
         // Find the sys_file UID
@@ -357,21 +360,21 @@ class IntegrationTestRunner {
             }
         } else {
             const added = await this.testTool('file_reference_add', {
-                tableName: 'tt_content',
+                table: 'tt_content',
                 uid: contentUid,
-                fileUid,
+                fileUids: String(fileUid),
                 fieldName: 'image',
             });
 
             await this.testTool('file_reference_list', {
-                tableName: 'tt_content',
+                table: 'tt_content',
                 uid: contentUid,
                 fieldName: 'image',
             });
 
             const refUid = added?.referenceUids?.[0];
             if (refUid) {
-                await this.testTool('file_reference_remove', { referenceUid: refUid });
+                await this.testTool('file_reference_remove', { referenceUids: String(refUid) });
             } else {
                 skip('file_reference_remove', 'no reference UID returned');
                 this.skipped.push({ tool: 'file_reference_remove', reason: 'no ref UID' });
@@ -379,8 +382,8 @@ class IntegrationTestRunner {
         }
 
         // Clean up
-        await this.callToolSafe('file_delete', { path: '/mcp-ref-test/ref-file.txt' });
-        await this.callToolSafe('directory_delete', { path: '/mcp-ref-test' });
+        await this.callToolSafe('file_delete', { fileIdentifier: '/mcp-ref-test/ref-file.txt' });
+        await this.callToolSafe('directory_delete', { directoryIdentifier: '/mcp-ref-test' });
     }
 
     async testTranslation(pageUid) {
@@ -389,9 +392,9 @@ class IntegrationTestRunner {
 
         if (pageUid) {
             await this.testTool('record_translate', {
-                tableName: 'pages',
+                table: 'pages',
                 uid: pageUid,
-                targetLanguageUid: 1,
+                targetLanguageId: 1,
             });
         }
     }
