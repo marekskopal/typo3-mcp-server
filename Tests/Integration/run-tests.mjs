@@ -480,12 +480,70 @@ class IntegrationTestRunner {
 
         // --- Scheduler (require typo3/cms-scheduler) ---
         if (this.availableTools.has('scheduler_list')) {
-            await this.testTool('scheduler_list', {});
+            const tasks = await this.testTool('scheduler_list', {});
+
+            // scheduler_get/update/delete require an existing task — skip if none
+            const taskUid = tasks?.records?.[0]?.uid;
+            if (taskUid) {
+                await this.testTool('scheduler_get', { uid: taskUid });
+                await this.testTool('scheduler_update', {
+                    uid: taskUid,
+                    fields: JSON.stringify({ description: 'Updated by integration test' }),
+                });
+                // Don't delete the only task — just verify the tool is callable
+            } else {
+                for (const t of ['scheduler_get', 'scheduler_update', 'scheduler_delete']) {
+                    skip(t, 'no scheduler tasks exist');
+                    this.skipped.push({ tool: t, reason: 'no tasks' });
+                }
+            }
         } else {
             for (const t of ['scheduler_list', 'scheduler_get', 'scheduler_update', 'scheduler_delete']) {
                 skip(t, 'typo3/cms-scheduler not installed');
                 this.skipped.push({ tool: t, reason: 'extension not installed' });
             }
+        }
+    }
+
+    async testDynamicTools(pageUid) {
+        section('Dynamic Tools (news)');
+
+        if (!this.availableTools.has('news_list')) {
+            const tools = ['news_list', 'news_get', 'news_create', 'news_update', 'news_delete', 'news_move'];
+            for (const t of tools) {
+                skip(t, 'news extension not installed or tools not registered');
+                this.skipped.push({ tool: t, reason: 'not available' });
+            }
+            return;
+        }
+
+        const pid = pageUid ?? 1;
+
+        // Create
+        const news = await this.testTool('news_create', {
+            pid,
+            fields: JSON.stringify({ title: 'Integration Test News' }),
+        });
+        const newsUid = news?.uid;
+
+        // List
+        await this.testTool('news_list', { pid });
+
+        // Get
+        if (newsUid) {
+            await this.testTool('news_get', { uid: newsUid });
+
+            // Update
+            await this.testTool('news_update', {
+                uid: newsUid,
+                fields: JSON.stringify({ title: 'Updated Integration Test News' }),
+            });
+
+            // Move
+            await this.testTool('news_move', { uid: newsUid, target: pid });
+
+            // Delete
+            await this.testTool('news_delete', { uid: newsUid });
         }
     }
 
@@ -518,6 +576,7 @@ class IntegrationTestRunner {
         await this.testBatchOperations(pageUid);
         await this.testCache();
         await this.testConditionalTools();
+        await this.testDynamicTools(pageUid);
         await this.cleanupRecords(pageUid, childUid, contentUid);
 
         // Check for any tools that were discovered but not tested

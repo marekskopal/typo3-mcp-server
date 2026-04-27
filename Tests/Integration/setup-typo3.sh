@@ -85,7 +85,7 @@ EOF
 composer config repositories.mcp-server \
     "{\"type\": \"path\", \"url\": \"$EXTENSION_PATH\", \"options\": {\"symlink\": true}}"
 
-# Install TYPO3 core + extension
+# Install TYPO3 core + extension + optional extensions for testing
 echo ""
 echo "Installing TYPO3 packages..."
 composer require \
@@ -96,8 +96,16 @@ composer require \
     "typo3/cms-frontend:$TYPO3_VERSION" \
     "typo3/cms-install:$TYPO3_VERSION" \
     "typo3/cms-filelist:$TYPO3_VERSION" \
+    "typo3/cms-redirects:$TYPO3_VERSION" \
+    "typo3/cms-scheduler:$TYPO3_VERSION" \
     "marekskopal/typo3-mcp-server:@dev" \
     --no-interaction --no-progress
+
+# Install news extension for dynamic tool testing (may not be available for all TYPO3 versions)
+echo ""
+echo "Installing news extension..."
+composer require "georgringer/news" --no-interaction --no-progress \
+    || echo "WARNING: georgringer/news not available for TYPO3 $TYPO3_VERSION, dynamic tool tests will be skipped"
 
 # --- Setup TYPO3 ---
 echo ""
