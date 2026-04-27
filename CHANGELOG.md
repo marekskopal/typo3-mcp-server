@@ -4,6 +4,19 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.8.0] - 2026-04-27
+
+### Added
+- **Scheduler task tools:** `scheduler_task_list`, `scheduler_task_get`, `scheduler_task_update`, `scheduler_task_delete` — conditionally registered when `typo3/cms-scheduler` is installed
+- **Redirect management tools:** `redirect_list`, `redirect_get`, `redirect_create`, `redirect_update`, `redirect_delete` — conditionally registered when `typo3/cms-redirects` is installed
+- **Permission checking tools:** Pre-flight access verification for table read/write access, page-level permissions, and full permission summary
+- **Batch tools for dynamic tables:** Batch delete, update, and move operations now available for dynamically registered extension tables
+
+### Fixed
+- Rate-limit `hit_count` increment failing with `Incorrect integer value` — removed redundant `expr()->literal()` wrapping on raw SQL expression
+- UID existence validation added before processing in batch tools
+- PHPUnit notices resolved by using `createStub()` instead of `createMock()` where no expectations were configured
+
 ## [0.7.1] - 2026-04-26
 
 ### Changed
