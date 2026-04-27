@@ -118,7 +118,7 @@ readonly class RateLimitService
 
         $queryBuilder
             ->update(self::TABLE)
-            ->set('hit_count', $queryBuilder->expr()->literal('hit_count + 1'), false)
+            ->set('hit_count', 'hit_count + 1', false)
             ->where(
                 $queryBuilder->expr()->eq('ip_address', $queryBuilder->createNamedParameter($ipAddress)),
                 $queryBuilder->expr()->eq('endpoint', $queryBuilder->createNamedParameter($endpoint)),
