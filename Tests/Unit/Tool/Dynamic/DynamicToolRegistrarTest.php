@@ -9,6 +9,9 @@ use MarekSkopal\MsMcpServer\Service\DataHandlerService;
 use MarekSkopal\MsMcpServer\Service\RecordService;
 use MarekSkopal\MsMcpServer\Service\TcaSchemaService;
 use MarekSkopal\MsMcpServer\Tool\Dynamic\DynamicToolRegistrar;
+use MarekSkopal\MsMcpServer\Tool\Result\BatchRecordsDeletedResult;
+use MarekSkopal\MsMcpServer\Tool\Result\BatchRecordsMovedResult;
+use MarekSkopal\MsMcpServer\Tool\Result\BatchRecordsUpdatedResult;
 use MarekSkopal\MsMcpServer\Tool\Result\ErrorResult;
 use MarekSkopal\MsMcpServer\Tool\Result\RecordCreatedResult;
 use MarekSkopal\MsMcpServer\Tool\Result\RecordDeletedResult;
@@ -572,6 +575,9 @@ final class DynamicToolRegistrarTest extends TestCase
 
         self::assertContains('discovered_item_list', $toolNames);
         self::assertContains('discovered_item_get', $toolNames);
+        self::assertContains('discovered_item_delete_batch', $toolNames);
+        self::assertContains('discovered_item_update_batch', $toolNames);
+        self::assertContains('discovered_item_move_batch', $toolNames);
 
         unset($GLOBALS['TCA']['tx_discovered_domain_model_item']);
     }
@@ -622,6 +628,162 @@ final class DynamicToolRegistrarTest extends TestCase
         $toolNames = array_column($tools, 'name');
 
         self::assertContains('item_list', $toolNames);
+    }
+
+    public function testDeleteBatchToolCallsDataHandlerService(): void
+    {
+        $recordService = $this->createMock(RecordService::class);
+        $recordService->method('findExistingUids')->willReturn([1, 2, 3]);
+
+        $dataHandlerService = $this->createMock(DataHandlerService::class);
+        $dataHandlerService->expects(self::once())
+            ->method('deleteRecords')
+            ->with(self::TABLE, [1, 2, 3]);
+
+        $closure = $this->getRegisteredClosure($recordService, $dataHandlerService, 'delete_batch');
+        $result = $closure('1,2,3');
+
+        self::assertInstanceOf(BatchRecordsDeletedResult::class, $result);
+        self::assertSame([1, 2, 3], $result->uids);
+        self::assertSame(3, $result->count);
+        self::assertSame([], $result->skippedUids);
+    }
+
+    public function testDeleteBatchToolSkipsNonExistentUids(): void
+    {
+        $recordService = $this->createStub(RecordService::class);
+        $recordService->method('findExistingUids')->willReturn([1, 3]);
+
+        $dataHandlerService = $this->createMock(DataHandlerService::class);
+        $dataHandlerService->expects(self::once())
+            ->method('deleteRecords')
+            ->with(self::TABLE, [1, 3]);
+
+        $closure = $this->getRegisteredClosure($recordService, $dataHandlerService, 'delete_batch');
+        $result = $closure('1,2,3');
+
+        self::assertInstanceOf(BatchRecordsDeletedResult::class, $result);
+        self::assertSame([1, 3], $result->uids);
+        self::assertSame(2, $result->count);
+        self::assertSame([2], $result->skippedUids);
+    }
+
+    public function testDeleteBatchToolThrowsWhenNoUidsExist(): void
+    {
+        $recordService = $this->createStub(RecordService::class);
+        $recordService->method('findExistingUids')->willReturn([]);
+
+        $closure = $this->getRegisteredClosure($recordService, $this->createStub(DataHandlerService::class), 'delete_batch');
+
+        $this->expectException(ToolCallException::class);
+        $this->expectExceptionMessage('None of the provided UIDs exist');
+
+        $closure('1,2,3');
+    }
+
+    public function testUpdateBatchToolCallsDataHandlerService(): void
+    {
+        $recordService = $this->createMock(RecordService::class);
+        $recordService->method('findExistingUids')->willReturn([1, 2]);
+
+        $dataHandlerService = $this->createMock(DataHandlerService::class);
+        $dataHandlerService->expects(self::once())
+            ->method('updateRecords')
+            ->with(self::TABLE, [1, 2], ['title' => 'Updated']);
+
+        $closure = $this->getRegisteredClosure($recordService, $dataHandlerService, 'update_batch');
+        $result = $closure('1,2', json_encode(['title' => 'Updated'], JSON_THROW_ON_ERROR));
+
+        self::assertInstanceOf(BatchRecordsUpdatedResult::class, $result);
+        self::assertSame([1, 2], $result->uids);
+        self::assertSame(2, $result->count);
+        self::assertSame(['title'], $result->updatedFields);
+        self::assertSame([], $result->ignoredFields);
+        self::assertSame([], $result->skippedUids);
+    }
+
+    public function testUpdateBatchToolSkipsNonExistentUidsAndIgnoresInvalidFields(): void
+    {
+        $recordService = $this->createStub(RecordService::class);
+        $recordService->method('findExistingUids')->willReturn([1]);
+
+        $dataHandlerService = $this->createMock(DataHandlerService::class);
+        $dataHandlerService->expects(self::once())
+            ->method('updateRecords')
+            ->with(self::TABLE, [1], ['title' => 'Updated']);
+
+        $closure = $this->getRegisteredClosure($recordService, $dataHandlerService, 'update_batch');
+        $result = $closure('1,2', json_encode(['title' => 'Updated', 'invalid' => 'x'], JSON_THROW_ON_ERROR));
+
+        self::assertInstanceOf(BatchRecordsUpdatedResult::class, $result);
+        self::assertSame([1], $result->uids);
+        self::assertSame([2], $result->skippedUids);
+        self::assertSame(['title'], $result->updatedFields);
+        self::assertSame(['invalid'], $result->ignoredFields);
+    }
+
+    public function testUpdateBatchToolThrowsWhenNoValidFields(): void
+    {
+        $recordService = $this->createStub(RecordService::class);
+        $recordService->method('findExistingUids')->willReturn([1]);
+
+        $closure = $this->getRegisteredClosure($recordService, $this->createStub(DataHandlerService::class), 'update_batch');
+
+        $this->expectException(ToolCallException::class);
+        $this->expectExceptionMessage('No valid writable fields');
+
+        $closure('1', json_encode(['invalid' => 'value'], JSON_THROW_ON_ERROR));
+    }
+
+    public function testMoveBatchToolCallsDataHandlerService(): void
+    {
+        $recordService = $this->createMock(RecordService::class);
+        $recordService->method('findExistingUids')->willReturn([10, 20]);
+
+        $dataHandlerService = $this->createMock(DataHandlerService::class);
+        $dataHandlerService->expects(self::once())
+            ->method('moveRecords')
+            ->with(self::TABLE, [10, 20], 5);
+
+        $closure = $this->getRegisteredClosure($recordService, $dataHandlerService, 'move_batch');
+        $result = $closure('10,20', 5);
+
+        self::assertInstanceOf(BatchRecordsMovedResult::class, $result);
+        self::assertSame([10, 20], $result->uids);
+        self::assertSame(2, $result->count);
+        self::assertSame(5, $result->target);
+        self::assertSame([], $result->skippedUids);
+    }
+
+    public function testMoveBatchToolSkipsNonExistentUids(): void
+    {
+        $recordService = $this->createStub(RecordService::class);
+        $recordService->method('findExistingUids')->willReturn([10]);
+
+        $dataHandlerService = $this->createMock(DataHandlerService::class);
+        $dataHandlerService->expects(self::once())
+            ->method('moveRecords')
+            ->with(self::TABLE, [10], -3);
+
+        $closure = $this->getRegisteredClosure($recordService, $dataHandlerService, 'move_batch');
+        $result = $closure('10,20', -3);
+
+        self::assertInstanceOf(BatchRecordsMovedResult::class, $result);
+        self::assertSame([10], $result->uids);
+        self::assertSame([20], $result->skippedUids);
+    }
+
+    public function testMoveBatchToolThrowsWhenNoUidsExist(): void
+    {
+        $recordService = $this->createStub(RecordService::class);
+        $recordService->method('findExistingUids')->willReturn([]);
+
+        $closure = $this->getRegisteredClosure($recordService, $this->createStub(DataHandlerService::class), 'move_batch');
+
+        $this->expectException(ToolCallException::class);
+        $this->expectExceptionMessage('None of the provided UIDs exist');
+
+        $closure('10,20', 5);
     }
 
     private function createRegistrar(

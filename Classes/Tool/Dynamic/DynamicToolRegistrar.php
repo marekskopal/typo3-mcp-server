@@ -8,6 +8,9 @@ use MarekSkopal\MsMcpServer\Repository\DiscoveredTableRepository;
 use MarekSkopal\MsMcpServer\Service\DataHandlerService;
 use MarekSkopal\MsMcpServer\Service\RecordService;
 use MarekSkopal\MsMcpServer\Service\TcaSchemaService;
+use MarekSkopal\MsMcpServer\Tool\Result\BatchRecordsDeletedResult;
+use MarekSkopal\MsMcpServer\Tool\Result\BatchRecordsMovedResult;
+use MarekSkopal\MsMcpServer\Tool\Result\BatchRecordsUpdatedResult;
 use MarekSkopal\MsMcpServer\Tool\Result\ErrorResult;
 use MarekSkopal\MsMcpServer\Tool\Result\RecordCreatedResult;
 use MarekSkopal\MsMcpServer\Tool\Result\RecordDeletedResult;
@@ -47,6 +50,9 @@ readonly class DynamicToolRegistrar
             $this->registerUpdateTool($builder, $tableName, $resolvedConfig);
             $this->registerDeleteTool($builder, $tableName, $resolvedConfig);
             $this->registerMoveTool($builder, $tableName, $resolvedConfig);
+            $this->registerDeleteBatchTool($builder, $tableName, $resolvedConfig);
+            $this->registerUpdateBatchTool($builder, $tableName, $resolvedConfig);
+            $this->registerMoveBatchTool($builder, $tableName, $resolvedConfig);
         }
     }
 
@@ -468,5 +474,162 @@ readonly class DynamicToolRegistrar
                 . ' Use a positive target to move to the top of a page (target = page pid).'
                 . ' Use a negative target to move after another record (target = -uid of the record to place after).',
         );
+    }
+
+    /** @param array{label: string, prefix: string, listFields: list<string>, readFields: list<string>, writableFields: list<string>, translationConfig: array{languageField: string|null, transOrigPointerField: string|null, translationSource: string|null}} $config */
+    private function registerDeleteBatchTool(Builder $builder, string $tableName, array $config): void
+    {
+        $recordService = $this->recordService;
+        $dataHandlerService = $this->dataHandlerService;
+        $logger = $this->logger;
+
+        $builder->addTool(
+            handler: static function (string $uids) use ($recordService, $dataHandlerService, $logger, $tableName): BatchRecordsDeletedResult {
+                $uidList = self::parseUids($uids);
+                $existingUids = $recordService->findExistingUids($tableName, $uidList);
+
+                if ($existingUids === []) {
+                    throw new ToolCallException('None of the provided UIDs exist in table ' . $tableName);
+                }
+
+                $skippedUids = array_values(array_diff($uidList, $existingUids));
+
+                try {
+                    $dataHandlerService->deleteRecords($tableName, $existingUids);
+                } catch (\Throwable $e) {
+                    $logger->error($tableName . ' delete batch tool failed', ['exception' => $e]);
+
+                    throw new ToolCallException($e->getMessage(), (int) $e->getCode(), $e);
+                }
+
+                return new BatchRecordsDeletedResult($existingUids, count($existingUids), $skippedUids);
+            },
+            name: $config['prefix'] . '_delete_batch',
+            description: 'Delete multiple ' . $config['label'] . ' records in a single operation.'
+                . ' Pass UIDs as a comma-separated string (e.g. "1,2,3").'
+                . ' Non-existent UIDs are skipped and reported in skippedUids.',
+        );
+    }
+
+    /** @param array{label: string, prefix: string, listFields: list<string>, readFields: list<string>, writableFields: list<string>, translationConfig: array{languageField: string|null, transOrigPointerField: string|null, translationSource: string|null}} $config */
+    private function registerUpdateBatchTool(Builder $builder, string $tableName, array $config): void
+    {
+        $recordService = $this->recordService;
+        $dataHandlerService = $this->dataHandlerService;
+        $logger = $this->logger;
+        $writableFields = $config['writableFields'];
+
+        $builder->addTool(
+            handler: static function (
+                string $uids,
+                string $fields,
+            ) use (
+                $recordService,
+                $dataHandlerService,
+                $logger,
+                $tableName,
+                $writableFields,
+            ): BatchRecordsUpdatedResult {
+                $uidList = self::parseUids($uids);
+                $existingUids = $recordService->findExistingUids($tableName, $uidList);
+
+                if ($existingUids === []) {
+                    throw new ToolCallException('None of the provided UIDs exist in table ' . $tableName);
+                }
+
+                $skippedUids = array_values(array_diff($uidList, $existingUids));
+
+                /** @var array<string, mixed> $fieldData */
+                $fieldData = json_decode($fields, true, 512, JSON_THROW_ON_ERROR);
+
+                $validFields = [];
+                $ignoredFields = [];
+                foreach ($fieldData as $field => $value) {
+                    if (in_array($field, $writableFields, true)) {
+                        $validFields[$field] = $value;
+                    } else {
+                        $ignoredFields[] = $field;
+                    }
+                }
+
+                if ($validFields === []) {
+                    throw new ToolCallException('No valid writable fields provided');
+                }
+
+                try {
+                    $dataHandlerService->updateRecords($tableName, $existingUids, $validFields);
+                } catch (\Throwable $e) {
+                    $logger->error($tableName . ' update batch tool failed', ['exception' => $e]);
+
+                    throw new ToolCallException($e->getMessage(), (int) $e->getCode(), $e);
+                }
+
+                return new BatchRecordsUpdatedResult(
+                    $existingUids,
+                    count($existingUids),
+                    array_keys($validFields),
+                    $ignoredFields,
+                    $skippedUids,
+                );
+            },
+            name: $config['prefix'] . '_update_batch',
+            description: 'Update the same fields on multiple ' . $config['label'] . ' records.'
+                . ' Pass UIDs as comma-separated (e.g. "1,2,3") and fields as a JSON object (e.g. {"hidden":1}).'
+                . ' Available fields: ' . implode(', ', $config['writableFields']) . '.'
+                . ' Non-existent UIDs are skipped and reported in skippedUids.',
+        );
+    }
+
+    /** @param array{label: string, prefix: string, listFields: list<string>, readFields: list<string>, writableFields: list<string>, translationConfig: array{languageField: string|null, transOrigPointerField: string|null, translationSource: string|null}} $config */
+    private function registerMoveBatchTool(Builder $builder, string $tableName, array $config): void
+    {
+        $recordService = $this->recordService;
+        $dataHandlerService = $this->dataHandlerService;
+        $logger = $this->logger;
+
+        $builder->addTool(
+            handler: static function (
+                string $uids,
+                int $target,
+            ) use (
+                $recordService,
+                $dataHandlerService,
+                $logger,
+                $tableName
+            ): BatchRecordsMovedResult {
+                $uidList = self::parseUids($uids);
+                $existingUids = $recordService->findExistingUids($tableName, $uidList);
+
+                if ($existingUids === []) {
+                    throw new ToolCallException('None of the provided UIDs exist in table ' . $tableName);
+                }
+
+                $skippedUids = array_values(array_diff($uidList, $existingUids));
+
+                try {
+                    $dataHandlerService->moveRecords($tableName, $existingUids, $target);
+                } catch (\Throwable $e) {
+                    $logger->error($tableName . ' move batch tool failed', ['exception' => $e]);
+
+                    throw new ToolCallException($e->getMessage(), (int) $e->getCode(), $e);
+                }
+
+                return new BatchRecordsMovedResult($existingUids, count($existingUids), $target, $skippedUids);
+            },
+            name: $config['prefix'] . '_move_batch',
+            description: 'Move multiple ' . $config['label'] . ' records to a new position in a single operation.'
+                . ' Pass UIDs as comma-separated (e.g. "1,2,3").'
+                . ' Positive target = move to page (target = pid). Negative target = move after record (target = -uid).'
+                . ' Non-existent UIDs are skipped and reported in skippedUids.',
+        );
+    }
+
+    /** @return list<int> */
+    private static function parseUids(string $uids): array
+    {
+        return array_values(array_filter(
+            array_map('intval', array_filter(explode(',', $uids), static fn(string $v): bool => $v !== '')),
+            static fn(int $v): bool => $v > 0,
+        ));
     }
 }

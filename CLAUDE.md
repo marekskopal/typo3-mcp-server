@@ -66,7 +66,7 @@ vendor/bin/typo3 mcp:cleanup
 - `Tool/Cache/CacheClearTool` — Flush TYPO3 caches (all, pages, or specific cache groups)
 - `Logging/AuditLogger` — Writes tool/resource invocations to `sys_log` table with user, timing, and outcome
 - `Resource/BackendLayoutResource` — MCP Resource Template exposing backend layout and column positions for a page (`typo3://pages/{pageId}/backend-layout`)
-- `Tool/Dynamic/DynamicToolRegistrar` — Registers CRUD tools at runtime for tables configured via `EXTCONF` and discovered tables from `tx_msmcpserver_discovered_table`
+- `Tool/Dynamic/DynamicToolRegistrar` — Registers CRUD + batch tools at runtime for tables configured via `EXTCONF` and discovered tables from `tx_msmcpserver_discovered_table`
 - `Service/ExtensionTableDiscoveryService` — Scans TCA for extension tables, generates label/prefix, filters system tables
 - `Repository/DiscoveredTableRepository` — CRUD for `tx_msmcpserver_discovered_table` (discovered extension tables with enable/disable)
 - `Command/CleanupExpiredTokensCommand` — CLI command (`mcp:cleanup`) to purge expired OAuth tokens and stale MCP session files
@@ -118,7 +118,7 @@ readonly class MyTool
 
 ## Testing
 
-455 unit tests covering:
+464 unit tests covering:
 - All 44 static MCP tools + 3 batch tools (Pages/Content/File/Schema/Search/Translation/Cache/Permission/Batch CRUD)
 - Dynamic tool registration and execution (DynamicToolRegistrar), including merged EXTCONF + discovered tables
 - OAuth classes (AuthorizationService incl. revocation, ClientRepository, PkceVerifier, OAuthTokenPair, RateLimitService)
