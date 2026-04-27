@@ -31,6 +31,7 @@ use MarekSkopal\MsMcpServer\Tool\Content\ContentMoveTool;
 use MarekSkopal\MsMcpServer\Tool\Content\ContentUpdateTool;
 use MarekSkopal\MsMcpServer\Repository\DiscoveredTableRepository;
 use MarekSkopal\MsMcpServer\Tool\Dynamic\DynamicToolRegistrar;
+use MarekSkopal\MsMcpServer\Tool\Redirect\RedirectToolRegistrar;
 use MarekSkopal\MsMcpServer\Tool\File\DirectoryCreateTool;
 use MarekSkopal\MsMcpServer\Tool\File\DirectoryDeleteTool;
 use MarekSkopal\MsMcpServer\Tool\File\DirectoryMoveTool;
@@ -69,8 +70,10 @@ use TYPO3\CMS\Core\Core\ApplicationContext;
 use TYPO3\CMS\Core\Core\Environment;
 use TYPO3\CMS\Core\Database\ConnectionPool;
 use TYPO3\CMS\Core\Information\Typo3Version;
+use TYPO3\CMS\Core\Package\PackageManager;
 use TYPO3\CMS\Core\Resource\StorageRepository;
 use TYPO3\CMS\Core\Site\SiteFinder;
+use TYPO3\CMS\Core\Utility\ExtensionManagementUtility;
 
 #[CoversClass(McpServerFactory::class)]
 final class McpServerFactoryTest extends TestCase
@@ -88,6 +91,10 @@ final class McpServerFactoryTest extends TestCase
             '/tmp/typo3-test/index.php',
             'UNIX',
         );
+
+        $packageManager = $this->createStub(PackageManager::class);
+        $packageManager->method('isPackageActive')->willReturn(false);
+        ExtensionManagementUtility::setPackageManager($packageManager);
     }
 
     public function testCreateReturnsServerInstance(): void
@@ -177,10 +184,11 @@ final class McpServerFactoryTest extends TestCase
         $discoveredTableRepository = $this->createStub(DiscoveredTableRepository::class);
         $discoveredTableRepository->method('findEnabled')->willReturn([]);
         $dynamicToolRegistrar = new DynamicToolRegistrar($recordService, $dataHandlerService, $tcaSchemaService, $discoveredTableRepository, $logger);
+        $redirectToolRegistrar = new RedirectToolRegistrar($recordService, $dataHandlerService, $logger);
 
         $auditLogger = $this->createStub(\MarekSkopal\MsMcpServer\Logging\AuditLogger::class);
 
-        $factory = new McpServerFactory($container, $dynamicToolRegistrar, $logger, $auditLogger, $tools, $resources, $prompts);
+        $factory = new McpServerFactory($container, $dynamicToolRegistrar, $redirectToolRegistrar, $logger, $auditLogger, $tools, $resources, $prompts);
         $server = $factory->create();
 
         self::assertInstanceOf(Server::class, $server);
@@ -193,7 +201,7 @@ final class McpServerFactoryTest extends TestCase
     public function testAllToolClassesHaveMcpToolAttribute(): void
     {
         $toolDir = __DIR__ . '/../../../Classes/Tool';
-        $excludedDirs = ['Result', 'Dynamic'];
+        $excludedDirs = ['Result', 'Dynamic', 'Redirect'];
         $excludedFiles = ['SearchConditionParser.php'];
 
         $iterator = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($toolDir));

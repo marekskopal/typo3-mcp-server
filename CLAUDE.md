@@ -62,6 +62,7 @@ vendor/bin/typo3 mcp:cleanup
 - `Tool/Search/ContentSearchTool` — Search content elements by header with language filtering
 - `Tool/Search/SearchConditionParser` — Shared condition parsing for search tools
 - `Tool/Batch/*` — Batch operations (record_delete_batch, record_update_batch, record_move_batch) for any table
+- `Tool/Redirect/RedirectToolRegistrar` — Conditionally registers redirect management tools (list, get, create, update, delete) when `typo3/cms-redirects` is installed
 - `Tool/Permission/*` — Permission checking tools (check table read/write access, page-level permissions, full permission summary)
 - `Tool/Cache/CacheClearTool` — Flush TYPO3 caches (all, pages, or specific cache groups)
 - `Logging/AuditLogger` — Writes tool/resource invocations to `sys_log` table with user, timing, and outcome
@@ -118,7 +119,7 @@ readonly class MyTool
 
 ## Testing
 
-464 unit tests covering:
+489 unit tests covering:
 - All 44 static MCP tools + 3 batch tools (Pages/Content/File/Schema/Search/Translation/Cache/Permission/Batch CRUD)
 - Dynamic tool registration and execution (DynamicToolRegistrar), including merged EXTCONF + discovered tables
 - OAuth classes (AuthorizationService incl. revocation, ClientRepository, PkceVerifier, OAuthTokenPair, RateLimitService)

@@ -12,6 +12,7 @@ services:
     exclude:
       - '../Classes/Tool/Result/*'
       - '../Classes/Tool/Dynamic/*'
+      - '../Classes/Tool/Redirect/*'
       - '../Classes/Tool/Search/SearchConditionParser.php'
     public: true
     tags:

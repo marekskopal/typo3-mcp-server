@@ -7,5 +7,4 @@
 ## Nice to have
 
 - **Scheduler tools** — list/run TYPO3 scheduler tasks
-- **Redirect tools** — manage sys_redirect records
 - **User/group tools** — list backend users, check permissions
