@@ -111,6 +111,7 @@ vendor/bin/typo3 setup \
     --password="$DB_PASS" \
     --admin-user-password='Password123!' \
     --project-name='TYPO3 MCP Integration Test' \
+    --server-type=other \
     --no-interaction \
     --force
 
