@@ -50,6 +50,7 @@ vendor/bin/typo3 mcp:cleanup
 - `Service/RecordService` — Read operations via QueryBuilder (findByUid, findByPid, search with pagination capped at 500)
 - `Service/FileService` — File operations via TYPO3 ResourceStorage (list, upload, copy, delete, move, rename, directory ops)
 - `Service/TcaSchemaService` — TCA field metadata extraction for schema introspection and dynamic tools
+- `Service/PermissionService` — Wraps `$GLOBALS['BE_USER']` permission APIs for table/page access checks and permission summaries
 - `Service/BackendLayoutService` — Resolves the effective BackendLayout for a page via BackendLayoutView, returns structured DTOs with column positions and grid structure
 - `Tool/Pages/*` — CRUD tools for pages table (use `#[McpTool]` attributes)
 - `Tool/Content/*` — CRUD tools for tt_content table (use `#[McpTool]` attributes)
@@ -61,6 +62,7 @@ vendor/bin/typo3 mcp:cleanup
 - `Tool/Search/ContentSearchTool` — Search content elements by header with language filtering
 - `Tool/Search/SearchConditionParser` — Shared condition parsing for search tools
 - `Tool/Batch/*` — Batch operations (record_delete_batch, record_update_batch, record_move_batch) for any table
+- `Tool/Permission/*` — Permission checking tools (check table read/write access, page-level permissions, full permission summary)
 - `Tool/Cache/CacheClearTool` — Flush TYPO3 caches (all, pages, or specific cache groups)
 - `Logging/AuditLogger` — Writes tool/resource invocations to `sys_log` table with user, timing, and outcome
 - `Resource/BackendLayoutResource` — MCP Resource Template exposing backend layout and column positions for a page (`typo3://pages/{pageId}/backend-layout`)
@@ -116,8 +118,8 @@ readonly class MyTool
 
 ## Testing
 
-424 unit tests covering:
-- All 41 static MCP tools + 3 batch tools (Pages/Content/File/Schema/Search/Translation/Cache/Batch CRUD)
+447 unit tests covering:
+- All 44 static MCP tools + 3 batch tools (Pages/Content/File/Schema/Search/Translation/Cache/Permission/Batch CRUD)
 - Dynamic tool registration and execution (DynamicToolRegistrar), including merged EXTCONF + discovered tables
 - OAuth classes (AuthorizationService incl. revocation, ClientRepository, PkceVerifier, OAuthTokenPair, RateLimitService)
 - OAuthMiddleware (metadata, authorize, register, revoke, token endpoints, rate limiting)
@@ -126,7 +128,7 @@ readonly class MyTool
 - ExtensionTableDiscoveryService (TCA scanning, label/prefix generation, system table filtering)
 - DiscoveredTableRepository (findAll, findEnabled, findByUid, insertIfNew, update, setEnabled)
 - BackendUserBootstrap, McpServerFactory, McpServerMiddleware
-- Services (RecordService, DataHandlerService, FileService, TcaSchemaService, BackendLayoutService)
+- Services (RecordService, DataHandlerService, FileService, TcaSchemaService, BackendLayoutService, PermissionService)
 - Resources (SystemInfo, SiteConfiguration, TcaTables, BackendUser, TcaTableSchema, BackendLayout)
 - CleanupExpiredTokensCommand
 

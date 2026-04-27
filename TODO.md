@@ -6,7 +6,6 @@
 
 ## Hardening for 1.0
 
-- **Permission checking tools** — verify user can access a page/table before acting
 - **Input validation** — batch tools accept any comma-separated string; could validate UIDs exist before processing
 - **Dynamic tool batch support** — batch ops for extension tables (news, blog, etc.)
 
