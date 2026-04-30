@@ -98,6 +98,7 @@ composer require \
     "typo3/cms-filelist:$TYPO3_VERSION" \
     "typo3/cms-redirects:$TYPO3_VERSION" \
     "typo3/cms-scheduler:$TYPO3_VERSION" \
+    "typo3/cms-workspaces:$TYPO3_VERSION" \
     "marekskopal/typo3-mcp-server:@dev" \
     --no-interaction --no-progress
 

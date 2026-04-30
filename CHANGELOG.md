@@ -12,6 +12,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
   - `BackendUserBootstrap` now calls `BackendUserAuthentication::setWorkspace()` from the persisted `be_users.workspace_id` when the workspaces extension is loaded, so DataHandler operations write into the active workspace as drafts.
   - **New tools:** `workspace_list`, `workspace_get`, `workspace_switch`, `workspace_changes_list`, `workspace_publish`, `workspace_discard`, `workspace_stage_set` — registered via `WorkspaceToolRegistrar` only when `typo3/cms-workspaces` is installed.
   - `DataHandlerService::processCommand()` for raw cmdmap dispatch (used by publish/discard).
+  - **Integration tests:** end-to-end coverage of the workspace lifecycle (switch → modify → overlay-verify → discard → publish → stage_set) added to `Tests/Integration/run-tests.mjs`. `typo3/cms-workspaces` is now installed by the integration test setup.
 
 ## [0.8.0] - 2026-04-27
 

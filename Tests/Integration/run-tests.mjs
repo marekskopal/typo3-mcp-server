@@ -505,6 +505,155 @@ class IntegrationTestRunner {
         }
     }
 
+    async testWorkspaceOperations(pageUid) {
+        section('Workspace Operations');
+
+        const workspaceTools = [
+            'workspace_list',
+            'workspace_get',
+            'workspace_switch',
+            'workspace_changes_list',
+            'workspace_publish',
+            'workspace_discard',
+            'workspace_stage_set',
+        ];
+
+        if (!this.availableTools.has('workspace_list')) {
+            for (const t of workspaceTools) {
+                skip(t, 'typo3/cms-workspaces not installed');
+                this.skipped.push({ tool: t, reason: 'extension not installed' });
+            }
+            return;
+        }
+
+        // ---- workspace_list: should include live (uid 0) and the seeded test workspace (uid 1) ----
+        const list = await this.testTool('workspace_list', {});
+        const hasLive = Array.isArray(list) && list.some(w => w.uid === 0);
+        const testWorkspace = Array.isArray(list) ? list.find(w => w.uid !== 0) : null;
+        if (!hasLive) {
+            this.failed.push({ tool: 'workspace_list', error: 'live workspace not in list' });
+            fail('workspace_list (live missing)', 'live workspace (uid 0) not returned');
+        }
+        if (!testWorkspace) {
+            // No custom workspace seeded — skip the rest of the lifecycle but the tool itself worked.
+            for (const t of ['workspace_switch', 'workspace_changes_list', 'workspace_publish', 'workspace_discard', 'workspace_stage_set']) {
+                skip(t, 'no custom sys_workspace record (run database:updateschema?)');
+                this.skipped.push({ tool: t, reason: 'no test workspace' });
+            }
+            // Still smoke-test workspace_get on live
+            await this.testTool('workspace_get', { workspaceId: 0 });
+            return;
+        }
+
+        const wsId = testWorkspace.uid;
+
+        // ---- workspace_get: live + custom ----
+        await this.testTool('workspace_get', { workspaceId: 0 });
+        await this.testTool('workspace_get', { workspaceId: wsId });
+
+        // ---- Create a dedicated test page in live so we can compare live vs. workspace overlay ----
+        const liveTitle = 'Workspace Live Title';
+        const created = await this.callToolSafe('pages_create', {
+            pid: pageUid ?? 1,
+            fields: JSON.stringify({ title: liveTitle, doktype: 1 }),
+        });
+        const wsPageUid = created?.uid;
+        if (!wsPageUid) {
+            for (const t of ['workspace_switch', 'workspace_changes_list', 'workspace_publish', 'workspace_discard', 'workspace_stage_set']) {
+                skip(t, 'could not create test page in live');
+                this.skipped.push({ tool: t, reason: 'setup failed' });
+            }
+            return;
+        }
+
+        try {
+            // ---- workspace_switch into the test workspace ----
+            await this.testTool('workspace_switch', { workspaceId: wsId });
+
+            // ---- pages_update under workspace context — should produce a workspace draft, not modify live ----
+            const draftTitle = 'Workspace Draft Title';
+            await this.callToolSafe('pages_update', {
+                uid: wsPageUid,
+                fields: JSON.stringify({ title: draftTitle }),
+            });
+
+            // ---- pages_get with workspace overlay — should reflect the draft ----
+            const overlaid = await this.callToolSafe('pages_get', { uid: wsPageUid });
+            if (overlaid?.title === draftTitle) {
+                this.passed.push({ tool: 'workspace overlay (pages_get)' });
+                pass('workspace overlay (pages_get returned draft title)');
+            } else {
+                this.failed.push({ tool: 'workspace overlay (pages_get)', error: `expected '${draftTitle}', got '${overlaid?.title}'` });
+                fail('workspace overlay (pages_get)', `expected '${draftTitle}', got '${overlaid?.title}'`);
+            }
+
+            // ---- workspace_changes_list — should show the modified page ----
+            const changes1 = await this.testTool('workspace_changes_list', {});
+            const pagesChanges = changes1?.tables?.pages ?? [];
+            const wsVersion = pagesChanges.find(c => c.liveUid === wsPageUid);
+            if (!wsVersion) {
+                this.failed.push({ tool: 'workspace_changes_list', error: 'modified page not in changes list' });
+                fail('workspace_changes_list (verify content)', 'modified page not in changes list');
+            }
+
+            // ---- workspace_discard the change, verify live data is restored on re-read ----
+            if (wsVersion) {
+                await this.testTool('workspace_discard', { table: 'pages', workspaceVersionUid: wsVersion.uid });
+                const afterDiscard = await this.callToolSafe('pages_get', { uid: wsPageUid });
+                if (afterDiscard?.title === liveTitle) {
+                    this.passed.push({ tool: 'workspace_discard (verify)' });
+                    pass('workspace_discard (live title restored)');
+                } else {
+                    this.failed.push({ tool: 'workspace_discard (verify)', error: `expected live title after discard, got '${afterDiscard?.title}'` });
+                    fail('workspace_discard (verify)', `expected '${liveTitle}', got '${afterDiscard?.title}'`);
+                }
+            }
+
+            // ---- Make a fresh change, exercise stage_set, then publish ----
+            const publishedTitle = 'Workspace Published Title';
+            await this.callToolSafe('pages_update', {
+                uid: wsPageUid,
+                fields: JSON.stringify({ title: publishedTitle }),
+            });
+            const changes2 = await this.callToolSafe('workspace_changes_list', {});
+            const newVersion = changes2?.tables?.pages?.find(c => c.liveUid === wsPageUid);
+
+            if (newVersion) {
+                // workspace_stage_set: editing -> ready to publish (-10)
+                await this.testTool('workspace_stage_set', {
+                    table: 'pages',
+                    workspaceVersionUid: newVersion.uid,
+                    stage: -10,
+                });
+
+                // workspace_publish: swap with live
+                await this.testTool('workspace_publish', { table: 'pages', workspaceVersionUid: newVersion.uid });
+            } else {
+                for (const t of ['workspace_stage_set', 'workspace_publish']) {
+                    skip(t, 'no workspace version to act on after second update');
+                    this.skipped.push({ tool: t, reason: 'no version' });
+                }
+            }
+
+            // ---- Switch back to live to verify the publish landed ----
+            await this.callToolSafe('workspace_switch', { workspaceId: 0 });
+            const liveAfter = await this.callToolSafe('pages_get', { uid: wsPageUid });
+            if (liveAfter?.title === publishedTitle) {
+                this.passed.push({ tool: 'workspace_publish (verify)' });
+                pass('workspace_publish (live updated after switch back)');
+            } else {
+                this.failed.push({ tool: 'workspace_publish (verify)', error: `expected live to reflect '${publishedTitle}', got '${liveAfter?.title}'` });
+                fail('workspace_publish (verify)', `expected '${publishedTitle}', got '${liveAfter?.title}'`);
+            }
+        } finally {
+            // Always switch back to live and remove the test page, regardless of test outcome
+            await this.callToolSafe('workspace_switch', { workspaceId: 0 });
+            if (wsPageUid) {
+                await this.callToolSafe('pages_delete', { uid: wsPageUid });
+            }
+        }
+    }
+
     async testDynamicTools(pageUid) {
         section('Dynamic Tools (news)');
 
@@ -577,6 +726,7 @@ class IntegrationTestRunner {
         await this.testCache();
         await this.testConditionalTools();
         await this.testDynamicTools(pageUid);
+        await this.testWorkspaceOperations(pageUid);
         await this.cleanupRecords(pageUid, childUid, contentUid);
 
         // Check for any tools that were discovered but not tested
