@@ -72,6 +72,11 @@ readonly class PermissionService
         return $this->getBackendUser()->checkLanguageAccess($languageId);
     }
 
+    public function isAdmin(): bool
+    {
+        return $this->getBackendUser()->isAdmin();
+    }
+
     private function getBackendUser(): BackendUserAuthentication
     {
         $backendUser = $GLOBALS['BE_USER'] ?? null;

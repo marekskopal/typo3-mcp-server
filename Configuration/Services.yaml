@@ -16,6 +16,7 @@ services:
       - '../Classes/Tool/Scheduler/*'
       - '../Classes/Tool/Workspace/*'
       - '../Classes/Tool/Search/SearchConditionParser.php'
+      - '../Classes/Tool/Helper/*'
     public: true
     tags:
       - name: 'mcp.tool'

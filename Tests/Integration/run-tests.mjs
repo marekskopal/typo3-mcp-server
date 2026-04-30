@@ -448,6 +448,55 @@ class IntegrationTestRunner {
         await this.testTool('cache_clear', { cacheGroup: 'all' });
     }
 
+    async testBackendUserAndGroupOperations() {
+        section('Backend User & Group Operations');
+
+        // ---- backend_user_list (admin connection — gating succeeds) ----
+        const users = await this.testTool('backend_user_list', {});
+        const adminUser = Array.isArray(users?.records)
+            ? users.records.find(u => u.username === 'admin')
+            : null;
+
+        // Filtered list
+        await this.testTool('backend_user_list', { search: 'admin', activeOnly: true, adminOnly: true });
+
+        // ---- backend_user_get ----
+        if (adminUser?.uid) {
+            const detail = await this.testTool('backend_user_get', { uid: adminUser.uid });
+            if (detail && detail.username !== 'admin') {
+                this.failed.push({
+                    tool: 'backend_user_get (verify)',
+                    error: `expected username 'admin', got '${detail.username}'`,
+                });
+                fail('backend_user_get (verify)', `expected 'admin', got '${detail?.username}'`);
+            }
+        } else {
+            skip('backend_user_get', 'admin user uid not found in list');
+            this.skipped.push({ tool: 'backend_user_get', reason: 'no admin uid' });
+        }
+
+        // Missing uid returns an ErrorResult (still a successful tool call)
+        const missing = await this.testTool('backend_user_get', { uid: 999_999 });
+        if (missing && !missing.error) {
+            this.failed.push({
+                tool: 'backend_user_get (missing uid)',
+                error: 'expected error result for missing uid',
+            });
+            fail('backend_user_get (missing uid)', 'expected error result');
+        }
+
+        // ---- backend_group_list / backend_group_get ----
+        const groups = await this.testTool('backend_group_list', {});
+        const groupUid = Array.isArray(groups?.records) ? groups.records[0]?.uid : null;
+
+        if (groupUid) {
+            await this.testTool('backend_group_get', { uid: groupUid });
+        } else {
+            skip('backend_group_get', 'no be_groups records exist');
+            this.skipped.push({ tool: 'backend_group_get', reason: 'no groups' });
+        }
+    }
+
     async testConditionalTools() {
         section('Conditional Tools');
 
@@ -724,6 +773,7 @@ class IntegrationTestRunner {
         await this.testTranslation(pageUid);
         await this.testBatchOperations(pageUid);
         await this.testCache();
+        await this.testBackendUserAndGroupOperations();
         await this.testConditionalTools();
         await this.testDynamicTools(pageUid);
         await this.testWorkspaceOperations(pageUid);

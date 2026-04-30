@@ -206,7 +206,7 @@ final class McpServerFactoryTest extends TestCase
     public function testAllToolClassesHaveMcpToolAttribute(): void
     {
         $toolDir = __DIR__ . '/../../../Classes/Tool';
-        $excludedDirs = ['Result', 'Dynamic', 'Redirect', 'Scheduler', 'Workspace'];
+        $excludedDirs = ['Result', 'Dynamic', 'Redirect', 'Scheduler', 'Workspace', 'Helper'];
         $excludedFiles = ['SearchConditionParser.php'];
 
         $iterator = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($toolDir));

@@ -245,4 +245,24 @@ final class PermissionServiceTest extends TestCase
 
         $service->checkTableAccess('pages');
     }
+
+    public function testIsAdminReturnsTrueForAdmin(): void
+    {
+        $backendUser = $this->createStub(BackendUserAuthentication::class);
+        $backendUser->method('isAdmin')->willReturn(true);
+
+        $GLOBALS['BE_USER'] = $backendUser;
+
+        self::assertTrue((new PermissionService())->isAdmin());
+    }
+
+    public function testIsAdminReturnsFalseForEditor(): void
+    {
+        $backendUser = $this->createStub(BackendUserAuthentication::class);
+        $backendUser->method('isAdmin')->willReturn(false);
+
+        $GLOBALS['BE_USER'] = $backendUser;
+
+        self::assertFalse((new PermissionService())->isAdmin());
+    }
 }

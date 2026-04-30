@@ -65,6 +65,9 @@ vendor/bin/typo3 mcp:cleanup
 - `Tool/Redirect/RedirectToolRegistrar` — Conditionally registers redirect management tools (list, get, create, update, delete) when `typo3/cms-redirects` is installed
 - `Tool/Scheduler/SchedulerToolRegistrar` — Conditionally registers scheduler task tools (list, get, update, delete) when `typo3/cms-scheduler` is installed
 - `Tool/Permission/*` — Permission checking tools (check table read/write access, page-level permissions, full permission summary)
+- `Tool/BackendUser/*` — Admin-only tools to list and inspect `be_users` (list with username/active/admin filters, get by uid). Sensitive fields (`password`, `mfa`) are never selected.
+- `Tool/BackendGroup/*` — Admin-only tools to list and inspect `be_groups` (list with title filter, get by uid).
+- `Tool/Helper/RowField` — Internal helper for typed extraction of fields from DB rows (excluded from `mcp.tool` auto-discovery)
 - `Tool/Cache/CacheClearTool` — Flush TYPO3 caches (all, pages, or specific cache groups)
 - `Logging/AuditLogger` — Writes tool/resource invocations to `sys_log` table with user, timing, and outcome
 - `Resource/BackendLayoutResource` — MCP Resource Template exposing backend layout and column positions for a page (`typo3://pages/{pageId}/backend-layout`)
@@ -120,8 +123,8 @@ readonly class MyTool
 
 ## Testing
 
-505 unit tests covering:
-- All 44 static MCP tools + 3 batch tools (Pages/Content/File/Schema/Search/Translation/Cache/Permission/Batch CRUD)
+545 unit tests covering:
+- All static MCP tools + batch tools (Pages/Content/File/Schema/Search/Translation/Cache/Permission/BackendUser/BackendGroup/Batch CRUD)
 - Dynamic tool registration and execution (DynamicToolRegistrar), including merged EXTCONF + discovered tables
 - OAuth classes (AuthorizationService incl. revocation, ClientRepository, PkceVerifier, OAuthTokenPair, RateLimitService)
 - OAuthMiddleware (metadata, authorize, register, revoke, token endpoints, rate limiting)
