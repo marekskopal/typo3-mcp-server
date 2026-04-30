@@ -6,13 +6,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-04-30
+
 ### Added
+- **Backend user & group tools (admin-gated):**
+  - `backend_user_list` — list `be_users` with `search` / `activeOnly` / `adminOnly` filters
+  - `backend_user_get` — fetch a single backend user by uid
+  - `backend_group_list` — list `be_groups` with optional title search
+  - `backend_group_get` — fetch a single backend group by uid
+  - All four restricted to admin backend users via the new `PermissionService::isAdmin()` helper. Sensitive `be_users` columns (`password`, `mfa`) are never selected; soft-deleted records are always excluded.
+  - Added `Tool/Helper/RowField` for type-safe extraction of mixed DB-row values.
 - **Workspace support (gated on `typo3/cms-workspaces`):**
   - New `WorkspaceContextService` consulted by `RecordService` so reads (`findByUid`, `findByPid`, `search`, `findFileReferences`, `findTranslations`) apply `WorkspaceRestriction` and `BackendUtility::workspaceOL()` for workspace-aware tables. Live workspace and tables without `versioningWS` behave unchanged.
   - `BackendUserBootstrap` now calls `BackendUserAuthentication::setWorkspace()` from the persisted `be_users.workspace_id` when the workspaces extension is loaded, so DataHandler operations write into the active workspace as drafts.
   - **New tools:** `workspace_list`, `workspace_get`, `workspace_switch`, `workspace_changes_list`, `workspace_publish`, `workspace_discard`, `workspace_stage_set` — registered via `WorkspaceToolRegistrar` only when `typo3/cms-workspaces` is installed.
   - `DataHandlerService::processCommand()` for raw cmdmap dispatch (used by publish/discard).
-  - **Integration tests:** end-to-end coverage of the workspace lifecycle (switch → modify → overlay-verify → discard → publish → stage_set) added to `Tests/Integration/run-tests.mjs`. `typo3/cms-workspaces` is now installed by the integration test setup.
+  - **Integration tests:** end-to-end coverage of the workspace lifecycle (switch → modify → overlay-verify → discard → publish → stage_set) added to `Tests/Integration/run-tests.mjs`. `typo3/cms-workspaces` is now installed by the integration test setup. Backend user/group tool coverage added alongside.
 
 ## [0.8.0] - 2026-04-27
 

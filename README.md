@@ -2,7 +2,7 @@
 
 > **Beta** — This extension is under active development. APIs and behavior may change between releases.
 
-TYPO3 CMS extension that implements an [MCP (Model Context Protocol)](https://modelcontextprotocol.io/) server for TYPO3 administration. It exposes 44 tools for managing pages, content elements, files, and custom extension records via the MCP protocol, allowing AI assistants to interact with your TYPO3 instance.
+TYPO3 CMS extension that implements an [MCP (Model Context Protocol)](https://modelcontextprotocol.io/) server for TYPO3 administration. It exposes 48+ tools for managing pages, content elements, files, backend users, and custom extension records via the MCP protocol, allowing AI assistants to interact with your TYPO3 instance.
 
 **This extension is designed primarily for direct, fully autonomous AI operation — changes take effect immediately, with no approval queue between the AI and the live site.** The goal is to let AI agents build, update, and maintain TYPO3 sites end-to-end without human intervention.
 
@@ -411,6 +411,17 @@ All batch tools work on any TCA table.
 |------|-------------|
 | `cache_clear` | Flush caches. Scopes: `pages` (default), `all`, or `page` (single page by `pageId`). |
 
+### Backend Users & Groups
+
+Restricted to admin backend users only. Sensitive `be_users` columns (`password`, `mfa`) are never returned; soft-deleted records are always excluded.
+
+| Tool | Description |
+|------|-------------|
+| `backend_user_list` | List `be_users`. Optional `search` (LIKE on username), `activeOnly`, `adminOnly` filters; paginated. |
+| `backend_user_get` | Get a single backend user by uid with extended fields (groups, mounts, language, TSconfig, etc.). |
+| `backend_group_list` | List `be_groups` with optional title search; paginated. |
+| `backend_group_get` | Get a single backend group by uid with permission and mount details. |
+
 ### Workspaces
 
 Registered only when `typo3/cms-workspaces` is installed. Direct (live-mode) operation is the primary use case for this extension — these tools enable a secondary draft/publish workflow when review is required. After `workspace_switch`, all subsequent reads and writes (`pages_*`, `content_*`, etc.) operate on the chosen workspace.
@@ -535,7 +546,7 @@ vendor/bin/phpstan analyse
 vendor/bin/phpcs
 vendor/bin/phpcbf
 
-# Tests (424 tests)
+# Tests (545 tests)
 vendor/bin/phpunit
 ```
 
