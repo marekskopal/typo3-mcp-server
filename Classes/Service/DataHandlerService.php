@@ -185,6 +185,20 @@ readonly class DataHandlerService
     }
 
     /**
+     * Execute a raw DataHandler command map. Used by workspace operations (publish, discard, version).
+     *
+     * @param array<string, array<int|string, array<string, mixed>>> $cmdmap
+     */
+    public function processCommand(array $cmdmap): void
+    {
+        $dataHandler = GeneralUtility::makeInstance(DataHandler::class);
+        $dataHandler->start([], $cmdmap);
+        $dataHandler->process_cmdmap();
+
+        $this->checkErrors($dataHandler);
+    }
+
+    /**
      * Create a translation of an existing record using TYPO3 localize command (connected mode).
      *
      * @return int The uid of the new translated record

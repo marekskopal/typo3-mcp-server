@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+- **Workspace support (gated on `typo3/cms-workspaces`):**
+  - New `WorkspaceContextService` consulted by `RecordService` so reads (`findByUid`, `findByPid`, `search`, `findFileReferences`, `findTranslations`) apply `WorkspaceRestriction` and `BackendUtility::workspaceOL()` for workspace-aware tables. Live workspace and tables without `versioningWS` behave unchanged.
+  - `BackendUserBootstrap` now calls `BackendUserAuthentication::setWorkspace()` from the persisted `be_users.workspace_id` when the workspaces extension is loaded, so DataHandler operations write into the active workspace as drafts.
+  - **New tools:** `workspace_list`, `workspace_get`, `workspace_switch`, `workspace_changes_list`, `workspace_publish`, `workspace_discard`, `workspace_stage_set` — registered via `WorkspaceToolRegistrar` only when `typo3/cms-workspaces` is installed.
+  - `DataHandlerService::processCommand()` for raw cmdmap dispatch (used by publish/discard).
+
 ## [0.8.0] - 2026-04-27
 
 ### Added

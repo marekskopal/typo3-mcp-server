@@ -21,6 +21,7 @@ use MarekSkopal\MsMcpServer\Service\FileService;
 use MarekSkopal\MsMcpServer\Service\RecordService;
 use MarekSkopal\MsMcpServer\Service\SiteLanguageService;
 use MarekSkopal\MsMcpServer\Service\TcaSchemaService;
+use MarekSkopal\MsMcpServer\Service\WorkspaceContextService;
 use MarekSkopal\MsMcpServer\Tool\Cache\CacheClearTool;
 use MarekSkopal\MsMcpServer\Tool\Content\ContentCopyTool;
 use MarekSkopal\MsMcpServer\Tool\Content\ContentCreateTool;
@@ -33,6 +34,7 @@ use MarekSkopal\MsMcpServer\Repository\DiscoveredTableRepository;
 use MarekSkopal\MsMcpServer\Tool\Dynamic\DynamicToolRegistrar;
 use MarekSkopal\MsMcpServer\Tool\Redirect\RedirectToolRegistrar;
 use MarekSkopal\MsMcpServer\Tool\Scheduler\SchedulerToolRegistrar;
+use MarekSkopal\MsMcpServer\Tool\Workspace\WorkspaceToolRegistrar;
 use MarekSkopal\MsMcpServer\Tool\File\DirectoryCreateTool;
 use MarekSkopal\MsMcpServer\Tool\File\DirectoryDeleteTool;
 use MarekSkopal\MsMcpServer\Tool\File\DirectoryMoveTool;
@@ -103,7 +105,7 @@ final class McpServerFactoryTest extends TestCase
         $connectionPool = $this->createStub(ConnectionPool::class);
         $storageRepository = $this->createStub(StorageRepository::class);
         $siteFinder = $this->createStub(SiteFinder::class);
-        $recordService = new RecordService($connectionPool);
+        $recordService = new RecordService($connectionPool, new WorkspaceContextService());
         $dataHandlerService = new DataHandlerService($this->createStub(SiteFinder::class));
         $fileService = new FileService($storageRepository, $connectionPool);
         $logger = new NullLogger();
@@ -187,10 +189,11 @@ final class McpServerFactoryTest extends TestCase
         $dynamicToolRegistrar = new DynamicToolRegistrar($recordService, $dataHandlerService, $tcaSchemaService, $discoveredTableRepository, $logger);
         $redirectToolRegistrar = new RedirectToolRegistrar($recordService, $dataHandlerService, $logger);
         $schedulerToolRegistrar = new SchedulerToolRegistrar($recordService, $dataHandlerService, $logger);
+        $workspaceToolRegistrar = new WorkspaceToolRegistrar($recordService, $dataHandlerService, $connectionPool, $logger);
 
         $auditLogger = $this->createStub(\MarekSkopal\MsMcpServer\Logging\AuditLogger::class);
 
-        $factory = new McpServerFactory($container, $dynamicToolRegistrar, $redirectToolRegistrar, $schedulerToolRegistrar, $logger, $auditLogger, $tools, $resources, $prompts);
+        $factory = new McpServerFactory($container, $dynamicToolRegistrar, $redirectToolRegistrar, $schedulerToolRegistrar, $workspaceToolRegistrar, $logger, $auditLogger, $tools, $resources, $prompts);
         $server = $factory->create();
 
         self::assertInstanceOf(Server::class, $server);
@@ -203,7 +206,7 @@ final class McpServerFactoryTest extends TestCase
     public function testAllToolClassesHaveMcpToolAttribute(): void
     {
         $toolDir = __DIR__ . '/../../../Classes/Tool';
-        $excludedDirs = ['Result', 'Dynamic', 'Redirect', 'Scheduler'];
+        $excludedDirs = ['Result', 'Dynamic', 'Redirect', 'Scheduler', 'Workspace'];
         $excludedFiles = ['SearchConditionParser.php'];
 
         $iterator = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($toolDir));

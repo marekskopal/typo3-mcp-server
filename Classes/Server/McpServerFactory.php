@@ -8,6 +8,7 @@ use MarekSkopal\MsMcpServer\Logging\AuditLogger;
 use MarekSkopal\MsMcpServer\Tool\Dynamic\DynamicToolRegistrar;
 use MarekSkopal\MsMcpServer\Tool\Redirect\RedirectToolRegistrar;
 use MarekSkopal\MsMcpServer\Tool\Scheduler\SchedulerToolRegistrar;
+use MarekSkopal\MsMcpServer\Tool\Workspace\WorkspaceToolRegistrar;
 use Mcp\Capability\Attribute\McpPrompt;
 use Mcp\Capability\Attribute\McpResource;
 use Mcp\Capability\Attribute\McpResourceTemplate;
@@ -33,6 +34,7 @@ readonly class McpServerFactory
         private DynamicToolRegistrar $dynamicToolRegistrar,
         private RedirectToolRegistrar $redirectToolRegistrar,
         private SchedulerToolRegistrar $schedulerToolRegistrar,
+        private WorkspaceToolRegistrar $workspaceToolRegistrar,
         private LoggerInterface $logger,
         private AuditLogger $auditLogger,
         private iterable $tools,
@@ -62,6 +64,7 @@ readonly class McpServerFactory
         $this->dynamicToolRegistrar->register($builder);
         $this->redirectToolRegistrar->register($builder);
         $this->schedulerToolRegistrar->register($builder);
+        $this->workspaceToolRegistrar->register($builder);
 
         foreach ($this->resources as $resource) {
             $attribute = $this->getMethodAttribute($resource, McpResource::class);

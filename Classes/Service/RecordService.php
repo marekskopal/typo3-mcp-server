@@ -11,7 +11,7 @@ use TYPO3\CMS\Core\Database\Query\QueryBuilder;
 
 readonly class RecordService
 {
-    public function __construct(private ConnectionPool $connectionPool)
+    public function __construct(private ConnectionPool $connectionPool, private WorkspaceContextService $workspaceContext,)
     {
     }
 
@@ -23,6 +23,7 @@ readonly class RecordService
     {
         $queryBuilder = $this->connectionPool->getQueryBuilderForTable($table);
         $queryBuilder->getRestrictions()->removeAll();
+        $this->workspaceContext->applyRestriction($queryBuilder, $table);
 
         $row = $queryBuilder
             ->select(...$fields)
@@ -31,7 +32,11 @@ readonly class RecordService
             ->executeQuery()
             ->fetchAssociative();
 
-        return $row !== false ? $row : null;
+        if ($row === false) {
+            return null;
+        }
+
+        return $this->workspaceContext->overlay($table, $row);
     }
 
     /**
@@ -80,9 +85,11 @@ readonly class RecordService
 
         $queryBuilder = $this->connectionPool->getQueryBuilderForTable($table);
         $queryBuilder->getRestrictions()->removeAll();
+        $this->workspaceContext->applyRestriction($queryBuilder, $table);
 
         $countQueryBuilder = $this->connectionPool->getQueryBuilderForTable($table);
         $countQueryBuilder->getRestrictions()->removeAll();
+        $this->workspaceContext->applyRestriction($countQueryBuilder, $table);
         $countQueryBuilder
             ->count('uid')
             ->from($table)
@@ -115,6 +122,8 @@ readonly class RecordService
             ->executeQuery()
             ->fetchAllAssociative();
 
+        $records = $this->workspaceContext->overlayMany($table, $records);
+
         return [
             'records' => $records,
             'total' => (int) $totalResult,
@@ -145,8 +154,10 @@ readonly class RecordService
 
         $queryBuilder = $this->connectionPool->getQueryBuilderForTable($table);
         $queryBuilder->getRestrictions()->removeAll();
+        $this->workspaceContext->applyRestriction($queryBuilder, $table);
         $countQueryBuilder = $this->connectionPool->getQueryBuilderForTable($table);
         $countQueryBuilder->getRestrictions()->removeAll();
+        $this->workspaceContext->applyRestriction($countQueryBuilder, $table);
 
         $queryBuilder->select(...$fields)->from($table);
         $countQueryBuilder->count('uid')->from($table);
@@ -174,6 +185,8 @@ readonly class RecordService
             ->orderBy($orderBy ?? 'uid', $orderDirection)
             ->executeQuery()
             ->fetchAllAssociative();
+
+        $records = $this->workspaceContext->overlayMany($table, $records);
 
         return [
             'records' => $records,
@@ -245,8 +258,9 @@ readonly class RecordService
     {
         $queryBuilder = $this->connectionPool->getQueryBuilderForTable('sys_file_reference');
         $queryBuilder->getRestrictions()->removeAll();
+        $this->workspaceContext->applyRestriction($queryBuilder, 'sys_file_reference');
 
-        return $queryBuilder
+        $rows = $queryBuilder
             ->select('uid', 'uid_local', 'title', 'description', 'alternative', 'link', 'crop', 'autoplay', 'sorting_foreign')
             ->from('sys_file_reference')
             ->where($queryBuilder->expr()->eq('uid_foreign', $queryBuilder->createNamedParameter($uid, ParameterType::INTEGER)))
@@ -255,6 +269,8 @@ readonly class RecordService
             ->orderBy('sorting_foreign', 'ASC')
             ->executeQuery()
             ->fetchAllAssociative();
+
+        return $this->workspaceContext->overlayMany('sys_file_reference', $rows);
     }
 
     /**
@@ -266,6 +282,7 @@ readonly class RecordService
     {
         $queryBuilder = $this->connectionPool->getQueryBuilderForTable($table);
         $queryBuilder->getRestrictions()->removeAll();
+        $this->workspaceContext->applyRestriction($queryBuilder, $table);
 
         /** @var list<array{uid: int|string, sys_language_uid: int|string}> $rows */
         $rows = $queryBuilder

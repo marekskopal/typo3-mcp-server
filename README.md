@@ -4,7 +4,9 @@
 
 TYPO3 CMS extension that implements an [MCP (Model Context Protocol)](https://modelcontextprotocol.io/) server for TYPO3 administration. It exposes 44 tools for managing pages, content elements, files, and custom extension records via the MCP protocol, allowing AI assistants to interact with your TYPO3 instance.
 
-**This extension is designed for fully autonomous AI operation — no workspaces, no approval queues.** Unlike workspace-based approaches that require human review before changes go live, this server lets AI agents manage your TYPO3 site directly. Changes take effect immediately. This is intentional: the goal is to enable AI agents to build, update, and maintain TYPO3 sites end-to-end without human intervention.
+**This extension is designed primarily for direct, fully autonomous AI operation — changes take effect immediately, with no approval queue between the AI and the live site.** The goal is to let AI agents build, update, and maintain TYPO3 sites end-to-end without human intervention.
+
+Workspace support is **also available** when `typo3/cms-workspaces` is installed: the AI can switch into a workspace, make draft changes, and use the workspace tools to publish or discard them. This is a secondary mode for cases where review-before-publish is required — direct mode remains the primary use case.
 
 ### Example Prompts
 
@@ -408,6 +410,20 @@ All batch tools work on any TCA table.
 | Tool | Description |
 |------|-------------|
 | `cache_clear` | Flush caches. Scopes: `pages` (default), `all`, or `page` (single page by `pageId`). |
+
+### Workspaces
+
+Registered only when `typo3/cms-workspaces` is installed. Direct (live-mode) operation is the primary use case for this extension — these tools enable a secondary draft/publish workflow when review is required. After `workspace_switch`, all subsequent reads and writes (`pages_*`, `content_*`, etc.) operate on the chosen workspace.
+
+| Tool | Description |
+|------|-------------|
+| `workspace_list` | List workspaces accessible to the current backend user (including the implicit live workspace, uid 0). |
+| `workspace_get` | Get workspace metadata by uid: title, custom stages flag, current user access level. |
+| `workspace_switch` | Switch the active workspace. Persists to `be_users.workspace_id`. Use uid `0` to return to live. |
+| `workspace_changes_list` | List records modified in the current workspace, grouped by table, with `t3ver_state` and stage. |
+| `workspace_publish` | Publish a workspace version to live (swap). |
+| `workspace_discard` | Discard a workspace version, dropping unpublished changes. |
+| `workspace_stage_set` | Move a workspace version to a different stage (`-10` ready to publish, `-20` ready to review, `0` editing, or a custom stage uid). |
 
 ### Dynamic Extension Tools
 

@@ -8,6 +8,7 @@ use Doctrine\DBAL\ParameterType;
 use TYPO3\CMS\Core\Authentication\BackendUserAuthentication;
 use TYPO3\CMS\Core\Database\ConnectionPool;
 use TYPO3\CMS\Core\Localization\LanguageServiceFactory;
+use TYPO3\CMS\Core\Utility\ExtensionManagementUtility;
 
 readonly class BackendUserBootstrap
 {
@@ -45,6 +46,12 @@ readonly class BackendUserBootstrap
         $backendUser->user = $userRow;
         // @phpstan-ignore method.internal
         $backendUser->fetchGroupData();
+
+        if (ExtensionManagementUtility::isLoaded('workspaces')) {
+            // setWorkspace() validates access and falls back to the default workspace if invalid.
+            // @phpstan-ignore method.internal
+            $backendUser->setWorkspace((int) ($userRow['workspace_id'] ?? 0));
+        }
 
         $GLOBALS['BE_USER'] = $backendUser;
         $GLOBALS['LANG'] = $this->languageServiceFactory->createFromUserPreferences($backendUser);

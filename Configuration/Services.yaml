@@ -14,6 +14,7 @@ services:
       - '../Classes/Tool/Dynamic/*'
       - '../Classes/Tool/Redirect/*'
       - '../Classes/Tool/Scheduler/*'
+      - '../Classes/Tool/Workspace/*'
       - '../Classes/Tool/Search/SearchConditionParser.php'
     public: true
     tags:
