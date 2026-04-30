@@ -25,14 +25,13 @@ readonly class WorkspaceToolRegistrar
     private const array WORKSPACE_LIST_FIELDS = [
         'uid',
         'title',
-        'description',
         'adminusers',
         'members',
         'db_mountpoints',
         'file_mountpoints',
-        'freeze',
         'live_edit',
         'custom_stages',
+        'publish_access',
     ];
 
     public function __construct(

@@ -17,10 +17,10 @@ VALUES (
 ON DUPLICATE KEY UPDATE is_online = 1, is_writable = 1;
 
 -- Ensure a test workspace exists (only takes effect when typo3/cms-workspaces is installed
--- and the sys_workspace table has been created via database:updateschema).
+-- and the sys_workspace table has been created by extension setup).
 -- The test runner skips workspace tests if this insert is a no-op.
-INSERT IGNORE INTO sys_workspace (uid, pid, title, description, deleted, hidden, crdate, tstamp)
-VALUES (1, 0, 'Integration Test Workspace', 'Used by run-tests.mjs', 0, 0, UNIX_TIMESTAMP(), UNIX_TIMESTAMP());
+INSERT IGNORE INTO sys_workspace (uid, pid, title, deleted, tstamp)
+VALUES (1, 0, 'Integration Test', 0, UNIX_TIMESTAMP());
 
 -- Reset the admin's workspace to live so each test run starts in a known state
 -- (workspace_switch persists to be_users.workspace_id).
