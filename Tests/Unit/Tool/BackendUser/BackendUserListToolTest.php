@@ -102,7 +102,7 @@ final class BackendUserListToolTest extends TestCase
                 ],
                 10,
                 5,
-                self::isType('array'),
+                self::isArray(),
                 null,
                 'username',
                 'ASC',

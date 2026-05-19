@@ -24,7 +24,7 @@ final class BackendGroupGetToolTest extends TestCase
         $recordService = $this->createMock(RecordService::class);
         $recordService->expects(self::once())
             ->method('findByUid')
-            ->with('be_groups', 3, self::isType('array'))
+            ->with('be_groups', 3, self::isArray())
             ->willReturn([
                 'uid' => 3,
                 'title' => 'Power Editors',

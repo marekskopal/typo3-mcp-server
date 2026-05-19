@@ -53,6 +53,7 @@ readonly class RecordService
 
         $queryBuilder = $this->connectionPool->getQueryBuilderForTable($table);
         $queryBuilder->getRestrictions()->removeAll();
+        $this->workspaceContext->applyRestriction($queryBuilder, $table);
 
         /** @var list<array{uid: int|string}> $rows */
         $rows = $queryBuilder
@@ -230,6 +231,7 @@ readonly class RecordService
     {
         $queryBuilder = $this->connectionPool->getQueryBuilderForTable($table);
         $queryBuilder->getRestrictions()->removeAll();
+        $this->workspaceContext->applyRestriction($queryBuilder, $table);
 
         $queryBuilder->count('uid')->from($table);
 

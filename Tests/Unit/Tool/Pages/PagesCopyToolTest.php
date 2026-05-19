@@ -6,6 +6,7 @@ namespace MarekSkopal\MsMcpServer\Tests\Unit\Tool\Pages;
 
 use MarekSkopal\MsMcpServer\Service\DataHandlerService;
 use MarekSkopal\MsMcpServer\Tool\Pages\PagesCopyTool;
+use MarekSkopal\MsMcpServer\Tool\Result\ErrorResult;
 use MarekSkopal\MsMcpServer\Tool\Result\RecordCopiedResult;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
@@ -13,7 +14,7 @@ use PHPUnit\Framework\TestCase;
 #[CoversClass(PagesCopyTool::class)]
 final class PagesCopyToolTest extends TestCase
 {
-    public function testExecuteCopiesPageAndReturnsResult(): void
+    public function testExecuteCopiesPageAsChildOfTargetPage(): void
     {
         $dataHandlerService = $this->createMock(DataHandlerService::class);
         $dataHandlerService->expects(self::once())
@@ -22,7 +23,7 @@ final class PagesCopyToolTest extends TestCase
             ->willReturn(100);
 
         $tool = new PagesCopyTool($dataHandlerService);
-        $result = $tool->execute(42, 10);
+        $result = $tool->execute(42, targetPid: 10);
 
         self::assertInstanceOf(RecordCopiedResult::class, $result);
         self::assertSame(42, $result->uid);
@@ -30,7 +31,7 @@ final class PagesCopyToolTest extends TestCase
         self::assertTrue($result->copied);
     }
 
-    public function testExecuteCopiesPageAfterAnotherPage(): void
+    public function testExecuteCopiesPageAfterSiblingViaAfterUid(): void
     {
         $dataHandlerService = $this->createMock(DataHandlerService::class);
         $dataHandlerService->expects(self::once())
@@ -39,7 +40,7 @@ final class PagesCopyToolTest extends TestCase
             ->willReturn(101);
 
         $tool = new PagesCopyTool($dataHandlerService);
-        $result = $tool->execute(42, -5);
+        $result = $tool->execute(42, afterUid: 5);
 
         self::assertInstanceOf(RecordCopiedResult::class, $result);
         self::assertSame(42, $result->uid);
@@ -55,10 +56,9 @@ final class PagesCopyToolTest extends TestCase
             ->willReturn(102);
 
         $tool = new PagesCopyTool($dataHandlerService);
-        $result = $tool->execute(42, 10, true);
+        $result = $tool->execute(42, targetPid: 10, includeSubpages: true);
 
         self::assertInstanceOf(RecordCopiedResult::class, $result);
-        self::assertSame(42, $result->uid);
         self::assertSame(102, $result->newUid);
     }
 
@@ -71,7 +71,18 @@ final class PagesCopyToolTest extends TestCase
             ->willReturn(103);
 
         $tool = new PagesCopyTool($dataHandlerService);
-        $tool->execute(42, 10, false);
+        $tool->execute(42, targetPid: 10, includeSubpages: false);
+    }
+
+    public function testExecuteReturnsErrorWhenNeitherTargetGiven(): void
+    {
+        $dataHandlerService = $this->createMock(DataHandlerService::class);
+        $dataHandlerService->expects(self::never())->method('copyRecord');
+
+        $tool = new PagesCopyTool($dataHandlerService);
+        $result = $tool->execute(42);
+
+        self::assertInstanceOf(ErrorResult::class, $result);
     }
 
     public function testExecuteThrowsExceptionOnError(): void
@@ -86,6 +97,6 @@ final class PagesCopyToolTest extends TestCase
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('DataHandler error');
 
-        $tool->execute(1, 10);
+        $tool->execute(1, targetPid: 10);
     }
 }

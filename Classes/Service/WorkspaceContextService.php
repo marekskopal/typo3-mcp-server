@@ -7,6 +7,7 @@ namespace MarekSkopal\MsMcpServer\Service;
 use TYPO3\CMS\Backend\Utility\BackendUtility;
 use TYPO3\CMS\Core\Authentication\BackendUserAuthentication;
 use TYPO3\CMS\Core\Database\Query\QueryBuilder;
+use TYPO3\CMS\Core\Database\Query\Restriction\DeletedRestriction;
 use TYPO3\CMS\Core\Database\Query\Restriction\WorkspaceRestriction;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
 
@@ -47,11 +48,16 @@ readonly class WorkspaceContextService
     }
 
     /**
-     * Apply a workspace restriction to the QueryBuilder if the table is workspace-aware.
+     * Apply the default restrictions for MCP queries to the QueryBuilder:
+     * - DeletedRestriction (no-op for tables without soft-delete capability)
+     * - WorkspaceRestriction (only when the table is workspace-aware)
+     *
      * Caller is expected to have already called removeAll() (the standard pattern in this codebase).
      */
     public function applyRestriction(QueryBuilder $queryBuilder, string $table): void
     {
+        $queryBuilder->getRestrictions()->add(GeneralUtility::makeInstance(DeletedRestriction::class));
+
         if (!$this->isTableWorkspaceAware($table)) {
             return;
         }

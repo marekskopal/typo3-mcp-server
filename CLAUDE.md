@@ -68,6 +68,7 @@ vendor/bin/typo3 mcp:cleanup
 - `Tool/BackendUser/*` — Admin-only tools to list and inspect `be_users` (list with username/active/admin filters, get by uid). Sensitive fields (`password`, `mfa`) are never selected.
 - `Tool/BackendGroup/*` — Admin-only tools to list and inspect `be_groups` (list with title filter, get by uid).
 - `Tool/Helper/RowField` — Internal helper for typed extraction of fields from DB rows (excluded from `mcp.tool` auto-discovery)
+- `Tool/Helper/MoveTarget` — Internal helper that translates the user-facing `targetPid`/`afterUid` pair into TYPO3 DataHandler's move/copy target convention (excluded from `mcp.tool` auto-discovery)
 - `Tool/Cache/CacheClearTool` — Flush TYPO3 caches (all, pages, or specific cache groups)
 - `Logging/AuditLogger` — Writes tool/resource invocations to `sys_log` table with user, timing, and outcome
 - `Resource/BackendLayoutResource` — MCP Resource Template exposing backend layout and column positions for a page (`typo3://pages/{pageId}/backend-layout`)
@@ -123,7 +124,7 @@ readonly class MyTool
 
 ## Testing
 
-545 unit tests covering:
+560 unit tests covering:
 - All static MCP tools + batch tools (Pages/Content/File/Schema/Search/Translation/Cache/Permission/BackendUser/BackendGroup/Batch CRUD)
 - Dynamic tool registration and execution (DynamicToolRegistrar), including merged EXTCONF + discovered tables
 - OAuth classes (AuthorizationService incl. revocation, ClientRepository, PkceVerifier, OAuthTokenPair, RateLimitService)

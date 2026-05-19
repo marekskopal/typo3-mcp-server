@@ -91,7 +91,7 @@ readonly class TcaSchemaService
         return array_values(array_unique($fields));
     }
 
-    /** @return list<string> All fields that can be read (simple value types + uid + pid). */
+    /** @return list<string> All fields that can be read (simple value types + uid + pid + sortby). */
     public function getReadFields(string $tableName): array
     {
         $tca = $this->getTca($tableName);
@@ -107,6 +107,11 @@ readonly class TcaSchemaService
         $systemFields = $this->getSystemFields($tca);
         $fields = ['uid', 'pid'];
 
+        $sortField = $this->getSortField($tca);
+        if ($sortField !== null) {
+            $fields[] = $sortField;
+        }
+
         foreach ($columns as $fieldName => $columnConfig) {
             if (!is_string($fieldName) || !is_array($columnConfig)) {
                 continue;
@@ -121,7 +126,7 @@ readonly class TcaSchemaService
             }
         }
 
-        return $fields;
+        return array_values(array_unique($fields));
     }
 
     /** @return list<string> Fields that can be written (readable fields minus uid, pid, readOnly, system fields). */
@@ -542,6 +547,23 @@ readonly class TcaSchemaService
         $systemFields[] = 't3ver_label';
 
         return array_values(array_unique($systemFields));
+    }
+
+    /**
+     * Returns the table's sort field (TCA ctrl.sortby), if defined.
+     *
+     * @param array<mixed> $tca
+     */
+    private function getSortField(array $tca): ?string
+    {
+        $ctrl = $tca['ctrl'] ?? [];
+        if (!is_array($ctrl)) {
+            return null;
+        }
+
+        $sortBy = $ctrl['sortby'] ?? null;
+
+        return is_string($sortBy) && $sortBy !== '' ? $sortBy : null;
     }
 
     /** @return array<mixed>|null */

@@ -8,6 +8,7 @@ use MarekSkopal\MsMcpServer\Repository\DiscoveredTableRepository;
 use MarekSkopal\MsMcpServer\Service\DataHandlerService;
 use MarekSkopal\MsMcpServer\Service\RecordService;
 use MarekSkopal\MsMcpServer\Service\TcaSchemaService;
+use MarekSkopal\MsMcpServer\Tool\Helper\MoveTarget;
 use MarekSkopal\MsMcpServer\Tool\Result\BatchRecordsDeletedResult;
 use MarekSkopal\MsMcpServer\Tool\Result\BatchRecordsMovedResult;
 use MarekSkopal\MsMcpServer\Tool\Result\BatchRecordsUpdatedResult;
@@ -458,7 +459,20 @@ readonly class DynamicToolRegistrar
         $logger = $this->logger;
 
         $builder->addTool(
-            handler: static function (int $uid, int $target) use ($dataHandlerService, $logger, $tableName): RecordMovedResult {
+            handler: static function (
+                int $uid,
+                int $targetPid = -1,
+                int $afterUid = 0,
+            ) use (
+                $dataHandlerService,
+                $logger,
+                $tableName
+            ): RecordMovedResult|ErrorResult {
+                $target = MoveTarget::resolve($targetPid, $afterUid);
+                if ($target instanceof ErrorResult) {
+                    return $target;
+                }
+
                 try {
                     $dataHandlerService->moveRecord($tableName, $uid, $target);
                 } catch (\Throwable $e) {
@@ -470,9 +484,8 @@ readonly class DynamicToolRegistrar
                 return new RecordMovedResult($uid, $target);
             },
             name: $config['prefix'] . '_move',
-            description: 'Move a ' . $config['label'] . ' record to a new position.'
-                . ' Use a positive target to move to the top of a page (target = page pid).'
-                . ' Use a negative target to move after another record (target = -uid of the record to place after).',
+            description: 'Move a ' . $config['label'] . ' record to a new position. Provide exactly one of:'
+                . ' targetPid (move to the top of that page) or afterUid (place after that sibling record).',
         );
     }
 
@@ -590,13 +603,19 @@ readonly class DynamicToolRegistrar
         $builder->addTool(
             handler: static function (
                 string $uids,
-                int $target,
+                int $targetPid = -1,
+                int $afterUid = 0,
             ) use (
                 $recordService,
                 $dataHandlerService,
                 $logger,
                 $tableName
-            ): BatchRecordsMovedResult {
+            ): BatchRecordsMovedResult|ErrorResult {
+                $target = MoveTarget::resolve($targetPid, $afterUid);
+                if ($target instanceof ErrorResult) {
+                    return $target;
+                }
+
                 $uidList = self::parseUids($uids);
                 $existingUids = $recordService->findExistingUids($tableName, $uidList);
 
@@ -619,7 +638,8 @@ readonly class DynamicToolRegistrar
             name: $config['prefix'] . '_move_batch',
             description: 'Move multiple ' . $config['label'] . ' records to a new position in a single operation.'
                 . ' Pass UIDs as comma-separated (e.g. "1,2,3").'
-                . ' Positive target = move to page (target = pid). Negative target = move after record (target = -uid).'
+                . ' Provide exactly one of: targetPid (move all to the top of that page)'
+                . ' or afterUid (place all after that sibling record).'
                 . ' Non-existent UIDs are skipped and reported in skippedUids.',
         );
     }

@@ -200,7 +200,7 @@ class IntegrationTestRunner {
 
         // Copy
         if (childUid && pageUid) {
-            await this.testTool('pages_copy', { uid: childUid, target: pageUid });
+            await this.testTool('pages_copy', { uid: childUid, targetPid: pageUid });
         }
 
         return { pageUid, childUid };
@@ -232,10 +232,10 @@ class IntegrationTestRunner {
 
         // Copy & Move
         if (contentUid) {
-            const copied = await this.testTool('content_copy', { uid: contentUid, target: pid });
+            const copied = await this.testTool('content_copy', { uid: contentUid, targetPid: pid });
             const copiedUid = copied?.newUid ?? copied?.uid;
             if (copiedUid) {
-                await this.testTool('content_move', { uid: copiedUid, target: pid });
+                await this.testTool('content_move', { uid: copiedUid, targetPid: pid });
                 // Clean up copy
                 await this.callToolSafe('content_delete', { uid: copiedUid });
             }
@@ -428,7 +428,7 @@ class IntegrationTestRunner {
             await this.testTool('record_move_batch', {
                 tableName: 'tt_content',
                 uids,
-                target: pid,
+                targetPid: pid,
             });
 
             await this.testTool('record_delete_batch', {
@@ -738,7 +738,7 @@ class IntegrationTestRunner {
             });
 
             // Move
-            await this.testTool('news_move', { uid: newsUid, target: pid });
+            await this.testTool('news_move', { uid: newsUid, targetPid: pid });
 
             // Delete
             await this.testTool('news_delete', { uid: newsUid });

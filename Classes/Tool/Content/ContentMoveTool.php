@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace MarekSkopal\MsMcpServer\Tool\Content;
 
 use MarekSkopal\MsMcpServer\Service\DataHandlerService;
+use MarekSkopal\MsMcpServer\Tool\Helper\MoveTarget;
+use MarekSkopal\MsMcpServer\Tool\Result\ErrorResult;
 use MarekSkopal\MsMcpServer\Tool\Result\RecordMovedResult;
 use Mcp\Capability\Attribute\McpTool;
 
@@ -16,12 +18,16 @@ readonly class ContentMoveTool
 
     #[McpTool(
         name: 'content_move',
-        description: 'Move a content element to a new position.'
-            . ' Use a positive target to move to the top of a page (target = page pid).'
-            . ' Use a negative target to move after another content element (target = -uid of the element to place after).',
+        description: 'Move a content element. Provide exactly one of: targetPid (move to top of that page)'
+            . ' or afterUid (place after that content element, on the same page and column as the sibling).',
     )]
-    public function execute(int $uid, int $target): RecordMovedResult
+    public function execute(int $uid, int $targetPid = -1, int $afterUid = 0): RecordMovedResult|ErrorResult
     {
+        $target = MoveTarget::resolve($targetPid, $afterUid);
+        if ($target instanceof ErrorResult) {
+            return $target;
+        }
+
         $this->dataHandlerService->moveRecord('tt_content', $uid, $target);
 
         return new RecordMovedResult($uid, $target);

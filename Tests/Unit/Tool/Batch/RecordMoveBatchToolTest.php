@@ -8,6 +8,7 @@ use MarekSkopal\MsMcpServer\Service\DataHandlerService;
 use MarekSkopal\MsMcpServer\Service\RecordService;
 use MarekSkopal\MsMcpServer\Tool\Batch\RecordMoveBatchTool;
 use MarekSkopal\MsMcpServer\Tool\Result\BatchRecordsMovedResult;
+use MarekSkopal\MsMcpServer\Tool\Result\ErrorResult;
 use Mcp\Exception\ToolCallException;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
@@ -15,7 +16,7 @@ use PHPUnit\Framework\TestCase;
 #[CoversClass(RecordMoveBatchTool::class)]
 final class RecordMoveBatchToolTest extends TestCase
 {
-    public function testExecuteMovesMultipleRecords(): void
+    public function testExecuteMovesMultipleRecordsToTargetPage(): void
     {
         $recordService = $this->createStub(RecordService::class);
         $recordService->method('findExistingUids')->willReturn([10, 20, 30]);
@@ -26,7 +27,7 @@ final class RecordMoveBatchToolTest extends TestCase
             ->with('tt_content', [10, 20, 30], 5);
 
         $tool = new RecordMoveBatchTool($dataHandlerService, $recordService);
-        $result = $tool->execute('tt_content', '10,20,30', 5);
+        $result = $tool->execute('tt_content', '10,20,30', targetPid: 5);
 
         self::assertInstanceOf(BatchRecordsMovedResult::class, $result);
         self::assertSame([10, 20, 30], $result->uids);
@@ -35,7 +36,7 @@ final class RecordMoveBatchToolTest extends TestCase
         self::assertSame([], $result->skippedUids);
     }
 
-    public function testExecuteWithNegativeTarget(): void
+    public function testExecuteMovesRecordsAfterSiblingViaAfterUid(): void
     {
         $recordService = $this->createStub(RecordService::class);
         $recordService->method('findExistingUids')->willReturn([10]);
@@ -46,9 +47,35 @@ final class RecordMoveBatchToolTest extends TestCase
             ->with('tt_content', [10], -42);
 
         $tool = new RecordMoveBatchTool($dataHandlerService, $recordService);
-        $result = $tool->execute('tt_content', '10', -42);
+        $result = $tool->execute('tt_content', '10', afterUid: 42);
 
+        self::assertInstanceOf(BatchRecordsMovedResult::class, $result);
         self::assertSame(-42, $result->target);
+    }
+
+    public function testExecuteReturnsErrorWhenNeitherTargetGiven(): void
+    {
+        $recordService = $this->createStub(RecordService::class);
+        $dataHandlerService = $this->createMock(DataHandlerService::class);
+        $dataHandlerService->expects(self::never())->method('moveRecords');
+
+        $tool = new RecordMoveBatchTool($dataHandlerService, $recordService);
+        $result = $tool->execute('tt_content', '10,20');
+
+        self::assertInstanceOf(ErrorResult::class, $result);
+    }
+
+    public function testExecuteReturnsErrorWhenBothTargetsGiven(): void
+    {
+        $recordService = $this->createStub(RecordService::class);
+        $dataHandlerService = $this->createMock(DataHandlerService::class);
+        $dataHandlerService->expects(self::never())->method('moveRecords');
+
+        $tool = new RecordMoveBatchTool($dataHandlerService, $recordService);
+        $result = $tool->execute('tt_content', '10,20', targetPid: 5, afterUid: 42);
+
+        self::assertInstanceOf(ErrorResult::class, $result);
+        self::assertStringContainsString('not both', $result->error);
     }
 
     public function testExecuteThrowsOnDataHandlerError(): void
@@ -63,7 +90,7 @@ final class RecordMoveBatchToolTest extends TestCase
         $tool = new RecordMoveBatchTool($dataHandlerService, $recordService);
 
         $this->expectException(\RuntimeException::class);
-        $tool->execute('tt_content', '10,20', 5);
+        $tool->execute('tt_content', '10,20', targetPid: 5);
     }
 
     public function testExecuteSkipsNonExistentUids(): void
@@ -77,8 +104,9 @@ final class RecordMoveBatchToolTest extends TestCase
             ->with('tt_content', [10, 30], 5);
 
         $tool = new RecordMoveBatchTool($dataHandlerService, $recordService);
-        $result = $tool->execute('tt_content', '10,20,30', 5);
+        $result = $tool->execute('tt_content', '10,20,30', targetPid: 5);
 
+        self::assertInstanceOf(BatchRecordsMovedResult::class, $result);
         self::assertSame([10, 30], $result->uids);
         self::assertSame(2, $result->count);
         self::assertSame([20], $result->skippedUids);
@@ -96,6 +124,6 @@ final class RecordMoveBatchToolTest extends TestCase
         $this->expectException(ToolCallException::class);
         $this->expectExceptionMessage('None of the provided UIDs exist');
 
-        $tool->execute('tt_content', '10,20', 5);
+        $tool->execute('tt_content', '10,20', targetPid: 5);
     }
 }

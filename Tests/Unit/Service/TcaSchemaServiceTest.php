@@ -279,7 +279,8 @@ final class TcaSchemaServiceTest extends TestCase
         self::assertNotContains('tstamp', $fields);
         self::assertNotContains('crdate', $fields);
         self::assertNotContains('deleted', $fields);
-        self::assertNotContains('sorting', $fields);
+        // sortby field is included as a readable field even though it cannot be written directly
+        self::assertContains('sorting', $fields);
         // languageField and transOrigPointerField are user-editable
         self::assertContains('sys_language_uid', $fields);
         self::assertContains('l10n_parent', $fields);
@@ -292,6 +293,31 @@ final class TcaSchemaServiceTest extends TestCase
         self::assertContains('fe_group', $fields);
         // l10n_diffsource is passthrough type, excluded by type check
         self::assertNotContains('l10n_diffsource', $fields);
+    }
+
+    public function testGetReadFieldsIncludesSortByEvenWithoutColumnDefinition(): void
+    {
+        $GLOBALS['TCA']['tx_test'] = [
+            'ctrl' => ['sortby' => 'sorting'],
+            'columns' => [
+                'title' => ['config' => ['type' => 'input']],
+            ],
+        ];
+
+        self::assertContains('sorting', $this->service->getReadFields('tx_test'));
+    }
+
+    public function testGetWritableFieldsExcludesSortBy(): void
+    {
+        $GLOBALS['TCA']['tx_test'] = [
+            'ctrl' => ['sortby' => 'sorting'],
+            'columns' => [
+                'title' => ['config' => ['type' => 'input']],
+                'sorting' => ['config' => ['type' => 'number']],
+            ],
+        ];
+
+        self::assertNotContains('sorting', $this->service->getWritableFields('tx_test'));
     }
 
     public function testGetWritableFieldsIncludesEnableColumns(): void

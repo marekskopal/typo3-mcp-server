@@ -12,11 +12,25 @@ use PHPUnit\Framework\TestCase;
 use TYPO3\CMS\Core\Database\ConnectionPool;
 use TYPO3\CMS\Core\Database\Query\Expression\ExpressionBuilder;
 use TYPO3\CMS\Core\Database\Query\QueryBuilder;
+use TYPO3\CMS\Core\Database\Query\Restriction\DeletedRestriction;
 use TYPO3\CMS\Core\Database\Query\Restriction\QueryRestrictionContainerInterface;
+use TYPO3\CMS\Core\Utility\GeneralUtility;
 
 #[CoversClass(RecordService::class)]
 final class RecordServiceTest extends TestCase
 {
+    protected function setUp(): void
+    {
+        for ($i = 0; $i < 10; $i++) {
+            GeneralUtility::addInstance(DeletedRestriction::class, $this->createStub(DeletedRestriction::class));
+        }
+    }
+
+    protected function tearDown(): void
+    {
+        GeneralUtility::purgeInstances();
+    }
+
     public function testFindByUidReturnsRecordWhenFound(): void
     {
         $expectedRecord = ['uid' => 1, 'title' => 'Test Page'];
@@ -57,6 +71,32 @@ final class RecordServiceTest extends TestCase
         $record = $service->findByUid('pages', 999, ['uid', 'title']);
 
         self::assertNull($record);
+    }
+
+    public function testFindByUidAppliesDeletedRestriction(): void
+    {
+        $result = $this->createStub(Result::class);
+        $result->method('fetchAssociative')->willReturn(['uid' => 1, 'title' => 'Test']);
+
+        $restrictions = $this->createMock(QueryRestrictionContainerInterface::class);
+        $restrictions->expects(self::atLeastOnce())->method('add');
+
+        $expressionBuilder = $this->createStub(ExpressionBuilder::class);
+
+        $queryBuilder = $this->createStub(QueryBuilder::class);
+        $queryBuilder->method('getRestrictions')->willReturn($restrictions);
+        $queryBuilder->method('expr')->willReturn($expressionBuilder);
+        $queryBuilder->method('createNamedParameter')->willReturn("'0'");
+        $queryBuilder->method('select')->willReturnSelf();
+        $queryBuilder->method('from')->willReturnSelf();
+        $queryBuilder->method('where')->willReturnSelf();
+        $queryBuilder->method('executeQuery')->willReturn($result);
+
+        $connectionPool = $this->createStub(ConnectionPool::class);
+        $connectionPool->method('getQueryBuilderForTable')->willReturn($queryBuilder);
+
+        $service = new RecordService($connectionPool, new WorkspaceContextService());
+        $service->findByUid('pages', 1, ['uid', 'title']);
     }
 
     public function testFindExistingUidsReturnsOnlyExistingUids(): void

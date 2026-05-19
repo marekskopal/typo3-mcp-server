@@ -9,7 +9,10 @@ use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 use TYPO3\CMS\Core\Authentication\BackendUserAuthentication;
 use TYPO3\CMS\Core\Database\Query\QueryBuilder;
+use TYPO3\CMS\Core\Database\Query\Restriction\DeletedRestriction;
 use TYPO3\CMS\Core\Database\Query\Restriction\QueryRestrictionContainerInterface;
+use TYPO3\CMS\Core\Database\Query\Restriction\WorkspaceRestriction;
+use TYPO3\CMS\Core\Utility\GeneralUtility;
 
 #[CoversClass(WorkspaceContextService::class)]
 final class WorkspaceContextServiceTest extends TestCase
@@ -74,18 +77,61 @@ final class WorkspaceContextServiceTest extends TestCase
         self::assertFalse($service->isTableWorkspaceAware('unknown_table'));
     }
 
-    public function testApplyRestrictionIsNoOpForNonWorkspaceTable(): void
+    public function testApplyRestrictionAddsOnlyDeletedRestrictionForNonWorkspaceTable(): void
     {
         $GLOBALS['TCA'] = ['tx_other' => ['ctrl' => []]];
 
+        $deletedStub = $this->createStub(DeletedRestriction::class);
+        GeneralUtility::addInstance(DeletedRestriction::class, $deletedStub);
+
+        $added = [];
         $restrictions = $this->createMock(QueryRestrictionContainerInterface::class);
-        $restrictions->expects(self::never())->method('add');
+        $restrictions->expects(self::once())
+            ->method('add')
+            ->willReturnCallback(function (object $restriction) use (&$added, $restrictions) {
+                $added[] = $restriction;
+
+                return $restrictions;
+            });
 
         $queryBuilder = $this->createStub(QueryBuilder::class);
         $queryBuilder->method('getRestrictions')->willReturn($restrictions);
 
         $service = new WorkspaceContextService();
         $service->applyRestriction($queryBuilder, 'tx_other');
+
+        self::assertCount(1, $added);
+        self::assertSame($deletedStub, $added[0]);
+    }
+
+    public function testApplyRestrictionAddsDeletedAndWorkspaceForWorkspaceAwareTable(): void
+    {
+        $GLOBALS['TCA'] = ['pages' => ['ctrl' => ['versioningWS' => true]]];
+
+        $deletedStub = $this->createStub(DeletedRestriction::class);
+        $workspaceStub = $this->createStub(WorkspaceRestriction::class);
+        GeneralUtility::addInstance(DeletedRestriction::class, $deletedStub);
+        GeneralUtility::addInstance(WorkspaceRestriction::class, $workspaceStub);
+
+        $added = [];
+        $restrictions = $this->createMock(QueryRestrictionContainerInterface::class);
+        $restrictions->expects(self::exactly(2))
+            ->method('add')
+            ->willReturnCallback(function (object $restriction) use (&$added, $restrictions) {
+                $added[] = $restriction;
+
+                return $restrictions;
+            });
+
+        $queryBuilder = $this->createStub(QueryBuilder::class);
+        $queryBuilder->method('getRestrictions')->willReturn($restrictions);
+
+        $service = new WorkspaceContextService();
+        $service->applyRestriction($queryBuilder, 'pages');
+
+        self::assertCount(2, $added);
+        self::assertSame($deletedStub, $added[0]);
+        self::assertSame($workspaceStub, $added[1]);
     }
 
     public function testOverlayReturnsRowUnchangedInLiveContext(): void

@@ -355,9 +355,10 @@ final class DynamicToolRegistrarTest extends TestCase
         $closure(1, json_encode(['title' => 'Test'], JSON_THROW_ON_ERROR));
     }
 
-    public function testMoveToolCallsDataHandlerService(): void
+    public function testMoveToolCallsDataHandlerServiceWithAfterUid(): void
     {
         $dataHandlerService = $this->createMock(DataHandlerService::class);
+        // afterUid=3 → DataHandler target = -3
         $dataHandlerService->expects(self::once())
             ->method('moveRecord')
             ->with(self::TABLE, 5, -3);
@@ -367,11 +368,44 @@ final class DynamicToolRegistrarTest extends TestCase
             $dataHandlerService,
             'move',
         );
-        $result = $closure(5, -3);
+        $result = $closure(5, afterUid: 3);
 
         self::assertInstanceOf(RecordMovedResult::class, $result);
         self::assertSame(5, $result->uid);
         self::assertSame(-3, $result->target);
+    }
+
+    public function testMoveToolCallsDataHandlerServiceWithTargetPid(): void
+    {
+        $dataHandlerService = $this->createMock(DataHandlerService::class);
+        $dataHandlerService->expects(self::once())
+            ->method('moveRecord')
+            ->with(self::TABLE, 5, 10);
+
+        $closure = $this->getRegisteredClosure(
+            $this->createStub(RecordService::class),
+            $dataHandlerService,
+            'move',
+        );
+        $result = $closure(5, targetPid: 10);
+
+        self::assertInstanceOf(RecordMovedResult::class, $result);
+        self::assertSame(10, $result->target);
+    }
+
+    public function testMoveToolReturnsErrorWhenNeitherTargetGiven(): void
+    {
+        $dataHandlerService = $this->createMock(DataHandlerService::class);
+        $dataHandlerService->expects(self::never())->method('moveRecord');
+
+        $closure = $this->getRegisteredClosure(
+            $this->createStub(RecordService::class),
+            $dataHandlerService,
+            'move',
+        );
+        $result = $closure(5);
+
+        self::assertInstanceOf(ErrorResult::class, $result);
     }
 
     public function testMoveToolThrowsToolCallExceptionOnError(): void
@@ -387,7 +421,7 @@ final class DynamicToolRegistrarTest extends TestCase
         );
 
         $this->expectException(ToolCallException::class);
-        $closure(5, 10);
+        $closure(5, targetPid: 10);
     }
 
     public function testDeleteToolCallsDataHandlerService(): void
@@ -735,7 +769,7 @@ final class DynamicToolRegistrarTest extends TestCase
         $closure('1', json_encode(['invalid' => 'value'], JSON_THROW_ON_ERROR));
     }
 
-    public function testMoveBatchToolCallsDataHandlerService(): void
+    public function testMoveBatchToolCallsDataHandlerServiceWithTargetPid(): void
     {
         $recordService = $this->createStub(RecordService::class);
         $recordService->method('findExistingUids')->willReturn([10, 20]);
@@ -746,7 +780,7 @@ final class DynamicToolRegistrarTest extends TestCase
             ->with(self::TABLE, [10, 20], 5);
 
         $closure = $this->getRegisteredClosure($recordService, $dataHandlerService, 'move_batch');
-        $result = $closure('10,20', 5);
+        $result = $closure('10,20', targetPid: 5);
 
         self::assertInstanceOf(BatchRecordsMovedResult::class, $result);
         self::assertSame([10, 20], $result->uids);
@@ -755,22 +789,35 @@ final class DynamicToolRegistrarTest extends TestCase
         self::assertSame([], $result->skippedUids);
     }
 
-    public function testMoveBatchToolSkipsNonExistentUids(): void
+    public function testMoveBatchToolCallsDataHandlerServiceWithAfterUid(): void
     {
         $recordService = $this->createStub(RecordService::class);
         $recordService->method('findExistingUids')->willReturn([10]);
 
         $dataHandlerService = $this->createMock(DataHandlerService::class);
+        // afterUid=3 → DataHandler target = -3
         $dataHandlerService->expects(self::once())
             ->method('moveRecords')
             ->with(self::TABLE, [10], -3);
 
         $closure = $this->getRegisteredClosure($recordService, $dataHandlerService, 'move_batch');
-        $result = $closure('10,20', -3);
+        $result = $closure('10,20', afterUid: 3);
 
         self::assertInstanceOf(BatchRecordsMovedResult::class, $result);
         self::assertSame([10], $result->uids);
         self::assertSame([20], $result->skippedUids);
+    }
+
+    public function testMoveBatchToolReturnsErrorWhenNeitherTargetGiven(): void
+    {
+        $recordService = $this->createStub(RecordService::class);
+        $dataHandlerService = $this->createMock(DataHandlerService::class);
+        $dataHandlerService->expects(self::never())->method('moveRecords');
+
+        $closure = $this->getRegisteredClosure($recordService, $dataHandlerService, 'move_batch');
+        $result = $closure('10,20');
+
+        self::assertInstanceOf(ErrorResult::class, $result);
     }
 
     public function testMoveBatchToolThrowsWhenNoUidsExist(): void
@@ -783,7 +830,7 @@ final class DynamicToolRegistrarTest extends TestCase
         $this->expectException(ToolCallException::class);
         $this->expectExceptionMessage('None of the provided UIDs exist');
 
-        $closure('10,20', 5);
+        $closure('10,20', targetPid: 5);
     }
 
     private function createRegistrar(
