@@ -6,6 +6,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+## [0.9.1] - 2026-05-20
+
+### Fixed
+- **Soft-deleted records leaking into read tools:** `RecordService` applied `removeAll()` on restrictions but never re-added `DeletedRestriction`, so `content_list`, `record_search`, `pages_search`, `content_search`, and `record_count` returned rows with `deleted=1`. Tools like `content_delete` and `record_delete_batch` worked, but the deleted rows were still visible afterwards. `WorkspaceContextService::applyRestriction()` now always adds `DeletedRestriction` (no-op for tables without soft-delete) alongside `WorkspaceRestriction`. `RecordService::findExistingUids()` and `RecordService::count()` now also apply restrictions.
+
+### Changed
+- **`*_move` / `*_copy` tools — explicit `targetPid` / `afterUid` parameters:** `content_move`, `content_copy`, `pages_copy`, `record_move_batch`, and the dynamic `<prefix>_move` / `<prefix>_move_batch` tools no longer take a sign-overloaded `target` parameter. They now take two named parameters and require exactly one:
+  - `targetPid` (>= 0): destination page id, places the record at the top of that page
+  - `afterUid` (> 0): sibling record uid, places after that sibling on the same page/column
+  - Returns an `ErrorResult` when neither or both are provided. Shared resolution logic lives in `Tool/Helper/MoveTarget`.
+- **`TcaSchemaService::getReadFields()`** now includes the table's `sortby` field (e.g. `tt_content.sorting`) so the `sorting` value is exposed in list/search responses and can be used as `orderBy`. It remains excluded from `getWritableFields()` because DataHandler is the source of truth — use `*_move` with `afterUid` to reorder.
+
 ## [0.9.0] - 2026-04-30
 
 ### Added
