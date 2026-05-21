@@ -54,19 +54,19 @@ readonly class McpSessionRepository
 
     public function upsert(string $sessionId, string $data, int $now): void
     {
-        $connection = $this->connectionPool->getConnectionForTable(self::TABLE);
+        if ($this->existsBySessionId($sessionId)) {
+            $connection = $this->connectionPool->getConnectionForTable(self::TABLE);
+            $connection->update(
+                self::TABLE,
+                ['data' => $data, 'last_activity' => $now],
+                ['session_id' => $sessionId],
+                ['data' => ParameterType::LARGE_OBJECT],
+            );
 
-        $affected = $connection->update(
-            self::TABLE,
-            ['data' => $data, 'last_activity' => $now],
-            ['session_id' => $sessionId],
-            ['data' => ParameterType::LARGE_OBJECT],
-        );
-
-        if ($affected !== 0) {
             return;
         }
 
+        $connection = $this->connectionPool->getConnectionForTable(self::TABLE);
         $connection->insert(
             self::TABLE,
             [
@@ -77,6 +77,21 @@ readonly class McpSessionRepository
             ],
             ['data' => ParameterType::LARGE_OBJECT],
         );
+    }
+
+    private function existsBySessionId(string $sessionId): bool
+    {
+        $queryBuilder = $this->connectionPool->getQueryBuilderForTable(self::TABLE);
+
+        /** @var array{uid: int}|false $existing */
+        $existing = $queryBuilder
+            ->select('uid')
+            ->from(self::TABLE)
+            ->where($queryBuilder->expr()->eq('session_id', $queryBuilder->createNamedParameter($sessionId)))
+            ->executeQuery()
+            ->fetchAssociative();
+
+        return $existing !== false;
     }
 
     public function delete(string $sessionId): bool

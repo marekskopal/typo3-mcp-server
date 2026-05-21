@@ -86,13 +86,14 @@ final class McpSessionRepositoryTest extends TestCase
     public function testUpsertUpdatesExistingRow(): void
     {
         $connection = $this->createMock(Connection::class);
-        $connection->expects(self::once())
-            ->method('update')
-            ->willReturn(1);
+        $connection->expects(self::once())->method('update');
         $connection->expects(self::never())->method('insert');
 
         $connectionPool = $this->createStub(ConnectionPool::class);
         $connectionPool->method('getConnectionForTable')->willReturn($connection);
+        $connectionPool->method('getQueryBuilderForTable')->willReturn(
+            $this->createSelectQueryBuilder(['uid' => 1]),
+        );
 
         $repository = new McpSessionRepository($connectionPool);
         $repository->upsert('abc', 'data', 1_700_000_000);
@@ -101,9 +102,7 @@ final class McpSessionRepositoryTest extends TestCase
     public function testUpsertInsertsWhenNoExistingRow(): void
     {
         $connection = $this->createMock(Connection::class);
-        $connection->expects(self::once())
-            ->method('update')
-            ->willReturn(0);
+        $connection->expects(self::never())->method('update');
         $connection->expects(self::once())
             ->method('insert')
             ->with(
@@ -119,6 +118,9 @@ final class McpSessionRepositoryTest extends TestCase
 
         $connectionPool = $this->createStub(ConnectionPool::class);
         $connectionPool->method('getConnectionForTable')->willReturn($connection);
+        $connectionPool->method('getQueryBuilderForTable')->willReturn(
+            $this->createSelectQueryBuilder(false),
+        );
 
         $repository = new McpSessionRepository($connectionPool);
         $repository->upsert('abc', 'data', 1_700_000_000);
@@ -173,6 +175,17 @@ final class McpSessionRepositoryTest extends TestCase
      */
     private function createConnectionPoolWithFetchAssociative(array|false $row): ConnectionPool
     {
+        $connectionPool = $this->createStub(ConnectionPool::class);
+        $connectionPool->method('getQueryBuilderForTable')->willReturn($this->createSelectQueryBuilder($row));
+
+        return $connectionPool;
+    }
+
+    /**
+     * @param array<string, mixed>|false $row
+     */
+    private function createSelectQueryBuilder(array|false $row): QueryBuilder
+    {
         $result = $this->createStub(Result::class);
         $result->method('fetchAssociative')->willReturn($row);
 
@@ -185,9 +198,6 @@ final class McpSessionRepositoryTest extends TestCase
         $queryBuilder->method('createNamedParameter')->willReturn(':p');
         $queryBuilder->method('executeQuery')->willReturn($result);
 
-        $connectionPool = $this->createStub(ConnectionPool::class);
-        $connectionPool->method('getQueryBuilderForTable')->willReturn($queryBuilder);
-
-        return $connectionPool;
+        return $queryBuilder;
     }
 }
