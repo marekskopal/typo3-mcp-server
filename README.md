@@ -39,10 +39,11 @@ After installation:
    ```bash
    vendor/bin/typo3 extension:setup
    ```
-2. Run database migrations to create the required OAuth tables:
+2. Run database migrations to create the required OAuth and session tables:
    ```bash
    vendor/bin/typo3 database:updateschema
    ```
+   Re-run this command after every extension update — new tables (e.g. `tx_msmcpserver_mcp_session` introduced for persistent sessions) won't be created automatically.
 
 ## Setup
 

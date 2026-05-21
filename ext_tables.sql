@@ -48,6 +48,19 @@ CREATE TABLE tx_msmcpserver_discovered_table (
     UNIQUE KEY table_name (table_name)
 );
 
+CREATE TABLE tx_msmcpserver_mcp_session (
+    uid int(11) unsigned NOT NULL AUTO_INCREMENT,
+    pid int(11) unsigned DEFAULT '0' NOT NULL,
+    session_id varchar(36) DEFAULT '' NOT NULL,
+    data mediumblob,
+    last_activity int(11) unsigned DEFAULT '0' NOT NULL,
+    crdate int(11) unsigned DEFAULT '0' NOT NULL,
+
+    PRIMARY KEY (uid),
+    UNIQUE KEY session_id (session_id),
+    KEY last_activity (last_activity)
+);
+
 CREATE TABLE tx_msmcpserver_rate_limit (
     uid int(11) unsigned NOT NULL AUTO_INCREMENT,
     pid int(11) unsigned DEFAULT '0' NOT NULL,

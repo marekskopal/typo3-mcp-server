@@ -6,10 +6,12 @@ namespace MarekSkopal\MsMcpServer\Tests\Unit\Command;
 
 use MarekSkopal\MsMcpServer\Command\CleanupExpiredTokensCommand;
 use MarekSkopal\MsMcpServer\OAuth\RateLimitService;
+use MarekSkopal\MsMcpServer\Repository\McpSessionRepository;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Input\ArrayInput;
 use Symfony\Component\Console\Output\BufferedOutput;
+use TYPO3\CMS\Core\Configuration\ExtensionConfiguration;
 use TYPO3\CMS\Core\Core\ApplicationContext;
 use TYPO3\CMS\Core\Core\Environment;
 use TYPO3\CMS\Core\Database\Connection;
@@ -59,7 +61,21 @@ final class CleanupExpiredTokensCommandTest extends TestCase
         $rateLimitService = $this->createStub(RateLimitService::class);
         $rateLimitService->method('deleteExpiredEntries')->willReturn(3);
 
-        $command = new CleanupExpiredTokensCommand($connectionPool, $rateLimitService);
+        $sessionRepository = $this->createMock(McpSessionRepository::class);
+        $sessionRepository->expects(self::once())
+            ->method('deleteExpired')
+            ->with(self::isInt())
+            ->willReturn(7);
+
+        $extensionConfiguration = $this->createStub(ExtensionConfiguration::class);
+        $extensionConfiguration->method('get')->willReturn(['sessionLifetime' => 86400]);
+
+        $command = new CleanupExpiredTokensCommand(
+            $connectionPool,
+            $rateLimitService,
+            $sessionRepository,
+            $extensionConfiguration,
+        );
 
         $input = new ArrayInput([]);
         $output = new BufferedOutput();
@@ -69,6 +85,7 @@ final class CleanupExpiredTokensCommandTest extends TestCase
         $outputText = $output->fetch();
         self::assertSame(0, $exitCode);
         self::assertStringContainsString('5 expired/revoked OAuth authorizations', $outputText);
+        self::assertStringContainsString('7 stale MCP sessions', $outputText);
         self::assertStringContainsString('3 expired rate limit entries', $outputText);
     }
 }

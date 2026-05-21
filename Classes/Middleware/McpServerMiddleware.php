@@ -58,7 +58,30 @@ readonly class McpServerMiddleware implements MiddlewareInterface
         /** @var ResponseInterface $response */
         $response = $server->run($transport);
 
+        if ($this->isSessionNotFoundResponse($response)) {
+            return $this->withCorsHeaders($this->createUnauthorizedResponse($request, 'Session expired'));
+        }
+
         return $this->withCorsHeaders($response);
+    }
+
+    /**
+     * The SDK returns HTTP 404 with a JSON-RPC body (code -32600, message "Session not found...")
+     * for both unknown and expired session IDs. Detect and rewrite to 401 so MCP clients
+     * re-run the OAuth + handshake flow automatically.
+     */
+    private function isSessionNotFoundResponse(ResponseInterface $response): bool
+    {
+        if ($response->getStatusCode() !== 404) {
+            return false;
+        }
+
+        $body = (string) $response->getBody();
+        $response->getBody()->rewind();
+
+        return $body !== ''
+            && str_contains($body, '"code":-32600')
+            && str_contains($body, 'Session not found');
     }
 
     private function extractBearerToken(ServerRequestInterface $request): ?string

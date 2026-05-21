@@ -4,25 +4,38 @@ declare(strict_types=1);
 
 namespace MarekSkopal\MsMcpServer\Command;
 
-use DirectoryIterator;
 use Doctrine\DBAL\ParameterType;
 use MarekSkopal\MsMcpServer\OAuth\RateLimitService;
+use MarekSkopal\MsMcpServer\Repository\McpSessionRepository;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
-use TYPO3\CMS\Core\Core\Environment;
+use TYPO3\CMS\Core\Configuration\ExtensionConfiguration;
 use TYPO3\CMS\Core\Database\ConnectionPool;
 
-#[AsCommand(name: 'mcp:cleanup', description: 'Remove expired and revoked OAuth authorizations and stale MCP session files')]
+#[AsCommand(name: 'mcp:cleanup', description: 'Remove expired and revoked OAuth authorizations and stale MCP sessions')]
 class CleanupExpiredTokensCommand extends Command
 {
     private const string AUTHORIZATION_TABLE = 'tx_msmcpserver_oauth_authorization';
 
-    public function __construct(private readonly ConnectionPool $connectionPool, private readonly RateLimitService $rateLimitService)
-    {
+    private const int DEFAULT_SESSION_LIFETIME = 86400;
+
+    private readonly int $sessionLifetime;
+
+    public function __construct(
+        private readonly ConnectionPool $connectionPool,
+        private readonly RateLimitService $rateLimitService,
+        private readonly McpSessionRepository $sessionRepository,
+        ExtensionConfiguration $extensionConfiguration,
+    ) {
         parent::__construct();
+
+        $config = $extensionConfiguration->get('ms_mcp_server');
+        $sessionLifetime = is_array($config) ? ($config['sessionLifetime'] ?? null) : null;
+        $resolved = is_numeric($sessionLifetime) ? (int) $sessionLifetime : self::DEFAULT_SESSION_LIFETIME;
+        $this->sessionLifetime = $resolved > 0 ? $resolved : self::DEFAULT_SESSION_LIFETIME;
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -32,8 +45,8 @@ class CleanupExpiredTokensCommand extends Command
         $deletedAuthorizations = $this->deleteExpiredAuthorizations();
         $io->writeln(sprintf('Deleted %d expired/revoked OAuth authorizations.', $deletedAuthorizations));
 
-        $deletedSessions = $this->deleteExpiredSessionFiles();
-        $io->writeln(sprintf('Deleted %d stale MCP session files.', $deletedSessions));
+        $deletedSessions = $this->sessionRepository->deleteExpired(time() - $this->sessionLifetime);
+        $io->writeln(sprintf('Deleted %d stale MCP sessions.', $deletedSessions));
 
         $deletedRateLimits = $this->rateLimitService->deleteExpiredEntries();
         $io->writeln(sprintf('Deleted %d expired rate limit entries.', $deletedRateLimits));
@@ -83,33 +96,5 @@ class CleanupExpiredTokensCommand extends Command
                 ),
             )
             ->executeStatement();
-    }
-
-    private function deleteExpiredSessionFiles(): int
-    {
-        $sessionDir = Environment::getVarPath() . '/mcp-sessions';
-        if (!is_dir($sessionDir)) {
-            return 0;
-        }
-
-        $deleted = 0;
-        // 24 hours
-        $maxAge = 86400;
-
-        $iterator = new DirectoryIterator($sessionDir);
-        foreach ($iterator as $file) {
-            if ($file->isDot() || !$file->isFile()) {
-                continue;
-            }
-
-            if ($file->getMTime() >= time() - $maxAge) {
-                continue;
-            }
-
-            unlink($file->getPathname());
-            $deleted++;
-        }
-
-        return $deleted;
     }
 }

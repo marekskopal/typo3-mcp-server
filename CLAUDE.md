@@ -43,7 +43,8 @@ vendor/bin/typo3 mcp:cleanup
 - `OAuth/PkceVerifier` — S256 PKCE verification
 - `OAuth/OAuthTokenPair` — DTO for access/refresh token pairs
 - `Authentication/BackendUserBootstrap` — Bootstraps a `BackendUserAuthentication` from a be_users record
-- `Server/McpServerFactory` — Builds the MCP Server instance; tools/resources/prompts are auto-discovered via DI tags, no hardcoded registration needed
+- `Server/McpServerFactory` — Builds the MCP Server instance; tools/resources/prompts are auto-discovered via DI tags, no hardcoded registration needed. Wires `DatabaseSessionStore` so MCP sessions survive container restarts.
+- `Server/Session/DatabaseSessionStore` — `Mcp\Server\Session\SessionStoreInterface` implementation backed by `tx_msmcpserver_mcp_session`. Bumps `last_activity` on read/exists for sliding TTL.
 - `Server/ErrorHandlingContainer` — Decorating PSR-11 container that wraps tool/resource instances with centralized error handling
 - `Server/ErrorHandlingProxy` — Proxy that catches `\Throwable` from tool/resource methods, logs it, and converts to `ToolCallException`/`ResourceReadException`
 - `Service/DataHandlerService` — Wraps TYPO3 DataHandler for create/update/delete operations (single and batch)
@@ -75,7 +76,8 @@ vendor/bin/typo3 mcp:cleanup
 - `Tool/Dynamic/DynamicToolRegistrar` — Registers CRUD + batch tools at runtime for tables configured via `EXTCONF` and discovered tables from `tx_msmcpserver_discovered_table`
 - `Service/ExtensionTableDiscoveryService` — Scans TCA for extension tables, generates label/prefix, filters system tables
 - `Repository/DiscoveredTableRepository` — CRUD for `tx_msmcpserver_discovered_table` (discovered extension tables with enable/disable)
-- `Command/CleanupExpiredTokensCommand` — CLI command (`mcp:cleanup`) to purge expired OAuth tokens and stale MCP session files
+- `Repository/McpSessionRepository` — CRUD for `tx_msmcpserver_mcp_session` (persistent MCP session storage)
+- `Command/CleanupExpiredTokensCommand` — CLI command (`mcp:cleanup`) to purge expired OAuth tokens and stale MCP sessions
 - `Controller/OAuthClientController` — Backend module for managing OAuth clients (create, edit, delete) and tokens (view, revoke)
 - `Controller/ExtensionTableController` — Backend module for extension table discovery and management (discover, enable/disable, edit label/prefix)
 
@@ -84,7 +86,7 @@ vendor/bin/typo3 mcp:cleanup
 - `Configuration/RequestMiddlewares.php` — Registers OAuthMiddleware and McpServerMiddleware in frontend stack
 - `Configuration/Backend/Modules.php` — Backend module registration (OAuth client + extension table routes)
 - `Configuration/TCA/tx_msmcpserver_oauth_client.php` — TCA for OAuth client table
-- `ext_conf_template.txt` — Extension settings for token lifetimes (accessTokenLifetime, refreshTokenLifetime, codeLifetime) and rate limiting (rateLimitEnabled, per-endpoint limits and windows)
+- `ext_conf_template.txt` — Extension settings for token lifetimes (accessTokenLifetime, refreshTokenLifetime, codeLifetime), session lifetime (sessionLifetime, sliding TTL in seconds, default 86400), and rate limiting (rateLimitEnabled, per-endpoint limits and windows)
 
 **SDK Workarounds:**
 - Tool classes must be `public: true` in Services.yaml because the SDK's `ReferenceHandler` calls `container->has()` which returns false for private TYPO3 services.

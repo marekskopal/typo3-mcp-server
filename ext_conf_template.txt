@@ -7,6 +7,9 @@ refreshTokenLifetime = 2592000
 # cat=token/enable; type=int+; label=Authorization code lifetime (seconds)
 codeLifetime = 60
 
+# cat=session/enable; type=int+; label=MCP session idle lifetime (seconds, sliding TTL)
+sessionLifetime = 86400
+
 # cat=rateLimit/enable; type=boolean; label=Enable rate limiting on OAuth endpoints
 rateLimitEnabled = 1
 

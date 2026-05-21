@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace MarekSkopal\MsMcpServer\Server;
 
 use MarekSkopal\MsMcpServer\Logging\AuditLogger;
+use MarekSkopal\MsMcpServer\Repository\McpSessionRepository;
+use MarekSkopal\MsMcpServer\Server\Session\DatabaseSessionStore;
 use MarekSkopal\MsMcpServer\Tool\Dynamic\DynamicToolRegistrar;
 use MarekSkopal\MsMcpServer\Tool\Redirect\RedirectToolRegistrar;
 use MarekSkopal\MsMcpServer\Tool\Scheduler\SchedulerToolRegistrar;
@@ -14,15 +16,18 @@ use Mcp\Capability\Attribute\McpResource;
 use Mcp\Capability\Attribute\McpResourceTemplate;
 use Mcp\Capability\Attribute\McpTool;
 use Mcp\Server;
-use Mcp\Server\Session\FileSessionStore;
 use Psr\Container\ContainerInterface;
 use Psr\Log\LoggerInterface;
 use ReflectionMethod;
-use TYPO3\CMS\Core\Core\Environment;
+use TYPO3\CMS\Core\Configuration\ExtensionConfiguration;
 
 readonly class McpServerFactory
 {
     public const string VERSION = '0.9.3';
+
+    private const int DEFAULT_SESSION_LIFETIME = 86400;
+
+    private int $sessionLifetime;
 
     /**
      * @param iterable<object> $tools
@@ -37,16 +42,21 @@ readonly class McpServerFactory
         private WorkspaceToolRegistrar $workspaceToolRegistrar,
         private LoggerInterface $logger,
         private AuditLogger $auditLogger,
+        private McpSessionRepository $sessionRepository,
+        ExtensionConfiguration $extensionConfiguration,
         private iterable $tools,
         private iterable $resources,
         private iterable $prompts,
     ) {
+        $config = $extensionConfiguration->get('ms_mcp_server');
+        $sessionLifetime = is_array($config) ? ($config['sessionLifetime'] ?? null) : null;
+        $resolved = is_numeric($sessionLifetime) ? (int) $sessionLifetime : self::DEFAULT_SESSION_LIFETIME;
+        $this->sessionLifetime = $resolved > 0 ? $resolved : self::DEFAULT_SESSION_LIFETIME;
     }
 
     public function create(): Server
     {
-        $sessionDir = Environment::getVarPath() . '/mcp-sessions';
-        $sessionStore = new FileSessionStore($sessionDir);
+        $sessionStore = new DatabaseSessionStore($this->sessionRepository, $this->sessionLifetime);
 
         $handlerTypes = $this->buildHandlerTypeMap();
         $errorHandlingContainer = new ErrorHandlingContainer($this->container, $this->logger, $this->auditLogger, $handlerTypes);

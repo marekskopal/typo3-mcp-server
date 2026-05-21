@@ -185,6 +185,46 @@ final class McpServerMiddlewareTest extends TestCase
         $middleware->process($request, $handler);
     }
 
+    public function testIsSessionNotFoundResponseDetectsSdkSessionExpired(): void
+    {
+        $middleware = new McpServerMiddleware(
+            $this->createAuthorizationService(),
+            $this->createStub(BackendUserBootstrap::class),
+            $this->createStub(McpServerFactory::class),
+            $this->createStub(ResponseFactoryInterface::class),
+            $this->createStub(StreamFactoryInterface::class),
+        );
+
+        $reflection = new \ReflectionMethod($middleware, 'isSessionNotFoundResponse');
+
+        $sessionExpired = $this->makeResponse(
+            404,
+            '{"jsonrpc":"2.0","id":null,"error":{"code":-32600,"message":"Session not found or has expired."}}',
+        );
+        self::assertTrue($reflection->invoke($middleware, $sessionExpired));
+
+        $okResponse = $this->makeResponse(200, '{"jsonrpc":"2.0","id":1,"result":{}}');
+        self::assertFalse($reflection->invoke($middleware, $okResponse));
+
+        $methodNotFound = $this->makeResponse(
+            404,
+            '{"jsonrpc":"2.0","id":1,"error":{"code":-32601,"message":"Method not found"}}',
+        );
+        self::assertFalse($reflection->invoke($middleware, $methodNotFound));
+    }
+
+    private function makeResponse(int $status, string $body): ResponseInterface
+    {
+        $stream = $this->createStub(StreamInterface::class);
+        $stream->method('__toString')->willReturn($body);
+
+        $response = $this->createStub(ResponseInterface::class);
+        $response->method('getStatusCode')->willReturn($status);
+        $response->method('getBody')->willReturn($stream);
+
+        return $response;
+    }
+
     private function createAuthorizationService(): AuthorizationService
     {
         $connectionPool = $this->createStub(ConnectionPool::class);

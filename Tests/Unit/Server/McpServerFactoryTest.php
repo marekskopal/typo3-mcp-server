@@ -13,6 +13,7 @@ use MarekSkopal\MsMcpServer\Resource\SiteConfigurationResource;
 use MarekSkopal\MsMcpServer\Resource\SystemInfoResource;
 use MarekSkopal\MsMcpServer\Resource\TcaTableSchemaResource;
 use MarekSkopal\MsMcpServer\Resource\TcaTablesResource;
+use MarekSkopal\MsMcpServer\Repository\McpSessionRepository;
 use MarekSkopal\MsMcpServer\Server\McpServerFactory;
 use MarekSkopal\MsMcpServer\Service\BackendLayoutService;
 use MarekSkopal\MsMcpServer\Service\CacheService;
@@ -69,6 +70,7 @@ use Psr\Container\ContainerInterface;
 use Psr\Log\NullLogger;
 use TYPO3\CMS\Backend\View\BackendLayoutView;
 use TYPO3\CMS\Core\Cache\CacheManager;
+use TYPO3\CMS\Core\Configuration\ExtensionConfiguration;
 use TYPO3\CMS\Core\Core\ApplicationContext;
 use TYPO3\CMS\Core\Core\Environment;
 use TYPO3\CMS\Core\Database\ConnectionPool;
@@ -192,8 +194,24 @@ final class McpServerFactoryTest extends TestCase
         $workspaceToolRegistrar = new WorkspaceToolRegistrar($recordService, $dataHandlerService, $connectionPool, $logger);
 
         $auditLogger = $this->createStub(\MarekSkopal\MsMcpServer\Logging\AuditLogger::class);
+        $sessionRepository = $this->createStub(McpSessionRepository::class);
+        $extensionConfiguration = $this->createStub(ExtensionConfiguration::class);
+        $extensionConfiguration->method('get')->willReturn(['sessionLifetime' => 86400]);
 
-        $factory = new McpServerFactory($container, $dynamicToolRegistrar, $redirectToolRegistrar, $schedulerToolRegistrar, $workspaceToolRegistrar, $logger, $auditLogger, $tools, $resources, $prompts);
+        $factory = new McpServerFactory(
+            $container,
+            $dynamicToolRegistrar,
+            $redirectToolRegistrar,
+            $schedulerToolRegistrar,
+            $workspaceToolRegistrar,
+            $logger,
+            $auditLogger,
+            $sessionRepository,
+            $extensionConfiguration,
+            $tools,
+            $resources,
+            $prompts,
+        );
         $server = $factory->create();
 
         self::assertInstanceOf(Server::class, $server);
