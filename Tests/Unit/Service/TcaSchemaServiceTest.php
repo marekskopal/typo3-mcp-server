@@ -169,7 +169,6 @@ final class TcaSchemaServiceTest extends TestCase
                 'image' => ['config' => ['type' => 'file']],
                 'docs' => ['config' => ['type' => 'folder']],
                 'cats' => ['config' => ['type' => 'category']],
-                'layout' => ['config' => ['type' => 'flex']],
                 'crop' => ['config' => ['type' => 'imageManipulation']],
                 'virtual' => ['config' => ['type' => 'none']],
                 'hidden_data' => ['config' => ['type' => 'passthrough']],
@@ -184,11 +183,34 @@ final class TcaSchemaServiceTest extends TestCase
         self::assertNotContains('image', $fields);
         self::assertNotContains('docs', $fields);
         self::assertNotContains('cats', $fields);
-        self::assertNotContains('layout', $fields);
         self::assertNotContains('crop', $fields);
         self::assertNotContains('virtual', $fields);
         self::assertNotContains('hidden_data', $fields);
         self::assertNotContains('custom', $fields);
+    }
+
+    public function testGetReadFieldsIncludesFlexType(): void
+    {
+        $GLOBALS['TCA']['tx_test'] = [
+            'ctrl' => [],
+            'columns' => [
+                'pi_flexform' => ['config' => ['type' => 'flex']],
+            ],
+        ];
+
+        self::assertContains('pi_flexform', $this->service->getReadFields('tx_test'));
+    }
+
+    public function testGetWritableFieldsIncludesFlexType(): void
+    {
+        $GLOBALS['TCA']['tx_test'] = [
+            'ctrl' => [],
+            'columns' => [
+                'pi_flexform' => ['config' => ['type' => 'flex']],
+            ],
+        ];
+
+        self::assertContains('pi_flexform', $this->service->getWritableFields('tx_test'));
     }
 
     public function testGetReadFieldsIncludesSelectWithoutMM(): void

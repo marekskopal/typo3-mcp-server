@@ -22,6 +22,7 @@ readonly class TcaSchemaService
         'uuid',
         'country',
         'language',
+        'flex',
     ];
 
     /** TCA types that may store simple values depending on configuration (no MM table). */
