@@ -22,7 +22,7 @@ use TYPO3\CMS\Core\Core\Environment;
 
 readonly class McpServerFactory
 {
-    public const string VERSION = '0.9.2';
+    public const string VERSION = '0.9.3';
 
     /**
      * @param iterable<object> $tools
