@@ -6,6 +6,35 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-05-21
+
+### Added
+- **Persistent MCP sessions:** Session state moves from the SDK's `FileSessionStore` (`var/mcp-sessions/`, wiped on container restart) to a new `tx_msmcpserver_mcp_session` table via `DatabaseSessionStore`. Containers can restart without invalidating active clients; the `Mcp-Session-Id` header keeps working across deploys.
+- **Sliding session TTL:** Every read and existence check on a session bumps `last_activity`, so idle TTL only triggers when truly idle. Configurable via the new `sessionLifetime` extension setting (default 86400 seconds / 1 day).
+
+### Changed
+- **`mcp:cleanup`** prunes expired DB sessions via `McpSessionRepository::deleteExpired` (TTL-aware cutoff) instead of scanning `var/mcp-sessions/`. The old directory becomes vestigial after upgrade.
+
+### Fixed
+- **`404 + JSON-RPC -32600 "Session not found"` rewritten to `401 + WWW-Authenticate`** by `McpServerMiddleware`. MCP clients that auto-retry on 401 transparently re-run OAuth + handshake instead of surfacing the error to the user.
+- `McpSessionRepository::upsert` uses a SELECT-then-INSERT/UPDATE pattern (matching `DiscoveredTableRepository::insertIfNew`) to avoid duplicate-key errors when MariaDB's update returns 0 affected rows for identical-payload writes in the same second.
+
+### Upgrade notes
+Run `vendor/bin/typo3 database:updateschema` after upgrading to create the new `tx_msmcpserver_mcp_session` table. In-flight sessions on existing installs will be lost once on first deploy; clients will re-handshake on the next request.
+
+## [0.9.3] - 2026-05-21
+
+### Fixed
+- **`passthrough` TCA columns stripped from create/update payloads:** Columns with `type: passthrough` (most commonly inline parent FKs like `tx_mspricing_domain_model_planfeature.plan`) were dropped before reaching DataHandler, so child records created via `<prefix>_create` ended up with their parent FK at `0` and never appeared under the parent. `_update` rejected the same field with "No valid fields provided". `passthrough` is now allowlisted in `TcaSchemaService`; DataHandler writes the scalar value directly, and system fields stay excluded via `getSystemFields()`.
+- **Scheduler tools failed on TYPO3 v13** with `Unknown column 'pid'`. `SchedulerToolRegistrar` now introspects `tx_scheduler_task` at registration time via `AbstractSchemaManager::introspectTableByUnquotedName()` and exposes only the columns that exist. The `tasktype` / `task_group` / `disable` filter parameters are dropped from queries when their column is missing, so the tool degrades gracefully on schemas without TCA-defined columns. (The bug was latent before v0.9.2 — the default 50-tool pagination hid `scheduler_list` from the test client.)
+
+## [0.9.2] - 2026-05-21
+
+### Fixed
+- **Tools missing for clients without pagination support:** The MCP SDK's default `paginationLimit` of 50 truncated `tools/list` responses, hiding dynamic CRUD tools past the first page for clients that don't follow `nextCursor`. `McpServerFactory` now sets the limit to 500 so practical installs fit in a single page.
+- **`pi_flexform` (and any `flex` TCA column) stripped from create/update payloads:** `TcaSchemaService` excluded the `flex` type from readable/writable fields, so `content_create`, `content_update`, `record_update_batch`, and every dynamic `<prefix>_create` / `<prefix>_update` tool silently dropped the field with "No valid writable fields provided". `flex` is now allowlisted; DataHandler accepts the raw XML string.
+- **`record_search` rejected empty input:** Passing `""` produced "Invalid JSON" and `"{}"` produced "No valid search fields provided", so listing everything in a `pid` required inventing a bogus `field=value`. Empty input is now treated as "no field filter"; inputs containing only unknown fields still error so typos remain visible.
+
 ## [0.9.1] - 2026-05-20
 
 ### Fixed
