@@ -138,6 +138,46 @@ final class RecordSearchToolTest extends TestCase
         self::assertSame(['nonexistent'], $result['ignoredFields']);
     }
 
+    public function testExecuteWithEmptyStringListsByPidWithoutFilter(): void
+    {
+        $recordService = $this->createMock(RecordService::class);
+        $recordService->expects(self::once())
+            ->method('search')
+            ->with(
+                'pages',
+                [],
+                20,
+                0,
+                self::anything(),
+                10,
+            )
+            ->willReturn(['records' => [['uid' => 1, 'pid' => 10]], 'total' => 1]);
+
+        $tool = new RecordSearchTool($recordService, new TcaSchemaService());
+        $result = json_decode($tool->execute('pages', '', 20, 0, 10), true, 512, JSON_THROW_ON_ERROR);
+
+        self::assertSame(1, $result['total']);
+    }
+
+    public function testExecuteWithEmptyObjectListsByPidWithoutFilter(): void
+    {
+        $recordService = $this->createMock(RecordService::class);
+        $recordService->expects(self::once())
+            ->method('search')
+            ->with(
+                'pages',
+                [],
+                20,
+                0,
+                self::anything(),
+                10,
+            )
+            ->willReturn(['records' => [], 'total' => 0]);
+
+        $tool = new RecordSearchTool($recordService, new TcaSchemaService());
+        $tool->execute('pages', '{}', 20, 0, 10);
+    }
+
     public function testExecuteWithEqOperator(): void
     {
         $recordService = $this->createMock(RecordService::class);

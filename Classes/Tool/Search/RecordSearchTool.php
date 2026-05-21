@@ -21,6 +21,7 @@ readonly class RecordSearchTool
             . ' Values can be a plain string for LIKE matching (e.g. {"title":"hello"}) or an object with "op" and "value"'
             . ' for advanced operators (e.g. {"uid":{"op":"gt","value":"10"}, "title":{"op":"eq","value":"Home"}}).'
             . ' Supported operators: eq, neq, like, gt, gte, lt, lte, in (comma-separated), null, notNull.'
+            . ' Pass an empty string or "{}" for no field filter (useful to list everything in a pid).'
             . ' Optionally filter by pid. Use orderBy to sort results by a field name and orderDirection (ASC or DESC).'
             . ' Returns matching records with pagination.',
     )]
@@ -39,11 +40,14 @@ readonly class RecordSearchTool
             return json_encode(['error' => 'Table not found or has no readable fields: ' . $tableName], JSON_THROW_ON_ERROR);
         }
 
-        try {
-            /** @var array<string, mixed> $searchData */
-            $searchData = json_decode($search, true, 512, JSON_THROW_ON_ERROR);
-        } catch (\JsonException $e) {
-            return json_encode(['error' => 'Invalid JSON in search parameter: ' . $e->getMessage()], JSON_THROW_ON_ERROR);
+        $searchData = [];
+        if (trim($search) !== '') {
+            try {
+                /** @var array<string, mixed> $searchData */
+                $searchData = json_decode($search, true, 512, JSON_THROW_ON_ERROR);
+            } catch (\JsonException $e) {
+                return json_encode(['error' => 'Invalid JSON in search parameter: ' . $e->getMessage()], JSON_THROW_ON_ERROR);
+            }
         }
 
         // Filter search fields to only allow readable fields and parse conditions
@@ -51,7 +55,7 @@ readonly class RecordSearchTool
         $validSearch = SearchConditionParser::fromArray($searchData, $allowedFields);
         $ignoredFields = array_values(array_diff(array_keys($searchData), $allowedFields));
 
-        if ($validSearch === []) {
+        if ($validSearch === [] && $searchData !== []) {
             return json_encode(
                 ['error' => 'No valid search fields provided', 'ignoredFields' => $ignoredFields],
                 JSON_THROW_ON_ERROR,
