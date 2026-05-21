@@ -54,7 +54,8 @@ readonly class McpServerFactory
         $builder = Server::builder()
             ->setServerInfo('TYPO3 MCP Server', self::VERSION)
             ->setContainer($errorHandlingContainer)
-            ->setSession($sessionStore);
+            ->setSession($sessionStore)
+            ->setPaginationLimit(500);
 
         foreach ($this->tools as $tool) {
             $attribute = $this->getMethodAttribute($tool, McpTool::class);
