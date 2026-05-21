@@ -171,7 +171,6 @@ final class TcaSchemaServiceTest extends TestCase
                 'cats' => ['config' => ['type' => 'category']],
                 'crop' => ['config' => ['type' => 'imageManipulation']],
                 'virtual' => ['config' => ['type' => 'none']],
-                'hidden_data' => ['config' => ['type' => 'passthrough']],
                 'custom' => ['config' => ['type' => 'user']],
             ],
         ];
@@ -185,7 +184,6 @@ final class TcaSchemaServiceTest extends TestCase
         self::assertNotContains('cats', $fields);
         self::assertNotContains('crop', $fields);
         self::assertNotContains('virtual', $fields);
-        self::assertNotContains('hidden_data', $fields);
         self::assertNotContains('custom', $fields);
     }
 
@@ -211,6 +209,30 @@ final class TcaSchemaServiceTest extends TestCase
         ];
 
         self::assertContains('pi_flexform', $this->service->getWritableFields('tx_test'));
+    }
+
+    public function testGetReadFieldsIncludesPassthroughType(): void
+    {
+        $GLOBALS['TCA']['tx_test'] = [
+            'ctrl' => [],
+            'columns' => [
+                'plan' => ['config' => ['type' => 'passthrough']],
+            ],
+        ];
+
+        self::assertContains('plan', $this->service->getReadFields('tx_test'));
+    }
+
+    public function testGetWritableFieldsIncludesPassthroughType(): void
+    {
+        $GLOBALS['TCA']['tx_test'] = [
+            'ctrl' => [],
+            'columns' => [
+                'plan' => ['config' => ['type' => 'passthrough']],
+            ],
+        ];
+
+        self::assertContains('plan', $this->service->getWritableFields('tx_test'));
     }
 
     public function testGetReadFieldsIncludesSelectWithoutMM(): void

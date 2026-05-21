@@ -23,6 +23,7 @@ readonly class TcaSchemaService
         'country',
         'language',
         'flex',
+        'passthrough',
     ];
 
     /** TCA types that may store simple values depending on configuration (no MM table). */
