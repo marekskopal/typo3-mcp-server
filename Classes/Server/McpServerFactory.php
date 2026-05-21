@@ -23,7 +23,7 @@ use TYPO3\CMS\Core\Configuration\ExtensionConfiguration;
 
 readonly class McpServerFactory
 {
-    public const string VERSION = '0.9.3';
+    public const string VERSION = '0.10.0';
 
     private const int DEFAULT_SESSION_LIFETIME = 86400;
 
