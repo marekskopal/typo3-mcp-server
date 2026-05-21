@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace MarekSkopal\MsMcpServer\Tests\Unit\Tool\Scheduler;
 
+use Doctrine\DBAL\Schema\AbstractSchemaManager;
+use Doctrine\DBAL\Schema\Table;
 use MarekSkopal\MsMcpServer\Service\DataHandlerService;
 use MarekSkopal\MsMcpServer\Service\RecordService;
 use MarekSkopal\MsMcpServer\Tool\Result\ErrorResult;
@@ -15,6 +17,8 @@ use Mcp\Server;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
+use TYPO3\CMS\Core\Database\Connection;
+use TYPO3\CMS\Core\Database\ConnectionPool;
 use TYPO3\CMS\Core\Package\PackageManager;
 use TYPO3\CMS\Core\Utility\ExtensionManagementUtility;
 use const JSON_THROW_ON_ERROR;
@@ -60,6 +64,51 @@ final class SchedulerToolRegistrarTest extends TestCase
 
         $tools = $this->getRegisteredTools($builder);
         self::assertSame([], $tools);
+    }
+
+    public function testListToolOmitsMissingColumnsOnTypo3V13Schema(): void
+    {
+        // TYPO3 v13's tx_scheduler_task has no pid and no tasktype columns.
+        $v13Columns = ['uid', 'task_group', 'description', 'disable', 'nextexecution'];
+
+        $recordService = $this->createMock(RecordService::class);
+        $recordService->expects(self::once())
+            ->method('search')
+            ->with(
+                'tx_scheduler_task',
+                // tasktype filter is dropped because the column does not exist
+                ['disable' => ['operator' => 'eq', 'value' => '1']],
+                20,
+                0,
+                $v13Columns,
+                null,
+                'uid',
+                'ASC',
+            )
+            ->willReturn(['records' => [], 'total' => 0]);
+
+        $registrar = $this->createRegistrar(
+            $recordService,
+            null,
+            $this->createConnectionPoolWithColumns($v13Columns),
+        );
+
+        $builder = Server::builder();
+        $registrar->register($builder);
+
+        $tools = $this->getRegisteredTools($builder);
+        foreach ($tools as $tool) {
+            if (($tool['name'] ?? null) === 'scheduler_list') {
+                /** @var \Closure $handler */
+                $handler = $tool['handler'];
+                // Pass tasktype filter — it should be ignored since the column is missing.
+                $handler(20, 0, 'GarbageCollection', -1, 1);
+
+                return;
+            }
+        }
+
+        self::fail('scheduler_list was not registered');
     }
 
     public function testListToolReturnsRecords(): void
@@ -287,10 +336,15 @@ final class SchedulerToolRegistrarTest extends TestCase
     private function createRegistrar(
         ?RecordService $recordService = null,
         ?DataHandlerService $dataHandlerService = null,
+        ?ConnectionPool $connectionPool = null,
     ): SchedulerToolRegistrar {
         return new SchedulerToolRegistrar(
             $recordService ?? $this->createStub(RecordService::class),
             $dataHandlerService ?? $this->createStub(DataHandlerService::class),
+            $connectionPool ?? $this->createConnectionPoolWithColumns([
+                'uid', 'pid', 'tasktype', 'task_group', 'description', 'disable',
+                'nextexecution', 'lastexecution_time', 'lastexecution_failure', 'lastexecution_context',
+            ]),
             new NullLogger(),
         );
     }
@@ -300,7 +354,7 @@ final class SchedulerToolRegistrarTest extends TestCase
         DataHandlerService $dataHandlerService,
         string $toolType,
     ): \Closure {
-        $registrar = new SchedulerToolRegistrar($recordService, $dataHandlerService, new NullLogger());
+        $registrar = $this->createRegistrar($recordService, $dataHandlerService);
 
         $builder = Server::builder();
         $registrar->register($builder);
@@ -318,6 +372,25 @@ final class SchedulerToolRegistrarTest extends TestCase
         }
 
         self::fail('Tool "' . $toolName . '" was not registered');
+    }
+
+    /** @param list<string> $columnNames */
+    private function createConnectionPoolWithColumns(array $columnNames): ConnectionPool
+    {
+        $table = $this->createStub(Table::class);
+        $table->method('hasColumn')
+            ->willReturnCallback(static fn(string $field): bool => in_array($field, $columnNames, true));
+
+        $schemaManager = $this->createStub(AbstractSchemaManager::class);
+        $schemaManager->method('introspectTableByUnquotedName')->willReturn($table);
+
+        $connection = $this->createStub(Connection::class);
+        $connection->method('createSchemaManager')->willReturn($schemaManager);
+
+        $connectionPool = $this->createStub(ConnectionPool::class);
+        $connectionPool->method('getConnectionForTable')->willReturn($connection);
+
+        return $connectionPool;
     }
 
     /**

@@ -188,7 +188,7 @@ final class McpServerFactoryTest extends TestCase
         $discoveredTableRepository->method('findEnabled')->willReturn([]);
         $dynamicToolRegistrar = new DynamicToolRegistrar($recordService, $dataHandlerService, $tcaSchemaService, $discoveredTableRepository, $logger);
         $redirectToolRegistrar = new RedirectToolRegistrar($recordService, $dataHandlerService, $logger);
-        $schedulerToolRegistrar = new SchedulerToolRegistrar($recordService, $dataHandlerService, $logger);
+        $schedulerToolRegistrar = new SchedulerToolRegistrar($recordService, $dataHandlerService, $connectionPool, $logger);
         $workspaceToolRegistrar = new WorkspaceToolRegistrar($recordService, $dataHandlerService, $connectionPool, $logger);
 
         $auditLogger = $this->createStub(\MarekSkopal\MsMcpServer\Logging\AuditLogger::class);

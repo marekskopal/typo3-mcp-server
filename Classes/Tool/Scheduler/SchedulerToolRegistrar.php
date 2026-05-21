@@ -12,6 +12,7 @@ use MarekSkopal\MsMcpServer\Tool\Result\RecordUpdatedResult;
 use Mcp\Exception\ToolCallException;
 use Mcp\Server\Builder;
 use Psr\Log\LoggerInterface;
+use TYPO3\CMS\Core\Database\ConnectionPool;
 use TYPO3\CMS\Core\Utility\ExtensionManagementUtility;
 use const JSON_THROW_ON_ERROR;
 
@@ -19,7 +20,7 @@ readonly class SchedulerToolRegistrar
 {
     private const string TABLE = 'tx_scheduler_task';
 
-    private const array LIST_FIELDS = [
+    private const array CANDIDATE_FIELDS = [
         'uid',
         'pid',
         'tasktype',
@@ -32,20 +33,7 @@ readonly class SchedulerToolRegistrar
         'lastexecution_context',
     ];
 
-    private const array READ_FIELDS = [
-        'uid',
-        'pid',
-        'tasktype',
-        'task_group',
-        'description',
-        'disable',
-        'nextexecution',
-        'lastexecution_time',
-        'lastexecution_failure',
-        'lastexecution_context',
-    ];
-
-    private const array WRITABLE_FIELDS = [
+    private const array CANDIDATE_WRITABLE_FIELDS = [
         'disable',
         'description',
         'task_group',
@@ -54,6 +42,7 @@ readonly class SchedulerToolRegistrar
     public function __construct(
         private RecordService $recordService,
         private DataHandlerService $dataHandlerService,
+        private ConnectionPool $connectionPool,
         private LoggerInterface $logger,
     ) {
     }
@@ -64,16 +53,50 @@ readonly class SchedulerToolRegistrar
             return;
         }
 
-        $this->registerListTool($builder);
-        $this->registerGetTool($builder);
-        $this->registerUpdateTool($builder);
+        $fields = $this->filterExistingColumns(self::TABLE, self::CANDIDATE_FIELDS);
+        if ($fields === []) {
+            return;
+        }
+
+        $writableFields = $this->filterExistingColumns(self::TABLE, self::CANDIDATE_WRITABLE_FIELDS);
+
+        $this->registerListTool($builder, $fields);
+        $this->registerGetTool($builder, $fields);
+        $this->registerUpdateTool($builder, $writableFields);
         $this->registerDeleteTool($builder);
     }
 
-    private function registerListTool(Builder $builder): void
+    /**
+     * @param non-empty-string $table
+     * @param list<string> $candidates
+     * @return list<string>
+     */
+    private function filterExistingColumns(string $table, array $candidates): array
+    {
+        try {
+            $tableInfo = $this->connectionPool->getConnectionForTable($table)
+                ->createSchemaManager()
+                ->introspectTableByUnquotedName($table);
+        } catch (\Throwable $e) {
+            $this->logger->warning('Failed to introspect ' . $table . ' columns', ['exception' => $e]);
+
+            return [];
+        }
+
+        return array_values(array_filter(
+            $candidates,
+            static fn (string $field): bool => $tableInfo->hasColumn($field),
+        ));
+    }
+
+    /** @param list<string> $fields */
+    private function registerListTool(Builder $builder, array $fields): void
     {
         $recordService = $this->recordService;
         $logger = $this->logger;
+        $hasTasktype = in_array('tasktype', $fields, true);
+        $hasTaskGroup = in_array('task_group', $fields, true);
+        $hasDisable = in_array('disable', $fields, true);
 
         $builder->addTool(
             handler: static function (
@@ -84,18 +107,22 @@ readonly class SchedulerToolRegistrar
                 int $disable = -1,
             ) use (
                 $recordService,
-                $logger
+                $logger,
+                $fields,
+                $hasTasktype,
+                $hasTaskGroup,
+                $hasDisable,
             ): string {
                 /** @var array<string, array{operator: string, value: string}> $conditions */
                 $conditions = [];
 
-                if ($tasktype !== '') {
+                if ($tasktype !== '' && $hasTasktype) {
                     $conditions['tasktype'] = ['operator' => 'like', 'value' => $tasktype];
                 }
-                if ($taskGroup >= 0) {
+                if ($taskGroup >= 0 && $hasTaskGroup) {
                     $conditions['task_group'] = ['operator' => 'eq', 'value' => (string) $taskGroup];
                 }
-                if ($disable >= 0) {
+                if ($disable >= 0 && $hasDisable) {
                     $conditions['disable'] = ['operator' => 'eq', 'value' => (string) $disable];
                 }
 
@@ -105,7 +132,7 @@ readonly class SchedulerToolRegistrar
                         $conditions,
                         $limit,
                         $offset,
-                        self::LIST_FIELDS,
+                        $fields,
                         null,
                         'uid',
                         'ASC',
@@ -120,20 +147,21 @@ readonly class SchedulerToolRegistrar
             },
             name: 'scheduler_list',
             description: 'List scheduler tasks with pagination and optional filtering.'
-                . ' Use tasktype for text search by task class name (LIKE).'
+                . ' Use tasktype for text search by task class name (LIKE; ignored when the column is unavailable).'
                 . ' Use taskGroup to filter by group ID. Use disable (0 or 1) to filter by status.',
         );
     }
 
-    private function registerGetTool(Builder $builder): void
+    /** @param list<string> $fields */
+    private function registerGetTool(Builder $builder, array $fields): void
     {
         $recordService = $this->recordService;
         $logger = $this->logger;
 
         $builder->addTool(
-            handler: static function (int $uid) use ($recordService, $logger): string {
+            handler: static function (int $uid) use ($recordService, $logger, $fields): string {
                 try {
-                    $record = $recordService->findByUid(self::TABLE, $uid, self::READ_FIELDS);
+                    $record = $recordService->findByUid(self::TABLE, $uid, $fields);
                 } catch (\Throwable $e) {
                     $logger->error('scheduler get tool failed', ['exception' => $e]);
 
@@ -151,17 +179,25 @@ readonly class SchedulerToolRegistrar
         );
     }
 
-    private function registerUpdateTool(Builder $builder): void
+    /** @param list<string> $writableFields */
+    private function registerUpdateTool(Builder $builder, array $writableFields): void
     {
         $dataHandlerService = $this->dataHandlerService;
         $logger = $this->logger;
 
         $builder->addTool(
-            handler: static function (int $uid, string $fields) use ($dataHandlerService, $logger): RecordUpdatedResult|ErrorResult {
+            handler: static function (
+                int $uid,
+                string $fields,
+            ) use (
+                $dataHandlerService,
+                $logger,
+                $writableFields,
+            ): RecordUpdatedResult|ErrorResult {
                 /** @var array<string, mixed> $data */
                 $data = json_decode($fields, true, 512, JSON_THROW_ON_ERROR);
 
-                $filteredData = array_intersect_key($data, array_flip(self::WRITABLE_FIELDS));
+                $filteredData = array_intersect_key($data, array_flip($writableFields));
                 $ignoredFields = array_values(array_diff(array_keys($data), array_keys($filteredData)));
 
                 if ($filteredData === []) {
@@ -180,7 +216,7 @@ readonly class SchedulerToolRegistrar
             },
             name: 'scheduler_update',
             description: 'Update a scheduler task. Pass fields as a JSON object string.'
-                . ' Available fields: ' . implode(', ', self::WRITABLE_FIELDS) . '.',
+                . ' Available fields: ' . implode(', ', $writableFields) . '.',
         );
     }
 
