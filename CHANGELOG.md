@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+### Added
+- **Configurable MCP base path:** new `mcpBasePath` extension setting (default `/mcp`) lets the MCP endpoint and OAuth sub-paths live under a different prefix when `/mcp` is already taken by another handler. OAuth endpoints follow the prefix (e.g. `/typo3-mcp/oauth/authorize`); the resource metadata advertises the configured path. For nested values like `/some/dir/mcp`, the `.well-known/*` discovery endpoints relocate to `/some/dir/.well-known/...` so they sit alongside the resource.
+
 ## [0.10.0] - 2026-05-21
 
 ### Added

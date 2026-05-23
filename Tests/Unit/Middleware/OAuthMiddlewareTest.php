@@ -8,6 +8,7 @@ use MarekSkopal\MsMcpServer\Middleware\OAuthMiddleware;
 use MarekSkopal\MsMcpServer\OAuth\AuthorizationService;
 use MarekSkopal\MsMcpServer\OAuth\ClientRepository;
 use MarekSkopal\MsMcpServer\OAuth\RateLimitService;
+use MarekSkopal\MsMcpServer\Service\McpPathProvider;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 use Psr\Http\Message\ResponseFactoryInterface;
@@ -17,6 +18,7 @@ use Psr\Http\Message\StreamFactoryInterface;
 use Psr\Http\Message\StreamInterface;
 use Psr\Http\Message\UriInterface;
 use Psr\Http\Server\RequestHandlerInterface;
+use TYPO3\CMS\Core\Configuration\ExtensionConfiguration;
 use TYPO3\CMS\Core\Crypto\PasswordHashing\PasswordHashFactory;
 use TYPO3\CMS\Core\Database\ConnectionPool;
 
@@ -203,20 +205,115 @@ final class OAuthMiddlewareTest extends TestCase
         self::assertStringContainsString('token parameter is required', $body);
     }
 
-    private function createMiddleware(): OAuthMiddleware
+    public function testCustomBasePathRoutesOAuthSubpaths(): void
+    {
+        $request = $this->createRequest('/typo3-mcp/oauth/revoke', 'POST');
+        $request->method('getParsedBody')->willReturn([]);
+
+        $handler = $this->createMock(RequestHandlerInterface::class);
+        $handler->expects(self::never())->method('handle');
+
+        $middleware = $this->createMiddlewareWithCapture(basePath: '/typo3-mcp');
+        $middleware->process($request, $handler);
+
+        $body = $this->capturedBodies[0] ?? '';
+        self::assertStringContainsString('token parameter is required', $body);
+    }
+
+    public function testCustomBasePathDefaultMcpRequestPassesThrough(): void
+    {
+        $request = $this->createRequest('/mcp/oauth/revoke', 'POST');
+
+        $expectedResponse = $this->createStub(ResponseInterface::class);
+
+        $handler = $this->createMock(RequestHandlerInterface::class);
+        $handler->expects(self::once())->method('handle')->with($request)->willReturn($expectedResponse);
+
+        $middleware = $this->createMiddleware(basePath: '/typo3-mcp');
+        self::assertSame($expectedResponse, $middleware->process($request, $handler));
+    }
+
+    public function testResourceMetadataAdvertisesCustomBasePath(): void
+    {
+        $uri = $this->createStub(UriInterface::class);
+        $uri->method('getPath')->willReturn('/.well-known/oauth-protected-resource');
+        $uri->method('getScheme')->willReturn('https');
+        $uri->method('getHost')->willReturn('example.com');
+        $uri->method('getPort')->willReturn(null);
+
+        $request = $this->createStub(ServerRequestInterface::class);
+        $request->method('getUri')->willReturn($uri);
+        $request->method('getMethod')->willReturn('GET');
+
+        $handler = $this->createMock(RequestHandlerInterface::class);
+        $handler->expects(self::never())->method('handle');
+
+        $middleware = $this->createMiddlewareWithCapture(basePath: '/typo3-mcp');
+        $middleware->process($request, $handler);
+
+        $decoded = $this->decodeCapturedBody();
+        self::assertSame('https://example.com/typo3-mcp', $decoded['resource'] ?? null);
+        self::assertSame(['https://example.com'], $decoded['authorization_servers'] ?? null);
+    }
+
+    public function testNestedBasePathRelocatesWellKnownEndpoints(): void
+    {
+        $uri = $this->createStub(UriInterface::class);
+        $uri->method('getPath')->willReturn('/some/dir/.well-known/oauth-authorization-server');
+        $uri->method('getScheme')->willReturn('https');
+        $uri->method('getHost')->willReturn('example.com');
+        $uri->method('getPort')->willReturn(null);
+
+        $request = $this->createStub(ServerRequestInterface::class);
+        $request->method('getUri')->willReturn($uri);
+        $request->method('getMethod')->willReturn('GET');
+
+        $handler = $this->createMock(RequestHandlerInterface::class);
+        $handler->expects(self::never())->method('handle');
+
+        $middleware = $this->createMiddlewareWithCapture(basePath: '/some/dir/mcp');
+        $middleware->process($request, $handler);
+
+        $decoded = $this->decodeCapturedBody();
+        self::assertSame('https://example.com/some/dir', $decoded['issuer'] ?? null);
+        self::assertSame(
+            'https://example.com/some/dir/mcp/oauth/authorize',
+            $decoded['authorization_endpoint'] ?? null,
+        );
+        self::assertSame(
+            'https://example.com/some/dir/mcp/oauth/token',
+            $decoded['token_endpoint'] ?? null,
+        );
+    }
+
+    public function testNestedBasePathRootWellKnownPassesThrough(): void
+    {
+        $request = $this->createRequest('/.well-known/oauth-authorization-server', 'GET');
+
+        $expectedResponse = $this->createStub(ResponseInterface::class);
+
+        $handler = $this->createMock(RequestHandlerInterface::class);
+        $handler->expects(self::once())->method('handle')->with($request)->willReturn($expectedResponse);
+
+        $middleware = $this->createMiddleware(basePath: '/some/dir/mcp');
+        self::assertSame($expectedResponse, $middleware->process($request, $handler));
+    }
+
+    private function createMiddleware(string $basePath = '/mcp'): OAuthMiddleware
     {
         return new OAuthMiddleware(
             $this->createStub(AuthorizationService::class),
             $this->createStub(ClientRepository::class),
             $this->createStub(ConnectionPool::class),
             $this->createStub(PasswordHashFactory::class),
+            $this->createPathProvider($basePath),
             $this->createStub(RateLimitService::class),
             $this->createStub(ResponseFactoryInterface::class),
             $this->createStub(StreamFactoryInterface::class),
         );
     }
 
-    private function createMiddlewareWithCapture(?RateLimitService $rateLimitService = null): OAuthMiddleware
+    private function createMiddlewareWithCapture(?RateLimitService $rateLimitService = null, string $basePath = '/mcp'): OAuthMiddleware
     {
         $stream = $this->createStub(StreamInterface::class);
 
@@ -241,9 +338,29 @@ final class OAuthMiddlewareTest extends TestCase
             $this->createStub(ClientRepository::class),
             $this->createStub(ConnectionPool::class),
             $this->createStub(PasswordHashFactory::class),
+            $this->createPathProvider($basePath),
             $rateLimitService ?? $this->createStub(RateLimitService::class),
             $responseFactory,
             $streamFactory,
         );
+    }
+
+    private function createPathProvider(string $basePath): McpPathProvider
+    {
+        $extensionConfiguration = $this->createStub(ExtensionConfiguration::class);
+        $extensionConfiguration->method('get')->willReturn(['mcpBasePath' => $basePath]);
+
+        return new McpPathProvider($extensionConfiguration);
+    }
+
+    /** @return array<string, mixed> */
+    private function decodeCapturedBody(): array
+    {
+        $body = $this->capturedBodies[0] ?? '';
+        $decoded = json_decode($body, true);
+        self::assertIsArray($decoded);
+
+        /** @var array<string, mixed> $decoded */
+        return $decoded;
     }
 }

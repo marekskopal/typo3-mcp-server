@@ -1,3 +1,6 @@
+# cat=basic/enable; type=string; label=MCP base path: Base URL path for the MCP endpoint and OAuth sub-paths (e.g. /mcp, /typo3-mcp). Must start with /. Defaults to /mcp.
+mcpBasePath = /mcp
+
 # cat=token/enable; type=int+; label=Access token lifetime (seconds)
 accessTokenLifetime = 3600
 

@@ -11,6 +11,7 @@ use MarekSkopal\MsMcpServer\OAuth\AuthorizationService;
 use MarekSkopal\MsMcpServer\OAuth\ClientRepository;
 use MarekSkopal\MsMcpServer\OAuth\PkceVerifier;
 use MarekSkopal\MsMcpServer\Server\McpServerFactory;
+use MarekSkopal\MsMcpServer\Service\McpPathProvider;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 use Psr\Http\Message\ResponseFactoryInterface;
@@ -46,6 +47,7 @@ final class McpServerMiddlewareTest extends TestCase
             $this->createAuthorizationService(),
             $this->createStub(BackendUserBootstrap::class),
             $this->createStub(McpServerFactory::class),
+            $this->createPathProvider(),
             $this->createStub(ResponseFactoryInterface::class),
             $this->createStub(StreamFactoryInterface::class),
         );
@@ -75,11 +77,37 @@ final class McpServerMiddlewareTest extends TestCase
             $this->createAuthorizationService(),
             $this->createStub(BackendUserBootstrap::class),
             $this->createStub(McpServerFactory::class),
+            $this->createPathProvider(),
             $responseFactory,
             $this->createStub(StreamFactoryInterface::class),
         );
 
         $middleware->process($request, $handler);
+    }
+
+    public function testCustomBasePathPassesThroughWhenDefaultMcpRequested(): void
+    {
+        $uri = $this->createStub(UriInterface::class);
+        $uri->method('getPath')->willReturn('/mcp');
+
+        $request = $this->createStub(ServerRequestInterface::class);
+        $request->method('getUri')->willReturn($uri);
+
+        $expectedResponse = $this->createStub(ResponseInterface::class);
+
+        $handler = $this->createMock(RequestHandlerInterface::class);
+        $handler->expects(self::once())->method('handle')->with($request)->willReturn($expectedResponse);
+
+        $middleware = new McpServerMiddleware(
+            $this->createAuthorizationService(),
+            $this->createStub(BackendUserBootstrap::class),
+            $this->createStub(McpServerFactory::class),
+            $this->createPathProvider('/typo3-mcp'),
+            $this->createStub(ResponseFactoryInterface::class),
+            $this->createStub(StreamFactoryInterface::class),
+        );
+
+        self::assertSame($expectedResponse, $middleware->process($request, $handler));
     }
 
     public function testMcpPathWithoutAuthReturns401(): void
@@ -114,6 +142,7 @@ final class McpServerMiddlewareTest extends TestCase
             $this->createAuthorizationService(),
             $this->createStub(BackendUserBootstrap::class),
             $this->createStub(McpServerFactory::class),
+            $this->createPathProvider(),
             $responseFactory,
             $streamFactory,
         );
@@ -178,6 +207,7 @@ final class McpServerMiddlewareTest extends TestCase
             $authorizationService,
             $this->createStub(BackendUserBootstrap::class),
             $this->createStub(McpServerFactory::class),
+            $this->createPathProvider(),
             $responseFactory,
             $streamFactory,
         );
@@ -191,6 +221,7 @@ final class McpServerMiddlewareTest extends TestCase
             $this->createAuthorizationService(),
             $this->createStub(BackendUserBootstrap::class),
             $this->createStub(McpServerFactory::class),
+            $this->createPathProvider(),
             $this->createStub(ResponseFactoryInterface::class),
             $this->createStub(StreamFactoryInterface::class),
         );
@@ -235,5 +266,13 @@ final class McpServerMiddlewareTest extends TestCase
             new ClientRepository($connectionPool),
             $this->createStub(ExtensionConfiguration::class),
         );
+    }
+
+    private function createPathProvider(string $basePath = '/mcp'): McpPathProvider
+    {
+        $extensionConfiguration = $this->createStub(ExtensionConfiguration::class);
+        $extensionConfiguration->method('get')->willReturn(['mcpBasePath' => $basePath]);
+
+        return new McpPathProvider($extensionConfiguration);
     }
 }

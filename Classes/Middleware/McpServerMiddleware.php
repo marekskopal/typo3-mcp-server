@@ -7,6 +7,7 @@ namespace MarekSkopal\MsMcpServer\Middleware;
 use MarekSkopal\MsMcpServer\Authentication\BackendUserBootstrap;
 use MarekSkopal\MsMcpServer\OAuth\AuthorizationService;
 use MarekSkopal\MsMcpServer\Server\McpServerFactory;
+use MarekSkopal\MsMcpServer\Service\McpPathProvider;
 use Mcp\Server\Transport\StreamableHttpTransport;
 use Psr\Http\Message\ResponseFactoryInterface;
 use Psr\Http\Message\ResponseInterface;
@@ -18,12 +19,11 @@ use const JSON_THROW_ON_ERROR;
 
 readonly class McpServerMiddleware implements MiddlewareInterface
 {
-    private const string MCP_PATH = '/mcp';
-
     public function __construct(
         private AuthorizationService $authorizationService,
         private BackendUserBootstrap $backendUserBootstrap,
         private McpServerFactory $mcpServerFactory,
+        private McpPathProvider $pathProvider,
         private ResponseFactoryInterface $responseFactory,
         private StreamFactoryInterface $streamFactory,
     ) {
@@ -31,7 +31,7 @@ readonly class McpServerMiddleware implements MiddlewareInterface
 
     public function process(ServerRequestInterface $request, RequestHandlerInterface $handler): ResponseInterface
     {
-        if ($request->getUri()->getPath() !== self::MCP_PATH) {
+        if ($request->getUri()->getPath() !== $this->pathProvider->getBasePath()) {
             return $handler->handle($request);
         }
 
@@ -113,7 +113,7 @@ readonly class McpServerMiddleware implements MiddlewareInterface
             $baseUrl .= ':' . $uri->getPort();
         }
 
-        $resourceMetadataUrl = $baseUrl . '/.well-known/oauth-protected-resource';
+        $resourceMetadataUrl = $baseUrl . $this->pathProvider->getResourceMetadataPath();
 
         $body = $this->streamFactory->createStream(json_encode(['error' => $error], JSON_THROW_ON_ERROR));
 

@@ -8,6 +8,7 @@ use Doctrine\DBAL\ParameterType;
 use MarekSkopal\MsMcpServer\OAuth\AuthorizationService;
 use MarekSkopal\MsMcpServer\OAuth\ClientRepository;
 use MarekSkopal\MsMcpServer\OAuth\RateLimitService;
+use MarekSkopal\MsMcpServer\Service\McpPathProvider;
 use Psr\Http\Message\ResponseFactoryInterface;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
@@ -22,23 +23,12 @@ use const JSON_THROW_ON_ERROR;
 
 readonly class OAuthMiddleware implements MiddlewareInterface
 {
-    private const string METADATA_PATH = '/.well-known/oauth-authorization-server';
-
-    private const string AUTHORIZE_PATH = '/mcp/oauth/authorize';
-
-    private const string TOKEN_PATH = '/mcp/oauth/token';
-
-    private const string REGISTER_PATH = '/mcp/oauth/register';
-
-    private const string REVOKE_PATH = '/mcp/oauth/revoke';
-
-    private const string RESOURCE_METADATA_PATH = '/.well-known/oauth-protected-resource';
-
     public function __construct(
         private AuthorizationService $authorizationService,
         private ClientRepository $clientRepository,
         private ConnectionPool $connectionPool,
         private PasswordHashFactory $passwordHashFactory,
+        private McpPathProvider $pathProvider,
         private RateLimitService $rateLimitService,
         private ResponseFactoryInterface $responseFactory,
         private StreamFactoryInterface $streamFactory,
@@ -50,12 +40,19 @@ readonly class OAuthMiddleware implements MiddlewareInterface
         $path = $request->getUri()->getPath();
         $method = $request->getMethod();
 
+        $authorizePath = $this->pathProvider->getAuthorizePath();
+        $tokenPath = $this->pathProvider->getTokenPath();
+        $registerPath = $this->pathProvider->getRegisterPath();
+        $revokePath = $this->pathProvider->getRevokePath();
+        $metadataPath = $this->pathProvider->getMetadataPath();
+        $resourceMetadataPath = $this->pathProvider->getResourceMetadataPath();
+
         $rateLimitEndpoint = match (true) {
-            $path === self::AUTHORIZE_PATH && $method === 'POST' => 'authorize_post',
-            $path === self::AUTHORIZE_PATH && $method === 'GET' => 'authorize_get',
-            $path === self::TOKEN_PATH && $method === 'POST' => 'token_post',
-            $path === self::REGISTER_PATH && $method === 'POST' => 'register_post',
-            $path === self::REVOKE_PATH && $method === 'POST' => 'revoke_post',
+            $path === $authorizePath && $method === 'POST' => 'authorize_post',
+            $path === $authorizePath && $method === 'GET' => 'authorize_get',
+            $path === $tokenPath && $method === 'POST' => 'token_post',
+            $path === $registerPath && $method === 'POST' => 'register_post',
+            $path === $revokePath && $method === 'POST' => 'revoke_post',
             default => null,
         };
 
@@ -70,31 +67,28 @@ readonly class OAuthMiddleware implements MiddlewareInterface
         }
 
         return match (true) {
-            $path === self::METADATA_PATH && $method === 'GET' => $this->handleMetadata($request),
-            $path === self::RESOURCE_METADATA_PATH && $method === 'GET' => $this->handleResourceMetadata($request),
-            $path === self::AUTHORIZE_PATH && $method === 'GET' => $this->handleAuthorizeGet($request),
-            $path === self::AUTHORIZE_PATH && $method === 'POST' => $this->handleAuthorizePost($request),
-            $path === self::TOKEN_PATH && $method === 'POST' => $this->handleToken($request),
-            $path === self::REGISTER_PATH && $method === 'POST' => $this->handleRegister($request),
-            $path === self::REVOKE_PATH && $method === 'POST' => $this->handleRevoke($request),
+            $path === $metadataPath && $method === 'GET' => $this->handleMetadata($request),
+            $path === $resourceMetadataPath && $method === 'GET' => $this->handleResourceMetadata($request),
+            $path === $authorizePath && $method === 'GET' => $this->handleAuthorizeGet($request),
+            $path === $authorizePath && $method === 'POST' => $this->handleAuthorizePost($request),
+            $path === $tokenPath && $method === 'POST' => $this->handleToken($request),
+            $path === $registerPath && $method === 'POST' => $this->handleRegister($request),
+            $path === $revokePath && $method === 'POST' => $this->handleRevoke($request),
             default => $handler->handle($request),
         };
     }
 
     private function handleMetadata(ServerRequestInterface $request): ResponseInterface
     {
-        $uri = $request->getUri();
-        $baseUrl = $uri->getScheme() . '://' . $uri->getHost();
-        if ($uri->getPort() !== null) {
-            $baseUrl .= ':' . $uri->getPort();
-        }
+        $baseUrl = $this->resolveBaseUrl($request);
+        $issuer = $baseUrl . $this->pathProvider->getWellKnownPrefix();
 
         $metadata = [
-            'issuer' => $baseUrl,
-            'authorization_endpoint' => $baseUrl . self::AUTHORIZE_PATH,
-            'token_endpoint' => $baseUrl . self::TOKEN_PATH,
-            'registration_endpoint' => $baseUrl . self::REGISTER_PATH,
-            'revocation_endpoint' => $baseUrl . self::REVOKE_PATH,
+            'issuer' => $issuer,
+            'authorization_endpoint' => $baseUrl . $this->pathProvider->getAuthorizePath(),
+            'token_endpoint' => $baseUrl . $this->pathProvider->getTokenPath(),
+            'registration_endpoint' => $baseUrl . $this->pathProvider->getRegisterPath(),
+            'revocation_endpoint' => $baseUrl . $this->pathProvider->getRevokePath(),
             'response_types_supported' => ['code'],
             'grant_types_supported' => ['authorization_code', 'refresh_token'],
             'code_challenge_methods_supported' => ['S256'],
@@ -106,18 +100,25 @@ readonly class OAuthMiddleware implements MiddlewareInterface
 
     private function handleResourceMetadata(ServerRequestInterface $request): ResponseInterface
     {
+        $baseUrl = $this->resolveBaseUrl($request);
+
+        $metadata = [
+            'resource' => $baseUrl . $this->pathProvider->getBasePath(),
+            'authorization_servers' => [$baseUrl . $this->pathProvider->getWellKnownPrefix()],
+        ];
+
+        return $this->createJsonResponse(200, $metadata);
+    }
+
+    private function resolveBaseUrl(ServerRequestInterface $request): string
+    {
         $uri = $request->getUri();
         $baseUrl = $uri->getScheme() . '://' . $uri->getHost();
         if ($uri->getPort() !== null) {
             $baseUrl .= ':' . $uri->getPort();
         }
 
-        $metadata = [
-            'resource' => $baseUrl . '/mcp',
-            'authorization_servers' => [$baseUrl],
-        ];
-
-        return $this->createJsonResponse(200, $metadata);
+        return $baseUrl;
     }
 
     private function handleAuthorizeGet(ServerRequestInterface $request): ResponseInterface
@@ -141,8 +142,9 @@ readonly class OAuthMiddleware implements MiddlewareInterface
         return $this->responseFactory->createResponse(200)
             ->withHeader('Content-Type', 'text/html; charset=utf-8')
             ->withHeader('Set-Cookie', sprintf(
-                'mcp_csrf=%s; Path=/mcp/oauth; HttpOnly; SameSite=Strict; Secure; Max-Age=600',
+                'mcp_csrf=%s; Path=%s; HttpOnly; SameSite=Strict; Secure; Max-Age=600',
                 $csrfToken,
+                $this->pathProvider->getOAuthCookiePath(),
             ))
             ->withBody($this->streamFactory->createStream($html));
     }
@@ -192,8 +194,9 @@ readonly class OAuthMiddleware implements MiddlewareInterface
             return $this->responseFactory->createResponse(200)
                 ->withHeader('Content-Type', 'text/html; charset=utf-8')
                 ->withHeader('Set-Cookie', sprintf(
-                    'mcp_csrf=%s; Path=/mcp/oauth; HttpOnly; SameSite=Strict; Secure; Max-Age=600',
+                    'mcp_csrf=%s; Path=%s; HttpOnly; SameSite=Strict; Secure; Max-Age=600',
                     $newCsrfToken,
+                    $this->pathProvider->getOAuthCookiePath(),
                 ))
                 ->withBody($this->streamFactory->createStream($html));
         }
@@ -217,7 +220,10 @@ readonly class OAuthMiddleware implements MiddlewareInterface
 
         return $this->responseFactory->createResponse(302)
             ->withHeader('Location', $redirectTarget)
-            ->withHeader('Set-Cookie', 'mcp_csrf=; Path=/mcp/oauth; HttpOnly; SameSite=Strict; Secure; Max-Age=0');
+            ->withHeader('Set-Cookie', sprintf(
+                'mcp_csrf=; Path=%s; HttpOnly; SameSite=Strict; Secure; Max-Age=0',
+                $this->pathProvider->getOAuthCookiePath(),
+            ));
     }
 
     private function handleToken(ServerRequestInterface $request): ResponseInterface
@@ -396,6 +402,8 @@ readonly class OAuthMiddleware implements MiddlewareInterface
             $hiddenFields .= sprintf('<input type="hidden" name="%s" value="%s" />', $field, $value);
         }
 
+        $formAction = htmlspecialchars($this->pathProvider->getAuthorizePath(), ENT_QUOTES, 'UTF-8');
+
         return <<<HTML
             <!DOCTYPE html>
             <html lang="en">
@@ -420,7 +428,7 @@ readonly class OAuthMiddleware implements MiddlewareInterface
                     <h1>Authorize Application</h1>
                     <p><span class="client-name">{$clientNameEscaped}</span> is requesting access to your TYPO3 backend account.</p>
                     {$errorHtml}
-                    <form method="post" action="/mcp/oauth/authorize">
+                    <form method="post" action="{$formAction}">
                         {$hiddenFields}
                         <input type="hidden" name="csrf_token" value="{$csrfToken}" />
                         <label for="username">Username</label>

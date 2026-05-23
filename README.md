@@ -72,6 +72,8 @@ For remote AI clients, the MCP server is available at `/mcp` on your TYPO3 insta
 
 HTTP transport requires OAuth 2.1 authentication. See the [Authentication](#authentication) section below.
 
+The base path is configurable via the `mcpBasePath` extension setting if `/mcp` is already in use by another handler — see [Base Path](#base-path).
+
 ## AI Client Configuration
 
 ### Claude Desktop
@@ -271,6 +273,28 @@ The stdio transport does not require OAuth — the user is specified via the `--
 | `/mcp/oauth/token` | Token endpoint |
 | `/mcp/oauth/revoke` | Token revocation endpoint |
 | `/mcp/oauth/register` | Dynamic client registration |
+
+### Base Path
+
+The MCP endpoint and all OAuth sub-paths share a single configurable prefix. Override it via **Settings > Extension Configuration > ms_mcp_server**:
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `mcpBasePath` | `/mcp` | Base URL path for the MCP endpoint. Must start with `/`. May contain directories (e.g. `/typo3-mcp`, `/api/mcp`). |
+
+When set to a nested path like `/api/mcp`, the `.well-known/*` discovery endpoints relocate to the parent directory (`/api/.well-known/oauth-authorization-server`, `/api/.well-known/oauth-protected-resource`) so they sit alongside the resource. For top-level paths (e.g. `/typo3-mcp`) the `.well-known/*` endpoints stay at the site root.
+
+Example with `mcpBasePath = /typo3-mcp`:
+
+| Endpoint | Path |
+|----------|------|
+| MCP server | `/typo3-mcp` |
+| Authorization | `/typo3-mcp/oauth/authorize` |
+| Token | `/typo3-mcp/oauth/token` |
+| Registration | `/typo3-mcp/oauth/register` |
+| Revocation | `/typo3-mcp/oauth/revoke` |
+| Authorization server metadata | `/.well-known/oauth-authorization-server` |
+| Protected resource metadata | `/.well-known/oauth-protected-resource` |
 
 ### Token Lifetimes
 
