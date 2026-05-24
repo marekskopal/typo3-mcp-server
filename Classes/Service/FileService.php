@@ -4,17 +4,33 @@ declare(strict_types=1);
 
 namespace MarekSkopal\MsMcpServer\Service;
 
+use CurlHandle;
 use Doctrine\DBAL\ParameterType;
 use TYPO3\CMS\Core\Database\ConnectionPool;
 use TYPO3\CMS\Core\Resource\File;
 use TYPO3\CMS\Core\Resource\Folder;
 use TYPO3\CMS\Core\Resource\ResourceStorage;
 use TYPO3\CMS\Core\Resource\StorageRepository;
+use const CURLE_ABORTED_BY_CALLBACK;
+use const CURLINFO_REDIRECT_URL;
+use const CURLINFO_RESPONSE_CODE;
+use const CURLOPT_CONNECTTIMEOUT;
+use const CURLOPT_FILE;
+use const CURLOPT_FOLLOWLOCATION;
+use const CURLOPT_NOPROGRESS;
+use const CURLOPT_RESOLVE;
+use const CURLOPT_SSL_VERIFYHOST;
+use const CURLOPT_SSL_VERIFYPEER;
+use const CURLOPT_TIMEOUT;
+use const CURLOPT_URL;
+use const CURLOPT_USERAGENT;
+use const CURLOPT_XFERINFOFUNCTION;
 use const FILTER_FLAG_NO_PRIV_RANGE;
 use const FILTER_FLAG_NO_RES_RANGE;
 use const FILTER_VALIDATE_IP;
 use const PHP_URL_HOST;
 use const PHP_URL_PATH;
+use const PHP_URL_PORT;
 use const PHP_URL_SCHEME;
 
 readonly class FileService
@@ -106,23 +122,7 @@ readonly class FileService
     /** @return array{uid: int, name: string, identifier: string, size: int, mimeType: string} */
     public function uploadFileFromUrl(int $storageUid, string $directoryPath, string $url, string $fileName = ''): array
     {
-        $scheme = parse_url($url, PHP_URL_SCHEME);
-        if (!is_string($scheme) || !in_array($scheme, ['http', 'https'], true)) {
-            throw new \RuntimeException('Only http and https URLs are allowed', 1712002010);
-        }
-
-        $host = parse_url($url, PHP_URL_HOST);
-        if (!is_string($host) || $host === '') {
-            throw new \RuntimeException('Invalid URL: missing host', 1712002014);
-        }
-
-        $resolvedIp = gethostbyname($host);
-        if (
-            $resolvedIp === $host
-            || filter_var($resolvedIp, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) === false
-        ) {
-            throw new \RuntimeException('URL resolves to a private or reserved IP address', 1712002015);
-        }
+        $this->assertHttpUrl($url);
 
         if ($fileName === '') {
             $path = parse_url($url, PHP_URL_PATH);
@@ -132,59 +132,13 @@ readonly class FileService
             }
         }
 
-        $context = stream_context_create([
-            'http' => [
-                'timeout' => 30,
-                'max_redirects' => 5,
-                'follow_location' => 1,
-                'method' => 'GET',
-                'user_agent' => 'TYPO3-MCP-Server/1.0',
-            ],
-            'ssl' => [
-                'verify_peer' => true,
-                'verify_peer_name' => true,
-            ],
-        ]);
-
-        // 100 MB
-        $maxSize = 104857600;
-
         $tempFile = tempnam(sys_get_temp_dir(), 'mcp_url_upload_');
         if ($tempFile === false) {
             throw new \RuntimeException('Failed to create temporary file', 1712002003);
         }
 
         try {
-            $stream = @fopen($url, 'r', false, $context);
-            if ($stream === false) {
-                throw new \RuntimeException('Failed to download file from URL', 1712002011);
-            }
-
-            $bytesWritten = 0;
-            $fp = fopen($tempFile, 'w');
-            if ($fp === false) {
-                fclose($stream);
-
-                throw new \RuntimeException('Failed to open temporary file for writing', 1712002016);
-            }
-
-            while (!feof($stream)) {
-                $chunk = fread($stream, 8192);
-                if ($chunk === false) {
-                    break;
-                }
-                $bytesWritten += strlen($chunk);
-                if ($bytesWritten > $maxSize) {
-                    fclose($fp);
-                    fclose($stream);
-
-                    throw new \RuntimeException('Downloaded file exceeds maximum allowed size of 100 MB', 1712002012);
-                }
-                fwrite($fp, $chunk);
-            }
-
-            fclose($fp);
-            fclose($stream);
+            $this->downloadToFile($url, $tempFile);
 
             $storage = $this->getStorage($storageUid);
             $folder = $storage->getFolder($directoryPath);
@@ -202,6 +156,139 @@ readonly class FileService
             'size' => $file->getSize(),
             'mimeType' => $file->getMimeType(),
         ];
+    }
+
+    /**
+     * SSRF-safe download into $tempFile.
+     *
+     * Pins DNS resolution to a single validated IP per hop via CURLOPT_RESOLVE so a
+     * short-TTL DNS rebind can't switch the connection to a private IP mid-request,
+     * and revalidates the host on every redirect so a public URL can't 30x into the
+     * cloud metadata service.
+     */
+    private function downloadToFile(string $url, string $tempFile): void
+    {
+        $maxRedirects = 5;
+        // 100 MB
+        $maxSize = 104857600;
+
+        $fp = fopen($tempFile, 'w');
+        if ($fp === false) {
+            throw new \RuntimeException('Failed to open temporary file for writing', 1712002016);
+        }
+
+        try {
+            $currentUrl = $url;
+            $completed = false;
+
+            for ($hop = 0; $hop <= $maxRedirects; $hop++) {
+                $hopHost = parse_url($currentUrl, PHP_URL_HOST);
+                $hopScheme = parse_url($currentUrl, PHP_URL_SCHEME);
+                if (
+                    !is_string($hopHost)
+                    || $hopHost === ''
+                    || !is_string($hopScheme)
+                    || !in_array($hopScheme, ['http', 'https'], true)
+                ) {
+                    throw new \RuntimeException('Redirect target is not a valid http(s) URL', 1712002017);
+                }
+
+                $parsedPort = parse_url($currentUrl, PHP_URL_PORT);
+                $hopPort = is_int($parsedPort) ? $parsedPort : ($hopScheme === 'https' ? 443 : 80);
+
+                $resolvedIp = $this->resolveAndValidateHost($hopHost);
+
+                // Discard any body from the previous (redirect) hop.
+                ftruncate($fp, 0);
+                rewind($fp);
+
+                $ch = curl_init();
+                if ($ch === false) {
+                    throw new \RuntimeException('Failed to initialize cURL', 1712002011);
+                }
+
+                curl_setopt_array($ch, [
+                    CURLOPT_URL => $currentUrl,
+                    CURLOPT_RESOLVE => [$hopHost . ':' . $hopPort . ':' . $resolvedIp],
+                    CURLOPT_FOLLOWLOCATION => false,
+                    CURLOPT_FILE => $fp,
+                    CURLOPT_TIMEOUT => 30,
+                    CURLOPT_CONNECTTIMEOUT => 10,
+                    CURLOPT_SSL_VERIFYPEER => true,
+                    CURLOPT_SSL_VERIFYHOST => 2,
+                    CURLOPT_USERAGENT => 'TYPO3-MCP-Server/1.0',
+                    CURLOPT_NOPROGRESS => false,
+                    CURLOPT_XFERINFOFUNCTION => static fn (
+                        CurlHandle $_,
+                        int $_dlTotal,
+                        int $dlNow,
+                    ): int => $dlNow > $maxSize ? 1 : 0,
+                ]);
+
+                $result = curl_exec($ch);
+                $errno = curl_errno($ch);
+                $status = (int) curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
+                $redirectUrl = curl_getinfo($ch, CURLINFO_REDIRECT_URL);
+                // cURL handles auto-destruct in PHP 8+; curl_close() is deprecated and unnecessary.
+
+                if ($result === false) {
+                    if ($errno === CURLE_ABORTED_BY_CALLBACK) {
+                        throw new \RuntimeException('Downloaded file exceeds maximum allowed size of 100 MB', 1712002012);
+                    }
+
+                    throw new \RuntimeException('Failed to download file from URL', 1712002011);
+                }
+
+                if ($status >= 200 && $status < 300) {
+                    $completed = true;
+                    break;
+                }
+
+                if ($status >= 300 && $status < 400) {
+                    if (!is_string($redirectUrl) || $redirectUrl === '') {
+                        throw new \RuntimeException('Redirect response missing Location header', 1712002018);
+                    }
+                    $currentUrl = $redirectUrl;
+                    continue;
+                }
+
+                throw new \RuntimeException('Upstream returned HTTP ' . $status, 1712002019);
+            }
+
+            if (!$completed) {
+                throw new \RuntimeException('Too many redirects (max ' . $maxRedirects . ')', 1712002020);
+            }
+        } finally {
+            if (is_resource($fp)) {
+                fclose($fp);
+            }
+        }
+    }
+
+    private function assertHttpUrl(string $url): void
+    {
+        $scheme = parse_url($url, PHP_URL_SCHEME);
+        if (!is_string($scheme) || !in_array($scheme, ['http', 'https'], true)) {
+            throw new \RuntimeException('Only http and https URLs are allowed', 1712002010);
+        }
+
+        $host = parse_url($url, PHP_URL_HOST);
+        if (!is_string($host) || $host === '') {
+            throw new \RuntimeException('Invalid URL: missing host', 1712002014);
+        }
+    }
+
+    private function resolveAndValidateHost(string $host): string
+    {
+        $resolvedIp = gethostbyname($host);
+        if (
+            $resolvedIp === $host
+            || filter_var($resolvedIp, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) === false
+        ) {
+            throw new \RuntimeException('URL resolves to a private or reserved IP address', 1712002015);
+        }
+
+        return $resolvedIp;
     }
 
     /** @return array{name: string, identifier: string} */

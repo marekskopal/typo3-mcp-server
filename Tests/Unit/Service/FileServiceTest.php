@@ -341,6 +341,31 @@ final class FileServiceTest extends TestCase
         $service->uploadFileFromUrl(1, '/', 'not-a-url');
     }
 
+    public function testUploadFileFromUrlRejectsHostResolvingToPrivateIp(): void
+    {
+        $storageRepository = $this->createStub(StorageRepository::class);
+        $service = new FileService($storageRepository, $this->createStub(ConnectionPool::class));
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionCode(1712002015);
+
+        // Loopback literal — gethostbyname returns 127.0.0.1, which fails the private/reserved
+        // IP filter. This also exercises the path that would catch a DNS rebind to localhost.
+        $service->uploadFileFromUrl(1, '/', 'http://127.0.0.1/file.txt');
+    }
+
+    public function testUploadFileFromUrlRejectsLinkLocalMetadataIp(): void
+    {
+        $storageRepository = $this->createStub(StorageRepository::class);
+        $service = new FileService($storageRepository, $this->createStub(ConnectionPool::class));
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionCode(1712002015);
+
+        // AWS / GCP / Azure cloud metadata endpoint — must be blocked.
+        $service->uploadFileFromUrl(1, '/', 'http://169.254.169.254/latest/meta-data/');
+    }
+
     public function testGetStorageThrowsWhenNotFound(): void
     {
         $storageRepository = $this->createStub(StorageRepository::class);
