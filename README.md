@@ -536,13 +536,29 @@ $GLOBALS['TYPO3_CONF_VARS']['EXTCONF']['ms_mcp_server']['tables']['tx_blog_domai
 
 ## Maintenance
 
-Clean up expired tokens, stale session files, and rate limit entries:
+The `mcp:cleanup` command purges expired OAuth authorization codes / access tokens / refresh tokens, idle MCP sessions past `sessionLifetime`, and stale rate-limit window rows:
 
 ```bash
 vendor/bin/typo3 mcp:cleanup
 ```
 
-Run this periodically via TYPO3 Scheduler or cron.
+Run it daily. Two ways:
+
+### Via TYPO3 Scheduler (recommended)
+
+1. **System > Scheduler > Scheduled tasks > Add task**.
+2. **Class:** *Execute console commands* (`TYPO3\CMS\Scheduler\Task\ExecuteSchedulableCommandTask`).
+3. **Frequency:** pick an interval (`86400` seconds for daily) or a cron expression (`0 3 * * *` for 03:00 every day).
+4. **Schedulable Command:** select `mcp:cleanup` from the dropdown.
+5. Save. Use *Run task* once to verify it works.
+
+The command is auto-discovered via the `console.command` tag — no extra registration needed.
+
+### Via cron
+
+```cron
+0 3 * * * cd /path/to/typo3-project && vendor/bin/typo3 mcp:cleanup >/dev/null 2>&1
+```
 
 ## Architecture
 
