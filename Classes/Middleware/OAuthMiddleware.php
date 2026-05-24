@@ -81,7 +81,7 @@ readonly class OAuthMiddleware implements MiddlewareInterface
     private function handleMetadata(ServerRequestInterface $request): ResponseInterface
     {
         $baseUrl = $this->resolveBaseUrl($request);
-        $issuer = $baseUrl . $this->pathProvider->getWellKnownPrefix();
+        $issuer = $baseUrl . $this->pathProvider->getBasePath();
 
         $metadata = [
             'issuer' => $issuer,
@@ -101,10 +101,11 @@ readonly class OAuthMiddleware implements MiddlewareInterface
     private function handleResourceMetadata(ServerRequestInterface $request): ResponseInterface
     {
         $baseUrl = $this->resolveBaseUrl($request);
+        $resource = $baseUrl . $this->pathProvider->getBasePath();
 
         $metadata = [
-            'resource' => $baseUrl . $this->pathProvider->getBasePath(),
-            'authorization_servers' => [$baseUrl . $this->pathProvider->getWellKnownPrefix()],
+            'resource' => $resource,
+            'authorization_servers' => [$resource],
         ];
 
         return $this->createJsonResponse(200, $metadata);

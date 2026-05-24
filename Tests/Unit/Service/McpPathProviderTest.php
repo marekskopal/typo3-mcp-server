@@ -23,9 +23,8 @@ final class McpPathProviderTest extends TestCase
         self::assertSame('/mcp/oauth/register', $provider->getRegisterPath());
         self::assertSame('/mcp/oauth/revoke', $provider->getRevokePath());
         self::assertSame('/mcp/oauth', $provider->getOAuthCookiePath());
-        self::assertSame('', $provider->getWellKnownPrefix());
-        self::assertSame('/.well-known/oauth-authorization-server', $provider->getMetadataPath());
-        self::assertSame('/.well-known/oauth-protected-resource', $provider->getResourceMetadataPath());
+        self::assertSame('/.well-known/oauth-authorization-server/mcp', $provider->getMetadataPath());
+        self::assertSame('/.well-known/oauth-protected-resource/mcp', $provider->getResourceMetadataPath());
     }
 
     public function testCustomBasePathDerivesOAuthEndpoints(): void
@@ -38,27 +37,19 @@ final class McpPathProviderTest extends TestCase
         self::assertSame('/typo3-mcp/oauth/register', $provider->getRegisterPath());
         self::assertSame('/typo3-mcp/oauth/revoke', $provider->getRevokePath());
         self::assertSame('/typo3-mcp/oauth', $provider->getOAuthCookiePath());
+        self::assertSame('/.well-known/oauth-authorization-server/typo3-mcp', $provider->getMetadataPath());
+        self::assertSame('/.well-known/oauth-protected-resource/typo3-mcp', $provider->getResourceMetadataPath());
     }
 
-    public function testNestedBasePathRelocatesWellKnownPrefix(): void
+    public function testNestedBasePathUsesPathInsertConvention(): void
     {
         $provider = $this->makeProvider(['mcpBasePath' => '/some/dir/mcp']);
 
         self::assertSame('/some/dir/mcp', $provider->getBasePath());
-        self::assertSame('/some/dir', $provider->getWellKnownPrefix());
-        self::assertSame('/some/dir/.well-known/oauth-authorization-server', $provider->getMetadataPath());
-        self::assertSame('/some/dir/.well-known/oauth-protected-resource', $provider->getResourceMetadataPath());
+        self::assertSame('/.well-known/oauth-authorization-server/some/dir/mcp', $provider->getMetadataPath());
+        self::assertSame('/.well-known/oauth-protected-resource/some/dir/mcp', $provider->getResourceMetadataPath());
         self::assertSame('/some/dir/mcp/oauth/authorize', $provider->getAuthorizePath());
         self::assertSame('/some/dir/mcp/oauth', $provider->getOAuthCookiePath());
-    }
-
-    public function testTopLevelBasePathKeepsWellKnownAtRoot(): void
-    {
-        $provider = $this->makeProvider(['mcpBasePath' => '/typo3-mcp']);
-
-        self::assertSame('', $provider->getWellKnownPrefix());
-        self::assertSame('/.well-known/oauth-authorization-server', $provider->getMetadataPath());
-        self::assertSame('/.well-known/oauth-protected-resource', $provider->getResourceMetadataPath());
     }
 
     /** @return iterable<string, array{0: string, 1: string}> */

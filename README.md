@@ -248,7 +248,7 @@ Add to your VS Code settings (`.vscode/settings.json`):
 Any MCP-compatible client can connect via either transport:
 
 - **stdio:** Run `php vendor/bin/typo3 mcp:server` — communicates via stdin/stdout, no auth needed
-- **HTTP:** Connect to `https://your-typo3-site.com/mcp` — requires OAuth 2.1 with PKCE. Server metadata is available at `/.well-known/oauth-authorization-server` for auto-discovery.
+- **HTTP:** Connect to `https://your-typo3-site.com/mcp` — requires OAuth 2.1 with PKCE. Server metadata is available at `/.well-known/oauth-authorization-server/mcp` (RFC 8414 path-insert) for auto-discovery.
 
 ## Authentication
 
@@ -267,8 +267,8 @@ The stdio transport does not require OAuth — the user is specified via the `--
 
 | Endpoint | Description |
 |----------|-------------|
-| `/.well-known/oauth-authorization-server` | Authorization server metadata |
-| `/.well-known/oauth-protected-resource` | Protected resource metadata |
+| `/.well-known/oauth-authorization-server/mcp` | Authorization server metadata (RFC 8414) |
+| `/.well-known/oauth-protected-resource/mcp` | Protected resource metadata (RFC 9728) |
 | `/mcp/oauth/authorize` | Authorization endpoint |
 | `/mcp/oauth/token` | Token endpoint |
 | `/mcp/oauth/revoke` | Token revocation endpoint |
@@ -282,7 +282,7 @@ The MCP endpoint and all OAuth sub-paths share a single configurable prefix. Ove
 |---------|---------|-------------|
 | `mcpBasePath` | `/mcp` | Base URL path for the MCP endpoint. Must start with `/`. May contain directories (e.g. `/typo3-mcp`, `/api/mcp`). |
 
-When set to a nested path like `/api/mcp`, the `.well-known/*` discovery endpoints relocate to the parent directory (`/api/.well-known/oauth-authorization-server`, `/api/.well-known/oauth-protected-resource`) so they sit alongside the resource. For top-level paths (e.g. `/typo3-mcp`) the `.well-known/*` endpoints stay at the site root.
+Per [RFC 8414 §3.1](https://datatracker.ietf.org/doc/html/rfc8414#section-3.1) and [RFC 9728 §3](https://datatracker.ietf.org/doc/html/rfc9728#section-3), the `.well-known/*` document for an issuer/resource `https://host/<path>` lives at `https://host/.well-known/<doc>/<path>` — the well-known string is *inserted* between the host and the issuer's path component, not appended. Spec-compliant MCP clients (e.g. Claude Code 2.1+) use that form.
 
 Example with `mcpBasePath = /typo3-mcp`:
 
@@ -293,8 +293,16 @@ Example with `mcpBasePath = /typo3-mcp`:
 | Token | `/typo3-mcp/oauth/token` |
 | Registration | `/typo3-mcp/oauth/register` |
 | Revocation | `/typo3-mcp/oauth/revoke` |
-| Authorization server metadata | `/.well-known/oauth-authorization-server` |
-| Protected resource metadata | `/.well-known/oauth-protected-resource` |
+| Authorization server metadata | `/.well-known/oauth-authorization-server/typo3-mcp` |
+| Protected resource metadata | `/.well-known/oauth-protected-resource/typo3-mcp` |
+
+And with `mcpBasePath = /api/mcp`:
+
+| Endpoint | Path |
+|----------|------|
+| MCP server | `/api/mcp` |
+| Authorization server metadata | `/.well-known/oauth-authorization-server/api/mcp` |
+| Protected resource metadata | `/.well-known/oauth-protected-resource/api/mcp` |
 
 ### Token Lifetimes
 

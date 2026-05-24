@@ -48,7 +48,7 @@ final class OAuthMiddlewareTest extends TestCase
 
     public function testMetadataEndpointReturnsServerConfig(): void
     {
-        $request = $this->createRequest('/.well-known/oauth-authorization-server', 'GET');
+        $request = $this->createRequest('/.well-known/oauth-authorization-server/mcp', 'GET');
 
         $handler = $this->createMock(RequestHandlerInterface::class);
         $handler->expects(self::never())->method('handle');
@@ -56,16 +56,17 @@ final class OAuthMiddlewareTest extends TestCase
         $middleware = $this->createMiddlewareWithCapture();
         $middleware->process($request, $handler);
 
-        $body = $this->capturedBodies[0] ?? '';
-        self::assertStringContainsString('authorization_endpoint', $body);
-        self::assertStringContainsString('token_endpoint', $body);
-        self::assertStringContainsString('S256', $body);
+        $decoded = $this->decodeCapturedBody();
+        self::assertSame('https://example.com/mcp', $decoded['issuer'] ?? null);
+        self::assertSame('https://example.com/mcp/oauth/authorize', $decoded['authorization_endpoint'] ?? null);
+        self::assertSame('https://example.com/mcp/oauth/token', $decoded['token_endpoint'] ?? null);
+        self::assertSame(['S256'], $decoded['code_challenge_methods_supported'] ?? null);
     }
 
     public function testResourceMetadataEndpointReturnsResourceConfig(): void
     {
         $uri = $this->createStub(UriInterface::class);
-        $uri->method('getPath')->willReturn('/.well-known/oauth-protected-resource');
+        $uri->method('getPath')->willReturn('/.well-known/oauth-protected-resource/mcp');
         $uri->method('getScheme')->willReturn('https');
         $uri->method('getHost')->willReturn('example.com');
         $uri->method('getPort')->willReturn(443);
@@ -80,9 +81,9 @@ final class OAuthMiddlewareTest extends TestCase
         $middleware = $this->createMiddlewareWithCapture();
         $middleware->process($request, $handler);
 
-        $body = $this->capturedBodies[0] ?? '';
-        self::assertStringContainsString('/mcp', $body);
-        self::assertStringContainsString('authorization_servers', $body);
+        $decoded = $this->decodeCapturedBody();
+        self::assertSame('https://example.com:443/mcp', $decoded['resource'] ?? null);
+        self::assertSame(['https://example.com:443/mcp'], $decoded['authorization_servers'] ?? null);
     }
 
     public function testAuthorizeGetWithMissingResponseTypeReturnsError(): void
@@ -235,15 +236,7 @@ final class OAuthMiddlewareTest extends TestCase
 
     public function testResourceMetadataAdvertisesCustomBasePath(): void
     {
-        $uri = $this->createStub(UriInterface::class);
-        $uri->method('getPath')->willReturn('/.well-known/oauth-protected-resource');
-        $uri->method('getScheme')->willReturn('https');
-        $uri->method('getHost')->willReturn('example.com');
-        $uri->method('getPort')->willReturn(null);
-
-        $request = $this->createStub(ServerRequestInterface::class);
-        $request->method('getUri')->willReturn($uri);
-        $request->method('getMethod')->willReturn('GET');
+        $request = $this->createRequest('/.well-known/oauth-protected-resource/typo3-mcp', 'GET');
 
         $handler = $this->createMock(RequestHandlerInterface::class);
         $handler->expects(self::never())->method('handle');
@@ -253,20 +246,12 @@ final class OAuthMiddlewareTest extends TestCase
 
         $decoded = $this->decodeCapturedBody();
         self::assertSame('https://example.com/typo3-mcp', $decoded['resource'] ?? null);
-        self::assertSame(['https://example.com'], $decoded['authorization_servers'] ?? null);
+        self::assertSame(['https://example.com/typo3-mcp'], $decoded['authorization_servers'] ?? null);
     }
 
-    public function testNestedBasePathRelocatesWellKnownEndpoints(): void
+    public function testNestedBasePathServesPathInsertMetadata(): void
     {
-        $uri = $this->createStub(UriInterface::class);
-        $uri->method('getPath')->willReturn('/some/dir/.well-known/oauth-authorization-server');
-        $uri->method('getScheme')->willReturn('https');
-        $uri->method('getHost')->willReturn('example.com');
-        $uri->method('getPort')->willReturn(null);
-
-        $request = $this->createStub(ServerRequestInterface::class);
-        $request->method('getUri')->willReturn($uri);
-        $request->method('getMethod')->willReturn('GET');
+        $request = $this->createRequest('/.well-known/oauth-authorization-server/some/dir/mcp', 'GET');
 
         $handler = $this->createMock(RequestHandlerInterface::class);
         $handler->expects(self::never())->method('handle');
@@ -275,7 +260,7 @@ final class OAuthMiddlewareTest extends TestCase
         $middleware->process($request, $handler);
 
         $decoded = $this->decodeCapturedBody();
-        self::assertSame('https://example.com/some/dir', $decoded['issuer'] ?? null);
+        self::assertSame('https://example.com/some/dir/mcp', $decoded['issuer'] ?? null);
         self::assertSame(
             'https://example.com/some/dir/mcp/oauth/authorize',
             $decoded['authorization_endpoint'] ?? null,
@@ -286,9 +271,24 @@ final class OAuthMiddlewareTest extends TestCase
         );
     }
 
-    public function testNestedBasePathRootWellKnownPassesThrough(): void
+    public function testNestedBasePathServesPathInsertResourceMetadata(): void
     {
-        $request = $this->createRequest('/.well-known/oauth-authorization-server', 'GET');
+        $request = $this->createRequest('/.well-known/oauth-protected-resource/some/dir/mcp', 'GET');
+
+        $handler = $this->createMock(RequestHandlerInterface::class);
+        $handler->expects(self::never())->method('handle');
+
+        $middleware = $this->createMiddlewareWithCapture(basePath: '/some/dir/mcp');
+        $middleware->process($request, $handler);
+
+        $decoded = $this->decodeCapturedBody();
+        self::assertSame('https://example.com/some/dir/mcp', $decoded['resource'] ?? null);
+        self::assertSame(['https://example.com/some/dir/mcp'], $decoded['authorization_servers'] ?? null);
+    }
+
+    public function testLegacyPathAppendWellKnownPassesThrough(): void
+    {
+        $request = $this->createRequest('/some/dir/.well-known/oauth-authorization-server', 'GET');
 
         $expectedResponse = $this->createStub(ResponseInterface::class);
 

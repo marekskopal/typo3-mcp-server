@@ -12,14 +12,11 @@ readonly class McpPathProvider
 
     private string $basePath;
 
-    private string $wellKnownPrefix;
-
     public function __construct(ExtensionConfiguration $extensionConfiguration)
     {
         $config = $extensionConfiguration->get('ms_mcp_server');
         $raw = is_array($config) ? ($config['mcpBasePath'] ?? null) : null;
         $this->basePath = $this->normalize(is_string($raw) ? $raw : self::DEFAULT_BASE_PATH);
-        $this->wellKnownPrefix = $this->deriveWellKnownPrefix($this->basePath);
     }
 
     public function getBasePath(): string
@@ -53,22 +50,23 @@ readonly class McpPathProvider
     }
 
     /**
-     * Parent directory of the base path, used as a prefix for .well-known endpoints.
-     * Empty string when the base path is a single segment (e.g. /mcp).
+     * RFC 8414 §3.1: the well-known URI is inserted between the host and the
+     * issuer's path component, so the metadata for issuer `https://host/<path>`
+     * lives at `/.well-known/oauth-authorization-server/<path>`.
      */
-    public function getWellKnownPrefix(): string
-    {
-        return $this->wellKnownPrefix;
-    }
-
     public function getMetadataPath(): string
     {
-        return $this->wellKnownPrefix . '/.well-known/oauth-authorization-server';
+        return '/.well-known/oauth-authorization-server' . $this->basePath;
     }
 
+    /**
+     * RFC 9728 §3: same path-insert convention for protected resource metadata —
+     * resource `https://host/<path>` is described at
+     * `/.well-known/oauth-protected-resource/<path>`.
+     */
     public function getResourceMetadataPath(): string
     {
-        return $this->wellKnownPrefix . '/.well-known/oauth-protected-resource';
+        return '/.well-known/oauth-protected-resource' . $this->basePath;
     }
 
     private function normalize(string $path): string
@@ -85,14 +83,5 @@ readonly class McpPathProvider
             return self::DEFAULT_BASE_PATH;
         }
         return $trimmed;
-    }
-
-    private function deriveWellKnownPrefix(string $basePath): string
-    {
-        $lastSlash = strrpos($basePath, '/');
-        if ($lastSlash === false || $lastSlash === 0) {
-            return '';
-        }
-        return substr($basePath, 0, $lastSlash);
     }
 }
