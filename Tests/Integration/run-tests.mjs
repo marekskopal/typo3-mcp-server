@@ -198,9 +198,15 @@ class IntegrationTestRunner {
             });
         }
 
-        // Copy
+        // Copy & Move
         if (childUid && pageUid) {
-            await this.testTool('pages_copy', { uid: childUid, targetPid: pageUid });
+            const copied = await this.testTool('pages_copy', { uid: childUid, targetPid: pageUid });
+            const copiedUid = copied?.newUid ?? copied?.uid;
+            if (copiedUid) {
+                await this.testTool('pages_move', { uid: copiedUid, afterUid: childUid });
+                // Clean up copy
+                await this.callToolSafe('pages_delete', { uid: copiedUid });
+            }
         }
 
         return { pageUid, childUid };

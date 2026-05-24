@@ -343,10 +343,11 @@ The **System > MCP Server** backend module provides:
 | `pages_update` | Update page fields. Pass a JSON object with field names and new values. |
 | `pages_delete` | Delete a page by UID. |
 | `pages_copy` | Copy a page. Set `includeSubpages: true` to copy the entire subtree. |
+| `pages_move` | Move a page in the tree. Subpages move with the page. |
 | `pages_tree` | Get the page tree hierarchy with configurable depth (1-10, default 3). |
 | `pages_search` | Search pages by title (plain text) or advanced conditions (JSON). Supports sorting. |
 
-**Target positioning** (for `pages_copy`): Use a positive target to place as child of that page. Use a negative target to place after a specific page (e.g., `target: -42` means "after page 42").
+**Target positioning** (for `pages_copy`, `pages_move`): Provide exactly one of `targetPid` (place as first child of that parent page) or `afterUid` (place as a sibling after that page, under the same parent).
 
 ### Content Elements
 
