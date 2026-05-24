@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace MarekSkopal\MsMcpServer\Tests\Unit\Repository;
 
+use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use Doctrine\DBAL\Result;
 use MarekSkopal\MsMcpServer\Repository\DiscoveredTableRepository;
 use PHPUnit\Framework\Attributes\CoversClass;
@@ -69,12 +70,6 @@ final class DiscoveredTableRepositoryTest extends TestCase
 
     public function testInsertIfNewInsertsWhenTableDoesNotExist(): void
     {
-        $queryResult = $this->createStub(Result::class);
-        $queryResult->method('fetchAssociative')->willReturn(false);
-
-        $queryBuilder = $this->createQueryBuilderStub();
-        $queryBuilder->method('executeQuery')->willReturn($queryResult);
-
         $connection = $this->createMock(Connection::class);
         $connection->expects(self::once())
             ->method('insert')
@@ -91,7 +86,6 @@ final class DiscoveredTableRepositoryTest extends TestCase
             );
 
         $connectionPool = $this->createStub(ConnectionPool::class);
-        $connectionPool->method('getQueryBuilderForTable')->willReturn($queryBuilder);
         $connectionPool->method('getConnectionForTable')->willReturn($connection);
 
         $repository = new DiscoveredTableRepository($connectionPool);
@@ -102,17 +96,12 @@ final class DiscoveredTableRepositoryTest extends TestCase
 
     public function testInsertIfNewReturnsFalseWhenTableAlreadyExists(): void
     {
-        $queryResult = $this->createStub(Result::class);
-        $queryResult->method('fetchAssociative')->willReturn(['uid' => 1]);
-
-        $queryBuilder = $this->createQueryBuilderStub();
-        $queryBuilder->method('executeQuery')->willReturn($queryResult);
-
         $connection = $this->createMock(Connection::class);
-        $connection->expects(self::never())->method('insert');
+        $connection->expects(self::once())
+            ->method('insert')
+            ->willThrowException($this->createStub(UniqueConstraintViolationException::class));
 
         $connectionPool = $this->createStub(ConnectionPool::class);
-        $connectionPool->method('getQueryBuilderForTable')->willReturn($queryBuilder);
         $connectionPool->method('getConnectionForTable')->willReturn($connection);
 
         $repository = new DiscoveredTableRepository($connectionPool);

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace MarekSkopal\MsMcpServer\Repository;
 
+use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use Doctrine\DBAL\ParameterType;
 use TYPO3\CMS\Core\Database\ConnectionPool;
 
@@ -54,44 +55,31 @@ readonly class McpSessionRepository
 
     public function upsert(string $sessionId, string $data, int $now): void
     {
-        if ($this->existsBySessionId($sessionId)) {
-            $connection = $this->connectionPool->getConnectionForTable(self::TABLE);
-            $connection->update(
+        $connection = $this->connectionPool->getConnectionForTable(self::TABLE);
+
+        try {
+            $connection->insert(
                 self::TABLE,
-                ['data' => $data, 'last_activity' => $now],
-                ['session_id' => $sessionId],
+                [
+                    'session_id' => $sessionId,
+                    'data' => $data,
+                    'last_activity' => $now,
+                    'crdate' => $now,
+                ],
                 ['data' => ParameterType::LARGE_OBJECT],
             );
 
             return;
+        } catch (UniqueConstraintViolationException) {
+            // Row already exists — fall through to UPDATE.
         }
 
-        $connection = $this->connectionPool->getConnectionForTable(self::TABLE);
-        $connection->insert(
+        $connection->update(
             self::TABLE,
-            [
-                'session_id' => $sessionId,
-                'data' => $data,
-                'last_activity' => $now,
-                'crdate' => $now,
-            ],
+            ['data' => $data, 'last_activity' => $now],
+            ['session_id' => $sessionId],
             ['data' => ParameterType::LARGE_OBJECT],
         );
-    }
-
-    private function existsBySessionId(string $sessionId): bool
-    {
-        $queryBuilder = $this->connectionPool->getQueryBuilderForTable(self::TABLE);
-
-        /** @var array{uid: int}|false $existing */
-        $existing = $queryBuilder
-            ->select('uid')
-            ->from(self::TABLE)
-            ->where($queryBuilder->expr()->eq('session_id', $queryBuilder->createNamedParameter($sessionId)))
-            ->executeQuery()
-            ->fetchAssociative();
-
-        return $existing !== false;
     }
 
     public function delete(string $sessionId): bool

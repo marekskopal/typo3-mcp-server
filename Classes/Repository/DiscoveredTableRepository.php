@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace MarekSkopal\MsMcpServer\Repository;
 
+use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use Doctrine\DBAL\ParameterType;
 use TYPO3\CMS\Core\Database\ConnectionPool;
 
@@ -67,32 +68,23 @@ readonly class DiscoveredTableRepository
     /** Inserts a new row only if the table_name does not already exist. Returns true if inserted. */
     public function insertIfNew(string $tableName, string $label, string $prefix): bool
     {
-        $queryBuilder = $this->connectionPool->getQueryBuilderForTable(self::TABLE);
-
-        /** @var array{uid: int}|false $existing */
-        $existing = $queryBuilder
-            ->select('uid')
-            ->from(self::TABLE)
-            ->where($queryBuilder->expr()->eq('table_name', $queryBuilder->createNamedParameter($tableName)))
-            ->executeQuery()
-            ->fetchAssociative();
-
-        if ($existing !== false) {
-            return false;
-        }
-
         $now = time();
         $connection = $this->connectionPool->getConnectionForTable(self::TABLE);
-        $connection->insert(self::TABLE, [
-            'table_name' => $tableName,
-            'label' => $label,
-            'prefix' => $prefix,
-            'enabled' => 0,
-            'crdate' => $now,
-            'tstamp' => $now,
-        ]);
 
-        return true;
+        try {
+            $connection->insert(self::TABLE, [
+                'table_name' => $tableName,
+                'label' => $label,
+                'prefix' => $prefix,
+                'enabled' => 0,
+                'crdate' => $now,
+                'tstamp' => $now,
+            ]);
+
+            return true;
+        } catch (UniqueConstraintViolationException) {
+            return false;
+        }
     }
 
     public function update(int $uid, string $label, string $prefix): void

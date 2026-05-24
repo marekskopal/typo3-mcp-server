@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace MarekSkopal\MsMcpServer\Tests\Unit\Repository;
 
+use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use Doctrine\DBAL\Result;
 use MarekSkopal\MsMcpServer\Repository\McpSessionRepository;
 use PHPUnit\Framework\Attributes\CoversClass;
@@ -83,23 +84,7 @@ final class McpSessionRepositoryTest extends TestCase
         $repository->touch('abc', 1_700_000_500);
     }
 
-    public function testUpsertUpdatesExistingRow(): void
-    {
-        $connection = $this->createMock(Connection::class);
-        $connection->expects(self::once())->method('update');
-        $connection->expects(self::never())->method('insert');
-
-        $connectionPool = $this->createStub(ConnectionPool::class);
-        $connectionPool->method('getConnectionForTable')->willReturn($connection);
-        $connectionPool->method('getQueryBuilderForTable')->willReturn(
-            $this->createSelectQueryBuilder(['uid' => 1]),
-        );
-
-        $repository = new McpSessionRepository($connectionPool);
-        $repository->upsert('abc', 'data', 1_700_000_000);
-    }
-
-    public function testUpsertInsertsWhenNoExistingRow(): void
+    public function testUpsertInsertsNewRow(): void
     {
         $connection = $this->createMock(Connection::class);
         $connection->expects(self::never())->method('update');
@@ -118,9 +103,28 @@ final class McpSessionRepositoryTest extends TestCase
 
         $connectionPool = $this->createStub(ConnectionPool::class);
         $connectionPool->method('getConnectionForTable')->willReturn($connection);
-        $connectionPool->method('getQueryBuilderForTable')->willReturn(
-            $this->createSelectQueryBuilder(false),
-        );
+
+        $repository = new McpSessionRepository($connectionPool);
+        $repository->upsert('abc', 'data', 1_700_000_000);
+    }
+
+    public function testUpsertFallsBackToUpdateOnDuplicateKey(): void
+    {
+        $connection = $this->createMock(Connection::class);
+        $connection->expects(self::once())
+            ->method('insert')
+            ->willThrowException($this->createStub(UniqueConstraintViolationException::class));
+        $connection->expects(self::once())
+            ->method('update')
+            ->with(
+                'tx_msmcpserver_mcp_session',
+                ['data' => 'data', 'last_activity' => 1_700_000_000],
+                ['session_id' => 'abc'],
+                self::anything(),
+            );
+
+        $connectionPool = $this->createStub(ConnectionPool::class);
+        $connectionPool->method('getConnectionForTable')->willReturn($connection);
 
         $repository = new McpSessionRepository($connectionPool);
         $repository->upsert('abc', 'data', 1_700_000_000);
