@@ -6,8 +6,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-05-24
+
 ### Added
 - **Configurable MCP base path:** new `mcpBasePath` extension setting (default `/mcp`) lets the MCP endpoint and OAuth sub-paths live under a different prefix when `/mcp` is already taken by another handler. OAuth endpoints follow the prefix (e.g. `/typo3-mcp/oauth/authorize`); the resource metadata advertises the configured path. For nested values like `/some/dir/mcp`, the `.well-known/*` discovery endpoints relocate to `/some/dir/.well-known/...` so they sit alongside the resource.
+- **`pages_move` tool:** moves a page (with its subpages) to a new position. Takes exactly one of `targetPid` (move as first child of that parent) or `afterUid` (move as next sibling after that page). Mirrors `content_move`; shares the `MoveTarget` helper. Closes the gap where single-page moves required falling back to the generic `record_move_batch`.
+
+### Security
+- **`file_upload_from_url` hardened against DNS rebinding and redirect-based SSRF.** Previously the host's IP was validated once via `gethostbyname`, then `fopen($url, ...)` re-resolved DNS at read time — a short-TTL rebind could flip to a private IP between the two calls. `follow_location: 1` also let a public URL 302 to a cloud metadata endpoint (e.g. `169.254.169.254`) without re-validation. The downloader now uses cURL with `CURLOPT_RESOLVE` pinning the validated IP for the entire connection, `CURLOPT_FOLLOWLOCATION` disabled, and a manual redirect loop (max 5 hops) that re-runs scheme + host + IP checks at every hop. `CURLOPT_XFERINFOFUNCTION` enforces the 100 MB cap. `ext-curl` is now an explicit composer requirement.
+
+### Fixed
+- **Race-safe upsert in `McpSessionRepository` and `DiscoveredTableRepository`.** Both repositories switched from SELECT-then-INSERT/UPDATE to INSERT-first + catch `UniqueConstraintViolationException` (the pattern already used by `RateLimitService`). Closes a narrow Postgres race window between SELECT and INSERT, and also resolves the original MariaDB "0 affected rows on identical-payload UPDATE" quirk that motivated v0.10.0's d165022 — the UPDATE no longer relies on row-count semantics.
+
+### Internal
+- **CI test matrix aligned with `composer.json`:** TYPO3 v14 row was pinned to `^14.1` but `composer.json` requires `^14.3.0`. Matrix now tests `^14.3`.
+- **Code coverage reporting in CI:** new `coverage` workflow job runs PHPUnit with pcov and writes a Classes / Methods / Lines summary into the GitHub Actions step summary so coverage trends are visible on each PR.
+- **README:** added concrete TYPO3 Scheduler UI steps and a cron example for `mcp:cleanup`. Refreshed the "48+ tools" / "545 tests" claims that had drifted.
 
 ## [0.10.0] - 2026-05-21
 
