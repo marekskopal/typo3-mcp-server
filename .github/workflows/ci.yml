@@ -56,3 +56,26 @@ jobs:
       - run: composer require --no-update typo3/cms-core:${{ matrix.typo3 }}
       - run: composer install --no-progress
       - run: vendor/bin/phpunit
+
+  coverage:
+    name: Coverage
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          coverage: pcov
+      - run: composer install --no-progress
+      - name: Run PHPUnit with coverage
+        run: vendor/bin/phpunit --coverage-text=coverage.txt --colors=never
+      - name: Write coverage summary to job output
+        if: always()
+        run: |
+          {
+            echo "## Code Coverage"
+            echo ""
+            echo '```'
+            grep -A3 "^ Summary:" coverage.txt || echo "No coverage summary found"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
