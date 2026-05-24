@@ -44,7 +44,7 @@ services:
     tags:
       - name: 'console.command'
         command: 'mcp:cleanup'
-        description: 'Remove expired and revoked OAuth authorizations and stale MCP session files'
+        description: 'Remove expired and revoked OAuth authorizations and stale MCP sessions'
 
   MarekSkopal\MsMcpServer\Command\McpServerCommand:
     tags:

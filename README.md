@@ -2,7 +2,7 @@
 
 > **Beta** — This extension is under active development. APIs and behavior may change between releases.
 
-TYPO3 CMS extension that implements an [MCP (Model Context Protocol)](https://modelcontextprotocol.io/) server for TYPO3 administration. It exposes 48+ tools for managing pages, content elements, files, backend users, and custom extension records via the MCP protocol, allowing AI assistants to interact with your TYPO3 instance.
+TYPO3 CMS extension that implements an [MCP (Model Context Protocol)](https://modelcontextprotocol.io/) server for TYPO3 administration. It exposes 60+ tools for managing pages, content elements, files, backend users, and custom extension records via the MCP protocol, allowing AI assistants to interact with your TYPO3 instance.
 
 **This extension is designed primarily for direct, fully autonomous AI operation — changes take effect immediately, with no approval queue between the AI and the live site.** The goal is to let AI agents build, update, and maintain TYPO3 sites end-to-end without human intervention.
 
@@ -588,7 +588,7 @@ vendor/bin/phpstan analyse
 vendor/bin/phpcs
 vendor/bin/phpcbf
 
-# Tests (545 tests)
+# Tests
 vendor/bin/phpunit
 ```
 
