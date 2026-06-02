@@ -8,6 +8,7 @@ use MarekSkopal\MsMcpServer\Middleware\OAuthMiddleware;
 use MarekSkopal\MsMcpServer\OAuth\AuthorizationService;
 use MarekSkopal\MsMcpServer\OAuth\AuthorizeParamsValidator;
 use MarekSkopal\MsMcpServer\OAuth\ClientRepository;
+use MarekSkopal\MsMcpServer\OAuth\OAuthContinuationCookie;
 use MarekSkopal\MsMcpServer\OAuth\RateLimitService;
 use MarekSkopal\MsMcpServer\Service\McpPathProvider;
 use PHPUnit\Framework\Attributes\CoversClass;
@@ -39,11 +40,12 @@ final class OAuthMiddlewareTest extends TestCase
         $beUser->method('getUserId')->willReturn(null);
         $beUser->method('getUserName')->willReturn(null);
         $GLOBALS['BE_USER'] = $beUser;
+        $GLOBALS['TYPO3_CONF_VARS']['SYS']['encryptionKey'] = 'test-encryption-key';
     }
 
     protected function tearDown(): void
     {
-        unset($GLOBALS['BE_USER']);
+        unset($GLOBALS['BE_USER'], $GLOBALS['TYPO3_CONF_VARS']);
     }
 
     public function testNonOAuthPathPassesThrough(): void
@@ -156,10 +158,117 @@ final class OAuthMiddlewareTest extends TestCase
 
         self::assertSame(302, $this->capturedStatusCode);
         $location = $this->capturedHeaders['Location'] ?? '';
-        self::assertStringStartsWith('/typo3/login?', $location);
-        self::assertStringContainsString('redirect=msmcpserver_oauth_bridge', $location);
-        self::assertStringContainsString('redirectParams%5Bclient_id%5D=client-abc', $location);
-        self::assertStringContainsString('redirectParams%5Bstate%5D=opaque-state', $location);
+        self::assertSame('/typo3/login?login_status=login', $location);
+
+        $setCookie = $this->capturedHeaders['Set-Cookie'] ?? '';
+        self::assertStringStartsWith('mcp_oauth_continuation=', $setCookie);
+        self::assertStringContainsString('HttpOnly', $setCookie);
+        self::assertStringContainsString('SameSite=Lax', $setCookie);
+        self::assertStringContainsString('Secure', $setCookie);
+
+        // The cookie payload should round-trip to the authorize URL we wanted to resume on
+        $cookieValue = $this->extractCookieValue($setCookie);
+        $cookie = new OAuthContinuationCookie();
+        $url = $cookie->read($cookieValue);
+        self::assertIsString($url);
+        self::assertStringStartsWith('/mcp/oauth/authorize?', $url);
+        self::assertStringContainsString('client_id=client-abc', $url);
+        self::assertStringContainsString('state=opaque-state', $url);
+    }
+
+    public function testBackendBounceFromTypo3MainRedirectsBackToAuthorize(): void
+    {
+        $beUser = $this->createStub(BackendUserAuthentication::class);
+        $beUser->method('getUserId')->willReturn(42);
+        $beUser->method('getUserName')->willReturn('editor');
+        $GLOBALS['BE_USER'] = $beUser;
+
+        $cookie = new OAuthContinuationCookie();
+        $cookieValue = $this->extractCookieValue(
+            $cookie->issue('/mcp/oauth/authorize?client_id=client-abc&state=opaque-state', secure: true),
+        );
+
+        $request = $this->createRequest('/typo3/main', 'GET');
+        $request->method('getCookieParams')->willReturn([
+            OAuthContinuationCookie::COOKIE_NAME => $cookieValue,
+        ]);
+
+        $handler = $this->createMock(RequestHandlerInterface::class);
+        $handler->expects(self::never())->method('handle');
+
+        $middleware = $this->createMiddlewareWithCapture();
+        $middleware->process($request, $handler);
+
+        self::assertSame(302, $this->capturedStatusCode);
+        self::assertSame(
+            '/mcp/oauth/authorize?client_id=client-abc&state=opaque-state',
+            $this->capturedHeaders['Location'] ?? '',
+        );
+        $clearCookie = $this->capturedHeaders['Set-Cookie'] ?? '';
+        self::assertStringContainsString('mcp_oauth_continuation=;', $clearCookie);
+        self::assertStringContainsString('Max-Age=0', $clearCookie);
+    }
+
+    public function testBackendBounceIgnoredWhenCookieTampered(): void
+    {
+        $beUser = $this->createStub(BackendUserAuthentication::class);
+        $beUser->method('getUserId')->willReturn(42);
+        $GLOBALS['BE_USER'] = $beUser;
+
+        $request = $this->createRequest('/typo3/main', 'GET');
+        $request->method('getCookieParams')->willReturn([
+            OAuthContinuationCookie::COOKIE_NAME => 'forged.cookie.value',
+        ]);
+
+        $expectedResponse = $this->createStub(ResponseInterface::class);
+        $handler = $this->createMock(RequestHandlerInterface::class);
+        $handler->expects(self::once())->method('handle')->with($request)->willReturn($expectedResponse);
+
+        $middleware = $this->createMiddleware();
+        self::assertSame($expectedResponse, $middleware->process($request, $handler));
+    }
+
+    public function testBackendBounceIgnoredWhenNotAuthenticated(): void
+    {
+        $cookie = new OAuthContinuationCookie();
+        $cookieValue = $this->extractCookieValue(
+            $cookie->issue('/mcp/oauth/authorize?client_id=client-abc', secure: true),
+        );
+
+        $request = $this->createRequest('/typo3/main', 'GET');
+        $request->method('getCookieParams')->willReturn([
+            OAuthContinuationCookie::COOKIE_NAME => $cookieValue,
+        ]);
+
+        $expectedResponse = $this->createStub(ResponseInterface::class);
+        $handler = $this->createMock(RequestHandlerInterface::class);
+        $handler->expects(self::once())->method('handle')->with($request)->willReturn($expectedResponse);
+
+        $middleware = $this->createMiddleware();
+        self::assertSame($expectedResponse, $middleware->process($request, $handler));
+    }
+
+    public function testBackendBounceIgnoredWhenUrlNotAuthorizeEndpoint(): void
+    {
+        $beUser = $this->createStub(BackendUserAuthentication::class);
+        $beUser->method('getUserId')->willReturn(42);
+        $GLOBALS['BE_USER'] = $beUser;
+
+        $cookie = new OAuthContinuationCookie();
+        // Valid signature but the URL points outside our authorize endpoint
+        $cookieValue = $this->extractCookieValue($cookie->issue('https://evil.example/steal', secure: true));
+
+        $request = $this->createRequest('/typo3/main', 'GET');
+        $request->method('getCookieParams')->willReturn([
+            OAuthContinuationCookie::COOKIE_NAME => $cookieValue,
+        ]);
+
+        $expectedResponse = $this->createStub(ResponseInterface::class);
+        $handler = $this->createMock(RequestHandlerInterface::class);
+        $handler->expects(self::once())->method('handle')->with($request)->willReturn($expectedResponse);
+
+        $middleware = $this->createMiddleware();
+        self::assertSame($expectedResponse, $middleware->process($request, $handler));
     }
 
     public function testAuthorizeGetAuthenticatedRendersConsentForm(): void
@@ -478,6 +587,7 @@ final class OAuthMiddlewareTest extends TestCase
             $this->createStub(AuthorizationService::class),
             $clientRepository,
             new AuthorizeParamsValidator($clientRepository),
+            new OAuthContinuationCookie(),
             $this->createPathProvider($basePath),
             $this->createStub(RateLimitService::class),
             $this->createStub(ResponseFactoryInterface::class),
@@ -527,11 +637,23 @@ final class OAuthMiddlewareTest extends TestCase
             $authorizationService ?? $this->createStub(AuthorizationService::class),
             $clientRepositoryResolved,
             new AuthorizeParamsValidator($clientRepositoryResolved),
+            new OAuthContinuationCookie(),
             $this->createPathProvider($basePath),
             $rateLimitService ?? $this->createStub(RateLimitService::class),
             $responseFactory,
             $streamFactory,
         );
+    }
+
+    private function extractCookieValue(string $setCookieHeader): string
+    {
+        $semicolon = strpos($setCookieHeader, ';');
+        self::assertIsInt($semicolon);
+        $pair = substr($setCookieHeader, 0, $semicolon);
+        $equals = strpos($pair, '=');
+        self::assertIsInt($equals);
+
+        return substr($pair, $equals + 1);
     }
 
     private function createPathProvider(string $basePath): McpPathProvider

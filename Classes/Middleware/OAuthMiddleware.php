@@ -7,6 +7,7 @@ namespace MarekSkopal\MsMcpServer\Middleware;
 use MarekSkopal\MsMcpServer\OAuth\AuthorizationService;
 use MarekSkopal\MsMcpServer\OAuth\AuthorizeParamsValidator;
 use MarekSkopal\MsMcpServer\OAuth\ClientRepository;
+use MarekSkopal\MsMcpServer\OAuth\OAuthContinuationCookie;
 use MarekSkopal\MsMcpServer\OAuth\RateLimitService;
 use MarekSkopal\MsMcpServer\Service\McpPathProvider;
 use Psr\Http\Message\ResponseFactoryInterface;
@@ -23,21 +24,26 @@ use const JSON_THROW_ON_ERROR;
 
 /**
  * Routes the OAuth endpoints. Authentication is delegated to the real TYPO3 backend
- * login form: an unauthenticated authorize request is bounced to `/typo3/login` with
- * a `RouteRedirect` carrier pointing at `msmcpserver_oauth_bridge`. Once the user
- * logs in, the bridge controller redirects back here and we render a consent screen
- * that the user can submit to mint an authorization code.
+ * login form via a top-level redirect to `/typo3/login`. We can't use TYPO3's
+ * `RouteRedirect` post-login carrier because it lands the user inside the backend's
+ * content iframe (`BackendController::mainAction` assigns the resolved redirect to
+ * `startupModule`, which is loaded into the `<iframe>` shell); the final 302 to a
+ * desktop-OAuth localhost callback would be blocked by `frame-src 'self'` /
+ * `form-action 'self'`. Instead we set a short-lived HMAC-signed cookie remembering
+ * the authorize URL, and a sibling backend-stack middleware bounce intercepts
+ * `/typo3/main` to issue a top-level 302 back to it before the dashboard renders.
  */
 readonly class OAuthMiddleware implements MiddlewareInterface
 {
     private const string BACKEND_LOGIN_PATH = '/typo3/login';
 
-    private const string BRIDGE_ROUTE_NAME = 'msmcpserver_oauth_bridge';
+    private const string BACKEND_POST_LOGIN_PATH = '/typo3/main';
 
     public function __construct(
         private AuthorizationService $authorizationService,
         private ClientRepository $clientRepository,
         private AuthorizeParamsValidator $authorizeParamsValidator,
+        private OAuthContinuationCookie $continuationCookie,
         private McpPathProvider $pathProvider,
         private RateLimitService $rateLimitService,
         private ResponseFactoryInterface $responseFactory,
@@ -49,6 +55,13 @@ readonly class OAuthMiddleware implements MiddlewareInterface
     {
         $path = $request->getUri()->getPath();
         $method = $request->getMethod();
+
+        if ($path === self::BACKEND_POST_LOGIN_PATH && $method === 'GET') {
+            $bounce = $this->handleBackendPostLoginBounce($request);
+            if ($bounce !== null) {
+                return $bounce;
+            }
+        }
 
         $authorizePath = $this->pathProvider->getAuthorizePath();
         $tokenPath = $this->pathProvider->getTokenPath();
@@ -144,7 +157,7 @@ readonly class OAuthMiddleware implements MiddlewareInterface
 
         $beUserUid = $this->resolveAuthenticatedBackendUserUid($request);
         if ($beUserUid === null) {
-            return $this->redirectToBackendLogin($params);
+            return $this->redirectToBackendLogin($request, $params);
         }
 
         $username = $this->resolveBackendUsername($request);
@@ -347,9 +360,9 @@ readonly class OAuthMiddleware implements MiddlewareInterface
     }
 
     /** @param array<string, mixed> $params */
-    private function redirectToBackendLogin(array $params): ResponseInterface
+    private function redirectToBackendLogin(ServerRequestInterface $request, array $params): ResponseInterface
     {
-        $redirectParams = [
+        $authorizeUrl = $this->pathProvider->getAuthorizePath() . '?' . http_build_query([
             'response_type' => 'code',
             'client_id' => is_string($params['client_id'] ?? null) ? $params['client_id'] : '',
             'redirect_uri' => is_string($params['redirect_uri'] ?? null) ? $params['redirect_uri'] : '',
@@ -357,16 +370,49 @@ readonly class OAuthMiddleware implements MiddlewareInterface
             'code_challenge_method' => is_string($params['code_challenge_method'] ?? null) ? $params['code_challenge_method'] : '',
             'state' => is_string($params['state'] ?? null) ? $params['state'] : '',
             'scope' => is_string($params['scope'] ?? null) ? $params['scope'] : '',
-        ];
-
-        $location = self::BACKEND_LOGIN_PATH . '?' . http_build_query([
-            'login_status' => 'login',
-            'redirect' => self::BRIDGE_ROUTE_NAME,
-            'redirectParams' => $redirectParams,
         ]);
 
+        $secure = $request->getUri()->getScheme() === 'https';
+
         return $this->responseFactory->createResponse(302)
-            ->withHeader('Location', $location);
+            ->withHeader('Location', self::BACKEND_LOGIN_PATH . '?login_status=login')
+            ->withHeader('Set-Cookie', $this->continuationCookie->issue($authorizeUrl, $secure));
+    }
+
+    /**
+     * Intercepts `/typo3/main` after backend login: if the continuation cookie is
+     * present and the user is authenticated, top-level 302 back to the authorize
+     * URL the cookie remembers (and clear the cookie). Returns null when the cookie
+     * is absent, tampered, or the user isn't yet authenticated — letting the request
+     * fall through to `BackendController::mainAction` normally.
+     */
+    private function handleBackendPostLoginBounce(ServerRequestInterface $request): ?ResponseInterface
+    {
+        $cookies = $request->getCookieParams();
+        $rawCookie = is_string($cookies[OAuthContinuationCookie::COOKIE_NAME] ?? null)
+            ? $cookies[OAuthContinuationCookie::COOKIE_NAME]
+            : null;
+
+        $url = $this->continuationCookie->read($rawCookie);
+        if ($url === null) {
+            return null;
+        }
+
+        // Only follow our own authorize URLs — never bounce anywhere else even with
+        // a valid signature, in case the secret ever leaks.
+        if (!str_starts_with($url, $this->pathProvider->getAuthorizePath() . '?')) {
+            return null;
+        }
+
+        if ($this->resolveAuthenticatedBackendUserUid($request) === null) {
+            return null;
+        }
+
+        $secure = $request->getUri()->getScheme() === 'https';
+
+        return $this->responseFactory->createResponse(302)
+            ->withHeader('Location', $url)
+            ->withHeader('Set-Cookie', $this->continuationCookie->clear($secure));
     }
 
     /** @param array<string, mixed> $params */
