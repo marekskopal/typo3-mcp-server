@@ -189,8 +189,8 @@ readonly class RedirectToolRegistrar
             ) use (
                 $dataHandlerService,
                 $logger
-            ): RecordCreatedResult|ErrorResult {
-                $data = [
+            ): RecordCreatedResult {
+                $required = [
                     'source_host' => $sourceHost,
                     'source_path' => $sourcePath,
                     'target' => $target,
@@ -201,18 +201,16 @@ readonly class RedirectToolRegistrar
                     /** @var array<string, mixed> $extra */
                     $extra = json_decode($fields, true, 512, JSON_THROW_ON_ERROR);
                     // Explicit params take precedence over fields JSON
-                    $data = array_merge($extra, $data);
+                    $merged = array_merge($extra, $required);
+                } else {
+                    $merged = $required;
                 }
 
-                $filteredData = array_intersect_key($data, array_flip(self::WRITABLE_FIELDS));
+                $filteredData = array_intersect_key($merged, array_flip(self::WRITABLE_FIELDS));
                 $ignoredFields = array_map(
                     'strval',
-                    array_values(array_diff(array_keys($data), array_keys($filteredData))),
+                    array_values(array_diff(array_keys($merged), array_keys($filteredData))),
                 );
-
-                if ($filteredData === []) {
-                    return new ErrorResult('No valid fields provided', ['ignoredFields' => $ignoredFields]);
-                }
 
                 try {
                     $uid = $dataHandlerService->createRecord(self::TABLE, $pid, $filteredData);
