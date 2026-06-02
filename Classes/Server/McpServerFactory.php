@@ -80,14 +80,24 @@ readonly class McpServerFactory
         foreach ($this->resources as $resource) {
             $attribute = $this->getMethodAttribute($resource, McpResource::class);
             if ($attribute !== null) {
-                $builder->addResource([$resource::class, 'execute'], $attribute->uri, $attribute->name);
+                $builder->addResource(
+                    handler: [$resource::class, 'execute'],
+                    uri: $attribute->uri,
+                    name: $attribute->name,
+                );
                 continue;
             }
 
             $templateAttribute = $this->getMethodAttribute($resource, McpResourceTemplate::class);
-            if ($templateAttribute !== null) {
-                $builder->addResourceTemplate([$resource::class, 'execute'], $templateAttribute->uriTemplate, $templateAttribute->name);
+            if ($templateAttribute === null) {
+                continue;
             }
+
+            $builder->addResourceTemplate(
+                handler: [$resource::class, 'execute'],
+                uriTemplate: $templateAttribute->uriTemplate,
+                name: $templateAttribute->name,
+            );
         }
 
         foreach ($this->prompts as $prompt) {
