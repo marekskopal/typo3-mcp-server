@@ -6,6 +6,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-06-02
+
+### Changed
+- **OAuth login delegated to the real TYPO3 backend login form.** The `/mcp/oauth/authorize` endpoint no longer ships its own username/password form. Unauthenticated authorize requests now set a short-lived HMAC-signed `mcp_oauth_continuation` cookie (sha256 over the relative URL + 600s expiry, keyed off `$GLOBALS['TYPO3_CONF_VARS']['SYS']['encryptionKey']`) and 302 to `/typo3/login`. A sibling backend-stack middleware intercepts `/typo3/main` post-login, verifies the cookie + `BE_USER`, and issues a top-level 302 back to `/mcp/oauth/authorize` — so the consent screen (single "Authorize Access" / "Cancel" button per RFC 6749 §4.1.2.1) renders outside the backend shell and the desktop-OAuth localhost callback redirect is not subject to the backend's `form-action 'self'` CSP. The bounce path-validates the cookie payload against `<basePath>/oauth/authorize?` before honouring it. MFA, `starttime`/`endtime`, per-user lockout, and `sys_log` failed-login entries come along for free (closes TMS-4).
+
+### Removed
+- **Custom credential flow.** `OAuthMiddleware::authenticateBackendUser`, `renderAuthorizeForm`, the inline `mcp_csrf`-only username/password form, and the `PasswordHashFactory` / `ConnectionPool` dependencies in `OAuthMiddleware` are gone. Existing `tx_msmcpserver_oauth_client` registrations keep working — only the *user-facing* auth UI changed.
+
+### Internal
+- **mcp/sdk bumped to ^0.6.** The v0.6.0 default `StreamableHttpTransport` middleware stack added `DnsRebindingProtectionMiddleware`, which only allows `localhost`/`127.0.0.1`/`[::1]` for `Host`/`Origin` and would 403 every real TYPO3 deployment. `McpServerMiddleware` now passes an explicit middleware list (`[CorsMiddleware, ProtocolVersionMiddleware]`) — bearer-token auth above is the actual protection here. Also adapted `Builder::addResource`/`addResourceTemplate` calls to the new `$title` parameter via named arguments.
+- **Tests grew from 613 to 637** (+ `AuthorizeParamsValidatorTest`, `OAuthContinuationCookieTest`, refreshed `OAuthMiddlewareTest` covering unauth → backend-login redirect with continuation cookie, authed → consent form rendered, POST → auth-code created, POST without BE session → 401, `/typo3/main` bounce success / tampered cookie / unauthenticated / foreign URL paths). PHPStan max + PHPCS green.
+
 ## [0.11.0] - 2026-05-24
 
 ### Added

@@ -32,7 +32,7 @@ vendor/bin/typo3 mcp:cleanup
 
 **Flow:** HTTP request to `/mcp` → `McpServerMiddleware` (Bearer token auth via OAuth) → `AuthorizationService` → `BackendUserBootstrap` → `McpServerFactory` → MCP SDK `Server` with `StreamableHttpTransport` → Tool execution → JSON response.
 
-**OAuth Flow:** `/.well-known/oauth-authorization-server/mcp` (RFC 8414 path-insert) → `OAuthMiddleware` handles `/mcp/oauth/authorize`, `/mcp/oauth/token`, `/mcp/oauth/register`, `/mcp/oauth/revoke` endpoints. Uses PKCE (S256), dynamic client registration (RFC 7591), token revocation (RFC 7009), protected resource metadata (RFC 9728), and IP-based rate limiting (configurable per-endpoint, 429 Too Many Requests with Retry-After).
+**OAuth Flow:** `/.well-known/oauth-authorization-server/mcp` (RFC 8414 path-insert) → `OAuthMiddleware` handles `/mcp/oauth/authorize`, `/mcp/oauth/token`, `/mcp/oauth/register`, `/mcp/oauth/revoke` endpoints. Uses PKCE (S256), dynamic client registration (RFC 7591), token revocation (RFC 7009), protected resource metadata (RFC 9728), and IP-based rate limiting (configurable per-endpoint, 429 Too Many Requests with Retry-After). Authentication is delegated to TYPO3's real backend login: an unauthenticated `authorize` GET sets an HMAC-signed `mcp_oauth_continuation` cookie carrying the authorize URL and 302s to `/typo3/login`; the same middleware is also registered in the backend stack and bounces `/typo3/main` post-login back to the authorize endpoint, where a single-click consent screen renders outside the backend shell (so the localhost-callback 302 isn't subject to the backend's CSP).
 
 **Key classes (all in `Classes/`):**
 - `Middleware/McpServerMiddleware` — PSR-15 middleware intercepting `/mcp` requests, handles auth and delegates to MCP SDK
@@ -42,6 +42,8 @@ vendor/bin/typo3 mcp:cleanup
 - `OAuth/RateLimitService` — IP-based rate limiting for OAuth endpoints with configurable per-endpoint limits and fixed-window counters
 - `OAuth/PkceVerifier` — S256 PKCE verification
 - `OAuth/OAuthTokenPair` — DTO for access/refresh token pairs
+- `OAuth/AuthorizeParamsValidator` — Shared OAuth authorize-param validation (used by `OAuthMiddleware` on both GET and POST)
+- `OAuth/OAuthContinuationCookie` — HMAC-signed cookie that carries the relative authorize URL across the `/typo3/login` round-trip; signed with `$GLOBALS['TYPO3_CONF_VARS']['SYS']['encryptionKey']`, 600s TTL, `HttpOnly; SameSite=Lax; Secure` when on HTTPS
 - `Authentication/BackendUserBootstrap` — Bootstraps a `BackendUserAuthentication` from a be_users record
 - `Server/McpServerFactory` — Builds the MCP Server instance; tools/resources/prompts are auto-discovered via DI tags, no hardcoded registration needed. Wires `DatabaseSessionStore` so MCP sessions survive container restarts.
 - `Server/Session/DatabaseSessionStore` — `Mcp\Server\Session\SessionStoreInterface` implementation backed by `tx_msmcpserver_mcp_session`. Bumps `last_activity` on read/exists for sliding TTL.
@@ -126,7 +128,7 @@ readonly class MyTool
 
 ## Testing
 
-560 unit tests covering:
+637 unit tests covering:
 - All static MCP tools + batch tools (Pages/Content/File/Schema/Search/Translation/Cache/Permission/BackendUser/BackendGroup/Batch CRUD)
 - Dynamic tool registration and execution (DynamicToolRegistrar), including merged EXTCONF + discovered tables
 - OAuth classes (AuthorizationService incl. revocation, ClientRepository, PkceVerifier, OAuthTokenPair, RateLimitService)

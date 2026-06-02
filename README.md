@@ -259,6 +259,7 @@ The stdio transport does not require OAuth — the user is specified via the `--
 ### OAuth Features
 
 - **Authorization Code flow with PKCE** — standard OAuth 2.1 for MCP clients
+- **Authentication via the real TYPO3 backend login** — the `/mcp/oauth/authorize` endpoint redirects unauthenticated users to `/typo3/login` and only renders a single-click consent screen once `BE_USER` is established; MFA, `starttime`/`endtime`, per-user lockout, and `sys_log` failed-login entries come from the standard backend pipeline
 - **Dynamic Client Registration** ([RFC 7591](https://datatracker.ietf.org/doc/html/rfc7591)) — clients can self-register
 - **Token Revocation** ([RFC 7009](https://datatracker.ietf.org/doc/html/rfc7009)) — revoke access and refresh tokens
 - **Protected Resource Metadata** ([RFC 9728](https://datatracker.ietf.org/doc/html/rfc9728)) — auto-discovery of auth requirements
@@ -321,8 +322,8 @@ OAuth endpoints are protected by IP-based rate limiting with configurable per-en
 | Setting | Default | Description |
 |---------|---------|-------------|
 | `rateLimitEnabled` | `1` | Enable/disable rate limiting |
-| `rateLimitAuthorize` | `5` / 300s | Authorize POST (password brute-force protection) |
-| `rateLimitAuthorizeGet` | `20` / 300s | Authorize GET (form display) |
+| `rateLimitAuthorize` | `5` / 300s | Authorize POST (consent submission — auth code minting) |
+| `rateLimitAuthorizeGet` | `20` / 300s | Authorize GET (consent form display) |
 | `rateLimitToken` | `20` / 300s | Token exchange/refresh |
 | `rateLimitRegister` | `10` / 3600s | Client registration |
 | `rateLimitRevoke` | `20` / 300s | Token revocation |
