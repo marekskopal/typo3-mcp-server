@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace MarekSkopal\MsMcpServer\Middleware;
 
-use Doctrine\DBAL\ParameterType;
 use MarekSkopal\MsMcpServer\OAuth\AuthorizationService;
+use MarekSkopal\MsMcpServer\OAuth\AuthorizeParamsValidator;
 use MarekSkopal\MsMcpServer\OAuth\ClientRepository;
 use MarekSkopal\MsMcpServer\OAuth\RateLimitService;
 use MarekSkopal\MsMcpServer\Service\McpPathProvider;
@@ -15,19 +15,29 @@ use Psr\Http\Message\ServerRequestInterface;
 use Psr\Http\Message\StreamFactoryInterface;
 use Psr\Http\Server\MiddlewareInterface;
 use Psr\Http\Server\RequestHandlerInterface;
-use TYPO3\CMS\Core\Crypto\PasswordHashing\PasswordHashFactory;
-use TYPO3\CMS\Core\Database\ConnectionPool;
+use TYPO3\CMS\Core\Authentication\BackendUserAuthentication;
 use TYPO3\CMS\Core\Http\NormalizedParams;
+use TYPO3\CMS\Core\Utility\GeneralUtility;
 use const ENT_QUOTES;
 use const JSON_THROW_ON_ERROR;
 
+/**
+ * Routes the OAuth endpoints. Authentication is delegated to the real TYPO3 backend
+ * login form: an unauthenticated authorize request is bounced to `/typo3/login` with
+ * a `RouteRedirect` carrier pointing at `msmcpserver_oauth_bridge`. Once the user
+ * logs in, the bridge controller redirects back here and we render a consent screen
+ * that the user can submit to mint an authorization code.
+ */
 readonly class OAuthMiddleware implements MiddlewareInterface
 {
+    private const string BACKEND_LOGIN_PATH = '/typo3/login';
+
+    private const string BRIDGE_ROUTE_NAME = 'msmcpserver_oauth_bridge';
+
     public function __construct(
         private AuthorizationService $authorizationService,
         private ClientRepository $clientRepository,
-        private ConnectionPool $connectionPool,
-        private PasswordHashFactory $passwordHashFactory,
+        private AuthorizeParamsValidator $authorizeParamsValidator,
         private McpPathProvider $pathProvider,
         private RateLimitService $rateLimitService,
         private ResponseFactoryInterface $responseFactory,
@@ -127,18 +137,24 @@ readonly class OAuthMiddleware implements MiddlewareInterface
         /** @var array<string, mixed> $params */
         $params = $request->getQueryParams();
 
-        $error = $this->validateAuthorizeParams($params);
+        $error = $this->authorizeParamsValidator->validate($params);
         if ($error !== null) {
             return $this->createJsonResponse(400, ['error' => 'invalid_request', 'error_description' => $error]);
         }
 
+        $beUserUid = $this->resolveAuthenticatedBackendUserUid($request);
+        if ($beUserUid === null) {
+            return $this->redirectToBackendLogin($params);
+        }
+
+        $username = $this->resolveBackendUsername($request);
+
         $clientId = is_string($params['client_id'] ?? null) ? $params['client_id'] : '';
         $client = $this->clientRepository->findByClientId($clientId);
-        $clientName = $client !== null ? $client['client_name'] : 'Unknown';
+        $clientName = $client !== null ? (string) $client['client_name'] : 'Unknown';
 
         $csrfToken = bin2hex(random_bytes(32));
-
-        $html = $this->renderAuthorizeForm($clientName, $params, $csrfToken);
+        $html = $this->renderConsentForm($clientName, $username, $params, $csrfToken);
 
         return $this->responseFactory->createResponse(200)
             ->withHeader('Content-Type', 'text/html; charset=utf-8')
@@ -169,38 +185,17 @@ readonly class OAuthMiddleware implements MiddlewareInterface
             return $this->createJsonResponse(400, ['error' => 'invalid_request', 'error_description' => 'Invalid redirect_uri']);
         }
 
-        $username = (string) ($body['username'] ?? '');
-        $password = (string) ($body['password'] ?? '');
+        $beUserUid = $this->resolveAuthenticatedBackendUserUid($request);
+        if ($beUserUid === null) {
+            return $this->createJsonResponse(401, [
+                'error' => 'login_required',
+                'error_description' => 'Backend session expired. Please restart the authorization flow.',
+            ]);
+        }
+
         $codeChallenge = (string) ($body['code_challenge'] ?? '');
         $codeChallengeMethod = (string) ($body['code_challenge_method'] ?? '');
         $state = (string) ($body['state'] ?? '');
-
-        $beUserUid = $this->authenticateBackendUser($username, $password);
-        if ($beUserUid === null) {
-            $client = $this->clientRepository->findByClientId($clientId);
-            $clientName = $client !== null ? (string) $client['client_name'] : 'Unknown';
-
-            $newCsrfToken = bin2hex(random_bytes(32));
-            $params = [
-                'client_id' => $clientId,
-                'redirect_uri' => $redirectUri,
-                'code_challenge' => $codeChallenge,
-                'code_challenge_method' => $codeChallengeMethod,
-                'state' => $state,
-                'response_type' => 'code',
-            ];
-
-            $html = $this->renderAuthorizeForm($clientName, $params, $newCsrfToken, 'Invalid username or password.');
-
-            return $this->responseFactory->createResponse(200)
-                ->withHeader('Content-Type', 'text/html; charset=utf-8')
-                ->withHeader('Set-Cookie', sprintf(
-                    'mcp_csrf=%s; Path=%s; HttpOnly; SameSite=Strict; Secure; Max-Age=600',
-                    $newCsrfToken,
-                    $this->pathProvider->getOAuthCookiePath(),
-                ))
-                ->withBody($this->streamFactory->createStream($html));
-        }
 
         try {
             $code = $this->authorizationService->createAuthorizationCode(
@@ -319,82 +314,66 @@ readonly class OAuthMiddleware implements MiddlewareInterface
         return $this->createJsonResponse(200, []);
     }
 
-    /** @param array<string, mixed> $params */
-    private function validateAuthorizeParams(array $params): ?string
+    /**
+     * Bootstraps a `BackendUserAuthentication` from the request's cookies (TYPO3's
+     * `be_typo_user` cookie is scoped to the site path, so it reaches the frontend
+     * stack on standard installs). Returns the authenticated uid or null.
+     */
+    private function resolveAuthenticatedBackendUserUid(ServerRequestInterface $request): ?int
     {
-        if (($params['response_type'] ?? '') !== 'code') {
-            return 'response_type must be "code"';
-        }
+        $beUser = $this->resolveBackendUser($request);
+        $uid = $beUser->getUserId();
 
-        $clientId = is_string($params['client_id'] ?? null) ? $params['client_id'] : '';
-        if ($clientId === '') {
-            return 'client_id is required';
-        }
-
-        $client = $this->clientRepository->findByClientId($clientId);
-        if ($client === null) {
-            return 'Unknown client_id';
-        }
-
-        $redirectUri = is_string($params['redirect_uri'] ?? null) ? $params['redirect_uri'] : '';
-        if ($redirectUri === '') {
-            return 'redirect_uri is required';
-        }
-
-        if (!$this->clientRepository->validateRedirectUri($clientId, $redirectUri)) {
-            return 'Invalid redirect_uri';
-        }
-
-        if (($params['code_challenge_method'] ?? '') !== 'S256') {
-            return 'code_challenge_method must be "S256"';
-        }
-
-        if (($params['code_challenge'] ?? '') === '') {
-            return 'code_challenge is required';
-        }
-
-        return null;
+        return $uid !== null && $uid > 0 ? $uid : null;
     }
 
-    private function authenticateBackendUser(string $username, string $password): ?int
+    private function resolveBackendUsername(ServerRequestInterface $request): string
     {
-        if ($username === '' || $password === '') {
-            return null;
+        return $this->resolveBackendUser($request)->getUserName() ?? '';
+    }
+
+    private function resolveBackendUser(ServerRequestInterface $request): BackendUserAuthentication
+    {
+        $beUser = $GLOBALS['BE_USER'] ?? null;
+        if ($beUser instanceof BackendUserAuthentication) {
+            return $beUser;
         }
 
-        $queryBuilder = $this->connectionPool->getQueryBuilderForTable('be_users');
-        /** @var array{uid: int|string, password: string}|false $row */
-        $row = $queryBuilder
-            ->select('uid', 'password')
-            ->from('be_users')
-            ->where(
-                $queryBuilder->expr()->eq('username', $queryBuilder->createNamedParameter($username)),
-                $queryBuilder->expr()->eq('disable', $queryBuilder->createNamedParameter(0, ParameterType::INTEGER)),
-                $queryBuilder->expr()->eq('deleted', $queryBuilder->createNamedParameter(0, ParameterType::INTEGER)),
-            )
-            ->executeQuery()
-            ->fetchAssociative();
+        $beUser = GeneralUtility::makeInstance(BackendUserAuthentication::class);
+        $beUser->start($request);
+        $GLOBALS['BE_USER'] = $beUser;
 
-        if ($row === false) {
-            return null;
-        }
-
-        $hashInstance = $this->passwordHashFactory->get($row['password'], 'BE');
-        if (!$hashInstance->checkPassword($password, $row['password'])) {
-            return null;
-        }
-
-        return (int) $row['uid'];
+        return $beUser;
     }
 
     /** @param array<string, mixed> $params */
-    private function renderAuthorizeForm(string $clientName, array $params, string $csrfToken, string $errorMessage = '',): string
+    private function redirectToBackendLogin(array $params): ResponseInterface
+    {
+        $redirectParams = [
+            'response_type' => 'code',
+            'client_id' => is_string($params['client_id'] ?? null) ? $params['client_id'] : '',
+            'redirect_uri' => is_string($params['redirect_uri'] ?? null) ? $params['redirect_uri'] : '',
+            'code_challenge' => is_string($params['code_challenge'] ?? null) ? $params['code_challenge'] : '',
+            'code_challenge_method' => is_string($params['code_challenge_method'] ?? null) ? $params['code_challenge_method'] : '',
+            'state' => is_string($params['state'] ?? null) ? $params['state'] : '',
+            'scope' => is_string($params['scope'] ?? null) ? $params['scope'] : '',
+        ];
+
+        $location = self::BACKEND_LOGIN_PATH . '?' . http_build_query([
+            'login_status' => 'login',
+            'redirect' => self::BRIDGE_ROUTE_NAME,
+            'redirectParams' => $redirectParams,
+        ]);
+
+        return $this->responseFactory->createResponse(302)
+            ->withHeader('Location', $location);
+    }
+
+    /** @param array<string, mixed> $params */
+    private function renderConsentForm(string $clientName, string $username, array $params, string $csrfToken): string
     {
         $clientNameEscaped = htmlspecialchars($clientName, ENT_QUOTES, 'UTF-8');
-        $errorHtml = $errorMessage !== ''
-            ? '<div style="background:#dc3545;color:#fff;padding:10px;border-radius:4px;margin-bottom:16px">'
-                . htmlspecialchars($errorMessage, ENT_QUOTES, 'UTF-8') . '</div>'
-            : '';
+        $usernameEscaped = htmlspecialchars($username !== '' ? $username : 'TYPO3 backend user', ENT_QUOTES, 'UTF-8');
 
         $hiddenFields = '';
         foreach (['client_id', 'redirect_uri', 'code_challenge', 'code_challenge_method', 'state'] as $field) {
@@ -404,6 +383,7 @@ readonly class OAuthMiddleware implements MiddlewareInterface
         }
 
         $formAction = htmlspecialchars($this->pathProvider->getAuthorizePath(), ENT_QUOTES, 'UTF-8');
+        $cancelHref = $this->buildCancelHref($params);
 
         return <<<HTML
             <!DOCTYPE html>
@@ -414,34 +394,62 @@ readonly class OAuthMiddleware implements MiddlewareInterface
                 <title>TYPO3 MCP Server - Authorization</title>
                 <style>
                     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #1a1a2e; color: #eee; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
-                    .card { background: #16213e; border-radius: 8px; padding: 32px; width: 100%; max-width: 400px; box-shadow: 0 4px 24px rgba(0,0,0,0.3); }
+                    .card { background: #16213e; border-radius: 8px; padding: 32px; width: 100%; max-width: 420px; box-shadow: 0 4px 24px rgba(0,0,0,0.3); }
                     h1 { font-size: 20px; margin: 0 0 8px; }
-                    p { color: #aaa; font-size: 14px; margin: 0 0 24px; }
-                    label { display: block; font-size: 13px; color: #ccc; margin-bottom: 4px; }
-                    input[type="text"], input[type="password"] { width: 100%; padding: 10px; border: 1px solid #333; border-radius: 4px; background: #0f3460; color: #eee; font-size: 14px; box-sizing: border-box; margin-bottom: 16px; }
-                    button { width: 100%; padding: 12px; background: #e94560; border: none; border-radius: 4px; color: #fff; font-size: 15px; cursor: pointer; font-weight: 600; }
-                    button:hover { background: #c73a52; }
+                    p { color: #aaa; font-size: 14px; margin: 0 0 16px; }
+                    .who { background: #0f3460; padding: 12px 14px; border-radius: 4px; font-size: 13px; margin: 0 0 20px; color: #ccc; }
+                    .who strong { color: #fff; }
+                    .actions { display: flex; gap: 10px; }
+                    button.primary { flex: 1; padding: 12px; background: #e94560; border: none; border-radius: 4px; color: #fff; font-size: 15px; cursor: pointer; font-weight: 600; }
+                    button.primary:hover { background: #c73a52; }
+                    a.cancel { flex: 1; padding: 12px; background: transparent; border: 1px solid #555; border-radius: 4px; color: #ccc; font-size: 15px; text-align: center; text-decoration: none; line-height: 1.2; }
+                    a.cancel:hover { border-color: #888; color: #fff; }
                     .client-name { color: #e94560; font-weight: 600; }
                 </style>
             </head>
             <body>
                 <div class="card">
-                    <h1>Authorize Application</h1>
+                    <h1>Authorize MCP Access</h1>
                     <p><span class="client-name">{$clientNameEscaped}</span> is requesting access to your TYPO3 backend account.</p>
-                    {$errorHtml}
+                    <div class="who">Signed in as <strong>{$usernameEscaped}</strong>.</div>
                     <form method="post" action="{$formAction}">
                         {$hiddenFields}
                         <input type="hidden" name="csrf_token" value="{$csrfToken}" />
-                        <label for="username">Username</label>
-                        <input type="text" id="username" name="username" required autofocus />
-                        <label for="password">Password</label>
-                        <input type="password" id="password" name="password" required />
-                        <button type="submit">Authorize</button>
+                        <div class="actions">
+                            <a class="cancel" href="{$cancelHref}">Cancel</a>
+                            <button type="submit" class="primary">Authorize Access</button>
+                        </div>
                     </form>
                 </div>
             </body>
             </html>
             HTML;
+    }
+
+    /**
+     * Builds the cancel link target: per RFC 6749 §4.1.2.1 the authorization
+     * server redirects to the registered `redirect_uri` with `error=access_denied`
+     * (plus the original `state` if provided).
+     *
+     * @param array<string, mixed> $params
+     */
+    private function buildCancelHref(array $params): string
+    {
+        $redirectUri = is_string($params['redirect_uri'] ?? null) ? $params['redirect_uri'] : '';
+        $state = is_string($params['state'] ?? null) ? $params['state'] : '';
+
+        if ($redirectUri === '') {
+            return '/';
+        }
+
+        $cancelParams = ['error' => 'access_denied'];
+        if ($state !== '') {
+            $cancelParams['state'] = $state;
+        }
+
+        $separator = str_contains($redirectUri, '?') ? '&' : '?';
+
+        return htmlspecialchars($redirectUri . $separator . http_build_query($cancelParams), ENT_QUOTES, 'UTF-8');
     }
 
     private function resolveIpAddress(ServerRequestInterface $request): string

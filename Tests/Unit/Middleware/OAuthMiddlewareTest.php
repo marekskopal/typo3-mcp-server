@@ -6,6 +6,7 @@ namespace MarekSkopal\MsMcpServer\Tests\Unit\Middleware;
 
 use MarekSkopal\MsMcpServer\Middleware\OAuthMiddleware;
 use MarekSkopal\MsMcpServer\OAuth\AuthorizationService;
+use MarekSkopal\MsMcpServer\OAuth\AuthorizeParamsValidator;
 use MarekSkopal\MsMcpServer\OAuth\ClientRepository;
 use MarekSkopal\MsMcpServer\OAuth\RateLimitService;
 use MarekSkopal\MsMcpServer\Service\McpPathProvider;
@@ -18,15 +19,32 @@ use Psr\Http\Message\StreamFactoryInterface;
 use Psr\Http\Message\StreamInterface;
 use Psr\Http\Message\UriInterface;
 use Psr\Http\Server\RequestHandlerInterface;
+use TYPO3\CMS\Core\Authentication\BackendUserAuthentication;
 use TYPO3\CMS\Core\Configuration\ExtensionConfiguration;
-use TYPO3\CMS\Core\Crypto\PasswordHashing\PasswordHashFactory;
-use TYPO3\CMS\Core\Database\ConnectionPool;
 
 #[CoversClass(OAuthMiddleware::class)]
 final class OAuthMiddlewareTest extends TestCase
 {
     /** @var list<string> */
     private array $capturedBodies = [];
+
+    /** @var array<string, string> */
+    private array $capturedHeaders = [];
+
+    private int $capturedStatusCode = 0;
+
+    protected function setUp(): void
+    {
+        $beUser = $this->createStub(BackendUserAuthentication::class);
+        $beUser->method('getUserId')->willReturn(null);
+        $beUser->method('getUserName')->willReturn(null);
+        $GLOBALS['BE_USER'] = $beUser;
+    }
+
+    protected function tearDown(): void
+    {
+        unset($GLOBALS['BE_USER']);
+    }
 
     public function testNonOAuthPathPassesThrough(): void
     {
@@ -108,6 +126,159 @@ final class OAuthMiddlewareTest extends TestCase
         $body = $this->capturedBodies[0] ?? '';
         self::assertStringContainsString('invalid_request', $body);
         self::assertStringContainsString('response_type', $body);
+    }
+
+    public function testAuthorizeGetUnauthenticatedRedirectsToBackendLogin(): void
+    {
+        $request = $this->createRequest('/mcp/oauth/authorize', 'GET');
+        $request->method('getQueryParams')->willReturn([
+            'response_type' => 'code',
+            'client_id' => 'client-abc',
+            'redirect_uri' => 'https://client.example/cb',
+            'code_challenge' => 'challenge-value',
+            'code_challenge_method' => 'S256',
+            'state' => 'opaque-state',
+        ]);
+
+        $clientRepository = $this->createStub(ClientRepository::class);
+        $clientRepository->method('findByClientId')->willReturn([
+            'client_id' => 'client-abc',
+            'client_name' => 'Test Client',
+            'redirect_uris' => ['https://client.example/cb'],
+        ]);
+        $clientRepository->method('validateRedirectUri')->willReturn(true);
+
+        $handler = $this->createMock(RequestHandlerInterface::class);
+        $handler->expects(self::never())->method('handle');
+
+        $middleware = $this->createMiddlewareWithCapture(clientRepository: $clientRepository);
+        $middleware->process($request, $handler);
+
+        self::assertSame(302, $this->capturedStatusCode);
+        $location = $this->capturedHeaders['Location'] ?? '';
+        self::assertStringStartsWith('/typo3/login?', $location);
+        self::assertStringContainsString('redirect=msmcpserver_oauth_bridge', $location);
+        self::assertStringContainsString('redirectParams%5Bclient_id%5D=client-abc', $location);
+        self::assertStringContainsString('redirectParams%5Bstate%5D=opaque-state', $location);
+    }
+
+    public function testAuthorizeGetAuthenticatedRendersConsentForm(): void
+    {
+        $beUser = $this->createStub(BackendUserAuthentication::class);
+        $beUser->method('getUserId')->willReturn(42);
+        $beUser->method('getUserName')->willReturn('editor');
+        $GLOBALS['BE_USER'] = $beUser;
+
+        $request = $this->createRequest('/mcp/oauth/authorize', 'GET');
+        $request->method('getQueryParams')->willReturn([
+            'response_type' => 'code',
+            'client_id' => 'client-abc',
+            'redirect_uri' => 'https://client.example/cb',
+            'code_challenge' => 'challenge-value',
+            'code_challenge_method' => 'S256',
+            'state' => 'opaque-state',
+        ]);
+
+        $clientRepository = $this->createStub(ClientRepository::class);
+        $clientRepository->method('findByClientId')->willReturn([
+            'client_id' => 'client-abc',
+            'client_name' => 'Test Client',
+            'redirect_uris' => ['https://client.example/cb'],
+        ]);
+        $clientRepository->method('validateRedirectUri')->willReturn(true);
+
+        $handler = $this->createMock(RequestHandlerInterface::class);
+        $handler->expects(self::never())->method('handle');
+
+        $middleware = $this->createMiddlewareWithCapture(clientRepository: $clientRepository);
+        $middleware->process($request, $handler);
+
+        $body = $this->capturedBodies[0] ?? '';
+        self::assertStringContainsString('Authorize MCP Access', $body);
+        self::assertStringContainsString('editor', $body);
+        self::assertStringContainsString('Test Client', $body);
+        self::assertStringContainsString('Authorize Access', $body);
+        self::assertStringNotContainsString('<input type="password"', $body);
+        self::assertStringNotContainsString('name="username"', $body);
+    }
+
+    public function testAuthorizePostWithoutBackendSessionReturns401(): void
+    {
+        $request = $this->createRequest('/mcp/oauth/authorize', 'POST');
+        $csrf = bin2hex(random_bytes(16));
+        $request->method('getCookieParams')->willReturn(['mcp_csrf' => $csrf]);
+        $request->method('getParsedBody')->willReturn([
+            'csrf_token' => $csrf,
+            'client_id' => 'client-abc',
+            'redirect_uri' => 'https://client.example/cb',
+            'code_challenge' => 'challenge-value',
+            'code_challenge_method' => 'S256',
+            'state' => 'opaque-state',
+        ]);
+
+        $clientRepository = $this->createStub(ClientRepository::class);
+        $clientRepository->method('validateRedirectUri')->willReturn(true);
+
+        $authorizationService = $this->createMock(AuthorizationService::class);
+        $authorizationService->expects(self::never())->method('createAuthorizationCode');
+
+        $handler = $this->createMock(RequestHandlerInterface::class);
+        $handler->expects(self::never())->method('handle');
+
+        $middleware = $this->createMiddlewareWithCapture(
+            clientRepository: $clientRepository,
+            authorizationService: $authorizationService,
+        );
+        $middleware->process($request, $handler);
+
+        self::assertSame(401, $this->capturedStatusCode);
+        $body = $this->capturedBodies[0] ?? '';
+        self::assertStringContainsString('login_required', $body);
+    }
+
+    public function testAuthorizePostSucceedsForAuthenticatedUser(): void
+    {
+        $beUser = $this->createStub(BackendUserAuthentication::class);
+        $beUser->method('getUserId')->willReturn(42);
+        $beUser->method('getUserName')->willReturn('editor');
+        $GLOBALS['BE_USER'] = $beUser;
+
+        $request = $this->createRequest('/mcp/oauth/authorize', 'POST');
+        $csrf = bin2hex(random_bytes(16));
+        $request->method('getCookieParams')->willReturn(['mcp_csrf' => $csrf]);
+        $request->method('getParsedBody')->willReturn([
+            'csrf_token' => $csrf,
+            'client_id' => 'client-abc',
+            'redirect_uri' => 'https://client.example/cb',
+            'code_challenge' => 'challenge-value',
+            'code_challenge_method' => 'S256',
+            'state' => 'opaque-state',
+        ]);
+
+        $clientRepository = $this->createStub(ClientRepository::class);
+        $clientRepository->method('validateRedirectUri')->willReturn(true);
+
+        $authorizationService = $this->createMock(AuthorizationService::class);
+        $authorizationService
+            ->expects(self::once())
+            ->method('createAuthorizationCode')
+            ->with('client-abc', 42, 'challenge-value', 'S256', 'https://client.example/cb')
+            ->willReturn('auth-code-xyz');
+
+        $handler = $this->createMock(RequestHandlerInterface::class);
+        $handler->expects(self::never())->method('handle');
+
+        $middleware = $this->createMiddlewareWithCapture(
+            clientRepository: $clientRepository,
+            authorizationService: $authorizationService,
+        );
+        $middleware->process($request, $handler);
+
+        self::assertSame(302, $this->capturedStatusCode);
+        $location = $this->capturedHeaders['Location'] ?? '';
+        self::assertStringContainsString('https://client.example/cb?', $location);
+        self::assertStringContainsString('code=auth-code-xyz', $location);
+        self::assertStringContainsString('state=opaque-state', $location);
     }
 
     public function testRegisterEndpointRequiresJsonContentType(): void
@@ -301,11 +472,12 @@ final class OAuthMiddlewareTest extends TestCase
 
     private function createMiddleware(string $basePath = '/mcp'): OAuthMiddleware
     {
+        $clientRepository = $this->createStub(ClientRepository::class);
+
         return new OAuthMiddleware(
             $this->createStub(AuthorizationService::class),
-            $this->createStub(ClientRepository::class),
-            $this->createStub(ConnectionPool::class),
-            $this->createStub(PasswordHashFactory::class),
+            $clientRepository,
+            new AuthorizeParamsValidator($clientRepository),
             $this->createPathProvider($basePath),
             $this->createStub(RateLimitService::class),
             $this->createStub(ResponseFactoryInterface::class),
@@ -313,8 +485,12 @@ final class OAuthMiddlewareTest extends TestCase
         );
     }
 
-    private function createMiddlewareWithCapture(?RateLimitService $rateLimitService = null, string $basePath = '/mcp'): OAuthMiddleware
-    {
+    private function createMiddlewareWithCapture(
+        ?RateLimitService $rateLimitService = null,
+        ?ClientRepository $clientRepository = null,
+        ?AuthorizationService $authorizationService = null,
+        string $basePath = '/mcp',
+    ): OAuthMiddleware {
         $stream = $this->createStub(StreamInterface::class);
 
         $streamFactory = $this->createStub(StreamFactoryInterface::class);
@@ -327,17 +503,30 @@ final class OAuthMiddlewareTest extends TestCase
         );
 
         $response = $this->createStub(ResponseInterface::class);
-        $response->method('withHeader')->willReturnSelf();
-        $response->method('withBody')->willReturnSelf();
+        $response->method('withHeader')->willReturnCallback(
+            function (string $name, $value) use (&$response): ResponseInterface {
+                $this->capturedHeaders[$name] = is_string($value) ? $value : implode(', ', (array) $value);
+
+                return $response;
+            },
+        );
+        $response->method('withBody')->willReturn($response);
 
         $responseFactory = $this->createStub(ResponseFactoryInterface::class);
-        $responseFactory->method('createResponse')->willReturn($response);
+        $responseFactory->method('createResponse')->willReturnCallback(
+            function (int $statusCode = 200) use ($response): ResponseInterface {
+                $this->capturedStatusCode = $statusCode;
+
+                return $response;
+            },
+        );
+
+        $clientRepositoryResolved = $clientRepository ?? $this->createStub(ClientRepository::class);
 
         return new OAuthMiddleware(
-            $this->createStub(AuthorizationService::class),
-            $this->createStub(ClientRepository::class),
-            $this->createStub(ConnectionPool::class),
-            $this->createStub(PasswordHashFactory::class),
+            $authorizationService ?? $this->createStub(AuthorizationService::class),
+            $clientRepositoryResolved,
+            new AuthorizeParamsValidator($clientRepositoryResolved),
             $this->createPathProvider($basePath),
             $rateLimitService ?? $this->createStub(RateLimitService::class),
             $responseFactory,
