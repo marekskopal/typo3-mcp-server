@@ -16,6 +16,25 @@ use TYPO3\CMS\Core\Resource\StorageRepository;
 #[CoversClass(FileService::class)]
 final class FileServiceTest extends TestCase
 {
+    public function testStorageEvaluatesPermissionsForBackendUser(): void
+    {
+        $folder = $this->createStub(Folder::class);
+
+        $storage = $this->createMock(ResourceStorage::class);
+        $storage->expects(self::once())->method('setEvaluatePermissions')->with(true);
+        $storage->method('getFolder')->willReturn($folder);
+        $storage->method('getFilesInFolder')->willReturn([]);
+        $storage->method('getFoldersInFolder')->willReturn([]);
+        $storage->method('countFilesInFolder')->willReturn(0);
+        $storage->method('countFoldersInFolder')->willReturn(0);
+
+        $storageRepository = $this->createStub(StorageRepository::class);
+        $storageRepository->method('findByUid')->willReturn($storage);
+
+        $service = new FileService($storageRepository, $this->createStub(ConnectionPool::class));
+        $service->listDirectory(1, '/', 20, 0);
+    }
+
     public function testListDirectoryReturnsFilesAndDirectories(): void
     {
         $file = $this->createStub(File::class);

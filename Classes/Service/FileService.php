@@ -448,6 +448,12 @@ readonly class FileService
             throw new \RuntimeException('Storage not found: ' . $storageUid, 1712002000);
         }
 
+        // A storage obtained programmatically defaults to evaluatePermissions=false, which
+        // makes every file/folder action permission check pass unconditionally. Enable it so
+        // the bootstrapped backend user's filemounts and file-operation permissions are
+        // enforced (admins still bypass, as TYPO3 intends).
+        $storage->setEvaluatePermissions(true);
+
         return $storage;
     }
 
