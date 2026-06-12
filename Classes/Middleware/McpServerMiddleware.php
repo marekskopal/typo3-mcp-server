@@ -17,6 +17,7 @@ use Psr\Http\Message\ServerRequestInterface;
 use Psr\Http\Message\StreamFactoryInterface;
 use Psr\Http\Server\MiddlewareInterface;
 use Psr\Http\Server\RequestHandlerInterface;
+use TYPO3\CMS\Core\Http\NormalizedParams;
 use const JSON_THROW_ON_ERROR;
 
 readonly class McpServerMiddleware implements MiddlewareInterface
@@ -117,13 +118,7 @@ readonly class McpServerMiddleware implements MiddlewareInterface
 
     private function createUnauthorizedResponse(ServerRequestInterface $request, string $error): ResponseInterface
     {
-        $uri = $request->getUri();
-        $baseUrl = $uri->getScheme() . '://' . $uri->getHost();
-        if ($uri->getPort() !== null) {
-            $baseUrl .= ':' . $uri->getPort();
-        }
-
-        $resourceMetadataUrl = $baseUrl . $this->pathProvider->getResourceMetadataPath();
+        $resourceMetadataUrl = $this->resolveBaseUrl($request) . $this->pathProvider->getResourceMetadataPath();
 
         $body = $this->streamFactory->createStream(json_encode(['error' => $error], JSON_THROW_ON_ERROR));
 
@@ -132,6 +127,30 @@ readonly class McpServerMiddleware implements MiddlewareInterface
             ->withHeader('Content-Type', 'application/json')
             ->withHeader('WWW-Authenticate', sprintf('Bearer resource_metadata="%s"', $resourceMetadataUrl))
             ->withBody($body);
+    }
+
+    /**
+     * The 401 advertises a resource_metadata URL that RFC 9728-aware clients use to bootstrap
+     * OAuth discovery. Prefer NormalizedParams::getHttpHost(), which TYPO3 validates against
+     * trustedHostsPattern, so a forged Host header cannot redirect discovery to an attacker
+     * origin. Fall back to the request URI only when normalizedParams is unavailable.
+     */
+    private function resolveBaseUrl(ServerRequestInterface $request): string
+    {
+        $normalizedParams = $request->getAttribute('normalizedParams');
+        if ($normalizedParams instanceof NormalizedParams) {
+            // getRequestHost() is "scheme://host[:port]" with the host validated against
+            // TYPO3's trustedHostsPattern.
+            return rtrim($normalizedParams->getRequestHost(), '/');
+        }
+
+        $uri = $request->getUri();
+        $baseUrl = $uri->getScheme() . '://' . $uri->getHost();
+        if ($uri->getPort() !== null) {
+            $baseUrl .= ':' . $uri->getPort();
+        }
+
+        return $baseUrl;
     }
 
     private function withCorsHeaders(ResponseInterface $response): ResponseInterface
