@@ -18,6 +18,7 @@ use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use Psr\Http\Message\StreamFactoryInterface;
 use Psr\Http\Message\StreamInterface;
+use Psr\Log\NullLogger;
 use Psr\Http\Message\UriInterface;
 use Psr\Http\Server\RequestHandlerInterface;
 use TYPO3\CMS\Core\Authentication\BackendUserAuthentication;
@@ -487,6 +488,8 @@ final class OAuthMiddlewareTest extends TestCase
 
         $body = $this->capturedBodies[0] ?? '';
         self::assertStringContainsString('invalid_grant', $body);
+        // The specific failure reason must not leak to the client.
+        self::assertStringNotContainsString('Unsupported grant type', $body);
     }
 
     /** @return ServerRequestInterface&\PHPUnit\Framework\MockObject\Stub */
@@ -646,6 +649,7 @@ final class OAuthMiddlewareTest extends TestCase
             $this->createStub(RateLimitService::class),
             $this->createStub(ResponseFactoryInterface::class),
             $this->createStub(StreamFactoryInterface::class),
+            new NullLogger(),
         );
     }
 
@@ -696,6 +700,7 @@ final class OAuthMiddlewareTest extends TestCase
             $rateLimitService ?? $this->createStub(RateLimitService::class),
             $responseFactory,
             $streamFactory,
+            new NullLogger(),
         );
     }
 

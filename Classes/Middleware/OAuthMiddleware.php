@@ -16,6 +16,7 @@ use Psr\Http\Message\ServerRequestInterface;
 use Psr\Http\Message\StreamFactoryInterface;
 use Psr\Http\Server\MiddlewareInterface;
 use Psr\Http\Server\RequestHandlerInterface;
+use Psr\Log\LoggerInterface;
 use TYPO3\CMS\Core\Authentication\BackendUserAuthentication;
 use TYPO3\CMS\Core\Http\NormalizedParams;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
@@ -48,6 +49,7 @@ readonly class OAuthMiddleware implements MiddlewareInterface
         private RateLimitService $rateLimitService,
         private ResponseFactoryInterface $responseFactory,
         private StreamFactoryInterface $streamFactory,
+        private LoggerInterface $logger,
     ) {
     }
 
@@ -276,7 +278,14 @@ readonly class OAuthMiddleware implements MiddlewareInterface
                 default => throw new \RuntimeException('Unsupported grant type', 1712100040),
             };
         } catch (\RuntimeException $e) {
-            return $this->createJsonResponse(400, ['error' => 'invalid_grant', 'error_description' => $e->getMessage()]);
+            // Log the specific failure server-side, but return a single generic invalid_grant
+            // so the client can't tell unknown vs. expired vs. mismatched-client vs. failed-PKCE.
+            $this->logger->info('OAuth token request rejected', ['reason' => $e->getMessage(), 'grant_type' => $grantType]);
+
+            return $this->createJsonResponse(400, [
+                'error' => 'invalid_grant',
+                'error_description' => 'The authorization grant is invalid, expired, or revoked.',
+            ]);
         }
 
         return $this->createJsonResponse(200, [
