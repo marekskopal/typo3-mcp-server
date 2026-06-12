@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+## [0.12.2] - 2026-06-12
+
+Re-release of 0.12.1. **Use 0.12.2, not 0.12.1** — the 0.12.1 tag was first pushed at a commit whose integration tests failed; the fix below moved the tag, but Packagist pins a tag to its original commit and won't pick up a moved tag, so this is published as a new patch. 0.12.2 contains everything in 0.12.1 (see below) plus the fixes here. The `database:updateschema` note from 0.12.1 still applies.
+
+### Fixed
+- **Record search tools** (`record_search`, `pages_search`, `content_search`, `backend_user_list`, `backend_group_list`) failed against a real database. TYPO3's `ExpressionBuilder` already quotes field identifiers, so the defense-in-depth `quoteIdentifier()` call added in 0.12.1 double-quoted them and produced invalid SQL. Reverted — the field names were already safe. (LIKE wildcard escaping of the *value* is unaffected and retained.)
+- **File and directory tools** were denied for every user, including admins. 0.12.1 forced `evaluatePermissions` on a storage resolved via `StorageRepository`, which has no filemounts attached, so all actions fell outside the (empty) filemount boundaries. Storages are now resolved through `BackendUserAuthentication::getFileStorages()`, which returns only the user's accessible storages already configured with their filemounts and permission evaluation (admins get every storage with full access) — preserving the filemount enforcement intended in 0.12.1 without breaking access.
+
 ## [0.12.1] - 2026-06-12
 
 Security-hardening release from a full audit of the OAuth layer, MCP request path, tools/services, and file operations. **Run `vendor/bin/typo3 database:updateschema` after upgrading** — this release adds a `be_user` column to `tx_msmcpserver_mcp_session` and a `token_family` column to `tx_msmcpserver_oauth_authorization`.
