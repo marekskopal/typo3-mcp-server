@@ -150,7 +150,7 @@ final class McpServerFactoryTest extends TestCase
             new FileReferenceRemoveTool($dataHandlerService),
             new FileUploadFromUrlTool($fileService),
             new FileSearchTool($fileService),
-            new TableSchemaTool($tcaSchemaService),
+            new TableSchemaTool($tcaSchemaService, $this->createStub(PermissionService::class)),
             new RecordSearchTool($recordService, $tcaSchemaService),
             new RecordCountTool($recordService, $tcaSchemaService),
             new SiteLanguagesTool($siteLanguageService),
@@ -213,7 +213,7 @@ final class McpServerFactoryTest extends TestCase
             $resources,
             $prompts,
         );
-        $server = $factory->create();
+        $server = $factory->create(42);
 
         self::assertInstanceOf(Server::class, $server);
     }

@@ -52,6 +52,7 @@ CREATE TABLE tx_msmcpserver_mcp_session (
     uid int(11) unsigned NOT NULL AUTO_INCREMENT,
     pid int(11) unsigned DEFAULT '0' NOT NULL,
     session_id varchar(36) DEFAULT '' NOT NULL,
+    be_user int(11) unsigned DEFAULT '0' NOT NULL,
     data mediumblob,
     last_activity int(11) unsigned DEFAULT '0' NOT NULL,
     crdate int(11) unsigned DEFAULT '0' NOT NULL,

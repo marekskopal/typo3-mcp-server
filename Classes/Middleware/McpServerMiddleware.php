@@ -54,7 +54,7 @@ readonly class McpServerMiddleware implements MiddlewareInterface
             return $this->withCorsHeaders($this->createUnauthorizedResponse($request, 'Authentication failed'));
         }
 
-        $server = $this->mcpServerFactory->create();
+        $server = $this->mcpServerFactory->create($beUserUid);
         // Opt out of the SDK's default DnsRebindingProtectionMiddleware: it only allows
         // localhost Host/Origin and would 403 every request to a real TYPO3 deployment.
         // Bearer-token auth above is the actual protection here.

@@ -21,6 +21,7 @@ final class McpSessionRepositoryTest extends TestCase
     {
         $row = [
             'session_id' => '11111111-1111-1111-1111-111111111111',
+            'be_user' => 42,
             'data' => 'serialized-payload',
             'last_activity' => 1_700_000_000,
         ];
@@ -53,6 +54,7 @@ final class McpSessionRepositoryTest extends TestCase
 
         $row = [
             'session_id' => 'abc',
+            'be_user' => 7,
             'data' => $stream,
             'last_activity' => 100,
         ];
@@ -94,6 +96,7 @@ final class McpSessionRepositoryTest extends TestCase
                 'tx_msmcpserver_mcp_session',
                 [
                     'session_id' => 'abc',
+                    'be_user' => 42,
                     'data' => 'data',
                     'last_activity' => 1_700_000_000,
                     'crdate' => 1_700_000_000,
@@ -105,7 +108,7 @@ final class McpSessionRepositoryTest extends TestCase
         $connectionPool->method('getConnectionForTable')->willReturn($connection);
 
         $repository = new McpSessionRepository($connectionPool);
-        $repository->upsert('abc', 'data', 1_700_000_000);
+        $repository->upsert('abc', 42, 'data', 1_700_000_000);
     }
 
     public function testUpsertFallsBackToUpdateOnDuplicateKey(): void
@@ -127,7 +130,7 @@ final class McpSessionRepositoryTest extends TestCase
         $connectionPool->method('getConnectionForTable')->willReturn($connection);
 
         $repository = new McpSessionRepository($connectionPool);
-        $repository->upsert('abc', 'data', 1_700_000_000);
+        $repository->upsert('abc', 42, 'data', 1_700_000_000);
     }
 
     public function testDeleteReturnsTrueWhenRowRemoved(): void

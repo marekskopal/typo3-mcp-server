@@ -54,9 +54,9 @@ readonly class McpServerFactory
         $this->sessionLifetime = $resolved > 0 ? $resolved : self::DEFAULT_SESSION_LIFETIME;
     }
 
-    public function create(): Server
+    public function create(int $beUserUid): Server
     {
-        $sessionStore = new DatabaseSessionStore($this->sessionRepository, $this->sessionLifetime);
+        $sessionStore = new DatabaseSessionStore($this->sessionRepository, $this->sessionLifetime, $beUserUid);
 
         $handlerTypes = $this->buildHandlerTypeMap();
         $errorHandlingContainer = new ErrorHandlingContainer($this->container, $this->logger, $this->auditLogger, $handlerTypes);

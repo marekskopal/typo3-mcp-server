@@ -16,14 +16,14 @@ readonly class McpSessionRepository
     {
     }
 
-    /** @return array{session_id: string, data: string, last_activity: int}|null */
+    /** @return array{session_id: string, be_user: int, data: string, last_activity: int}|null */
     public function findBySessionId(string $sessionId): ?array
     {
         $queryBuilder = $this->connectionPool->getQueryBuilderForTable(self::TABLE);
 
-        /** @var array{session_id: string, data: string|resource|null, last_activity: int}|false $row */
+        /** @var array{session_id: string, be_user: int|string, data: string|resource|null, last_activity: int}|false $row */
         $row = $queryBuilder
-            ->select('session_id', 'data', 'last_activity')
+            ->select('session_id', 'be_user', 'data', 'last_activity')
             ->from(self::TABLE)
             ->where($queryBuilder->expr()->eq('session_id', $queryBuilder->createNamedParameter($sessionId)))
             ->executeQuery()
@@ -38,6 +38,7 @@ readonly class McpSessionRepository
 
         return [
             'session_id' => $row['session_id'],
+            'be_user' => (int) $row['be_user'],
             'data' => $data,
             'last_activity' => $row['last_activity'],
         ];
@@ -53,7 +54,7 @@ readonly class McpSessionRepository
         );
     }
 
-    public function upsert(string $sessionId, string $data, int $now): void
+    public function upsert(string $sessionId, int $beUser, string $data, int $now): void
     {
         $connection = $this->connectionPool->getConnectionForTable(self::TABLE);
 
@@ -62,6 +63,7 @@ readonly class McpSessionRepository
                 self::TABLE,
                 [
                     'session_id' => $sessionId,
+                    'be_user' => $beUser,
                     'data' => $data,
                     'last_activity' => $now,
                     'crdate' => $now,

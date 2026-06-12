@@ -48,7 +48,7 @@ class McpServerCommand extends Command
 
         $this->backendUserBootstrap->bootstrap($beUserUid);
 
-        $server = $this->mcpServerFactory->create();
+        $server = $this->mcpServerFactory->create($beUserUid);
         $transport = new StdioTransport(STDIN, STDOUT, $this->logger);
 
         return $server->run($transport);
