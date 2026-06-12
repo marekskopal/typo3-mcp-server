@@ -25,7 +25,7 @@ Security-hardening release from a full audit of the OAuth layer, MCP request pat
 - **`WWW-Authenticate` metadata URL is derived from the trustedHostsPattern-validated host** rather than the raw `Host` header.
 - **Audit-log writes hardened**: the error message is kept out of the `details` format string and stripped of control characters, and failures are logged at level `error`.
 - **Rate limiting no longer fails open** when the client IP is unresolved (such requests are bucketed under a shared key), and **LIKE search wildcards are escaped**.
-- **Defense-in-depth**: condition field identifiers are quoted in `RecordService`; loopback redirect URIs must match the query string (only the port may vary); batch UID lists are capped (500) and negative pagination offsets clamped.
+- **Defense-in-depth**: loopback redirect URIs must match the query string (only the port may vary); batch UID lists are capped (500) and negative pagination offsets clamped.
 
 ### Fixed
 - A malformed `Mcp-Session-Id` header returned HTTP 500 (uncaught `Uuid::fromString` exception); it now returns a clean 400.

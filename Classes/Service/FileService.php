@@ -6,6 +6,7 @@ namespace MarekSkopal\MsMcpServer\Service;
 
 use CurlHandle;
 use Doctrine\DBAL\ParameterType;
+use TYPO3\CMS\Core\Authentication\BackendUserAuthentication;
 use TYPO3\CMS\Core\Database\ConnectionPool;
 use TYPO3\CMS\Core\Resource\File;
 use TYPO3\CMS\Core\Resource\Folder;
@@ -442,17 +443,26 @@ readonly class FileService
 
     private function getStorage(int $storageUid): ResourceStorage
     {
-        $storage = $this->storageRepository->findByUid($storageUid);
+        // Resolve through the backend user's accessible storages rather than StorageRepository
+        // directly: getFileStorages() returns only the storages the user may use, each already
+        // configured with the user's filemounts and permission evaluation (admins get every
+        // storage with full access). This enforces filemounts/file-operation rights instead of
+        // the unrestricted storage a programmatic lookup would return.
+        $backendUser = $GLOBALS['BE_USER'] ?? null;
+        if ($backendUser instanceof BackendUserAuthentication) {
+            $storage = $backendUser->getFileStorages()[$storageUid] ?? null;
+            if ($storage instanceof ResourceStorage) {
+                return $storage;
+            }
 
+            throw new \RuntimeException('Storage not found or not accessible: ' . $storageUid, 1712002000);
+        }
+
+        // No backend-user context (not reachable on the authenticated tool paths).
+        $storage = $this->storageRepository->findByUid($storageUid);
         if ($storage === null) {
             throw new \RuntimeException('Storage not found: ' . $storageUid, 1712002000);
         }
-
-        // A storage obtained programmatically defaults to evaluatePermissions=false, which
-        // makes every file/folder action permission check pass unconditionally. Enable it so
-        // the bootstrapped backend user's filemounts and file-operation permissions are
-        // enforced (admins still bypass, as TYPO3 intends).
-        $storage->setEvaluatePermissions(true);
 
         return $storage;
     }

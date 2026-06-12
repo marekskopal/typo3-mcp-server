@@ -7,6 +7,7 @@ namespace MarekSkopal\MsMcpServer\Tests\Unit\Service;
 use MarekSkopal\MsMcpServer\Service\FileService;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
+use TYPO3\CMS\Core\Authentication\BackendUserAuthentication;
 use TYPO3\CMS\Core\Database\ConnectionPool;
 use TYPO3\CMS\Core\Resource\File;
 use TYPO3\CMS\Core\Resource\Folder;
@@ -16,23 +17,51 @@ use TYPO3\CMS\Core\Resource\StorageRepository;
 #[CoversClass(FileService::class)]
 final class FileServiceTest extends TestCase
 {
-    public function testStorageEvaluatesPermissionsForBackendUser(): void
+    public function testResolvesStorageThroughBackendUserAccessibleStorages(): void
     {
         $folder = $this->createStub(Folder::class);
 
-        $storage = $this->createMock(ResourceStorage::class);
-        $storage->expects(self::once())->method('setEvaluatePermissions')->with(true);
+        $storage = $this->createStub(ResourceStorage::class);
         $storage->method('getFolder')->willReturn($folder);
         $storage->method('getFilesInFolder')->willReturn([]);
         $storage->method('getFoldersInFolder')->willReturn([]);
         $storage->method('countFilesInFolder')->willReturn(0);
         $storage->method('countFoldersInFolder')->willReturn(0);
 
-        $storageRepository = $this->createStub(StorageRepository::class);
-        $storageRepository->method('findByUid')->willReturn($storage);
+        $backendUser = $this->createStub(BackendUserAuthentication::class);
+        $backendUser->method('getFileStorages')->willReturn([7 => $storage]);
+        $GLOBALS['BE_USER'] = $backendUser;
 
-        $service = new FileService($storageRepository, $this->createStub(ConnectionPool::class));
-        $service->listDirectory(1, '/', 20, 0);
+        try {
+            // StorageRepository must NOT be consulted when a backend user is present.
+            $storageRepository = $this->createMock(StorageRepository::class);
+            $storageRepository->expects(self::never())->method('findByUid');
+
+            $service = new FileService($storageRepository, $this->createStub(ConnectionPool::class));
+            $result = $service->listDirectory(7, '/', 20, 0);
+
+            self::assertSame(0, $result['totalFiles']);
+        } finally {
+            unset($GLOBALS['BE_USER']);
+        }
+    }
+
+    public function testThrowsWhenStorageNotAccessibleToBackendUser(): void
+    {
+        $backendUser = $this->createStub(BackendUserAuthentication::class);
+        $backendUser->method('getFileStorages')->willReturn([]);
+        $GLOBALS['BE_USER'] = $backendUser;
+
+        try {
+            $service = new FileService($this->createStub(StorageRepository::class), $this->createStub(ConnectionPool::class));
+
+            $this->expectException(\RuntimeException::class);
+            $this->expectExceptionMessage('Storage not found or not accessible: 7');
+
+            $service->listDirectory(7, '/', 20, 0);
+        } finally {
+            unset($GLOBALS['BE_USER']);
+        }
     }
 
     public function testListDirectoryReturnsFilesAndDirectories(): void
