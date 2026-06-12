@@ -6,6 +6,36 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+## [0.12.1] - 2026-06-12
+
+Security-hardening release from a full audit of the OAuth layer, MCP request path, tools/services, and file operations. **Run `vendor/bin/typo3 database:updateschema` after upgrading** — this release adds a `be_user` column to `tx_msmcpserver_mcp_session` and a `token_family` column to `tx_msmcpserver_oauth_authorization`.
+
+### Security
+- **Record reads now enforce `tables_select`.** `RecordService` read methods (`findByUid`, `findByPid`, `search`, `count`) removed all query restrictions, so any authenticated MCP user could read every TCA table via `record_search`/`record_count`/`table_schema` and the generic get/list tools — including `be_users` and `fe_users` — bypassing the admin gate on the dedicated backend-user tools. All read paths and `table_schema` now check the backend user's `tables_select` grant (admins pass automatically).
+- **File operations now enforce filemount permissions.** `FileService::getStorage()` returned a `ResourceStorage` with `evaluatePermissions = false`, so a restricted editor could list/read/upload/move/rename/copy/delete files in any storage and path. `setEvaluatePermissions(true)` is now set so FAL honours the user's filemounts and file-operation rights.
+- **MCP sessions are bound to the authenticated user.** The session table gained a `be_user` column; `exists`/`read`/`destroy` now refuse a session owned by a different backend user, closing cross-user session-state tampering / DoS via a leaked session id.
+- **Refresh-token reuse revokes the whole token family.** Token pairs are tagged with a `token_family` inherited across rotations; replaying an already-revoked refresh token now revokes every token in that family (OAuth 2.1 §6.1).
+- **PKCE is validated on the authorize POST**, not just the GET — a crafted POST could previously mint an authorization code bound to an empty or non-S256 challenge.
+- **Dynamic client registration validates `redirect_uris`** (RFC 8252: https / http-loopback / reverse-domain private scheme only; count and length capped) instead of storing arbitrary values.
+- **Consent screen hardened** with `X-Frame-Options: DENY`, CSP `frame-ancestors 'none'`, `Cache-Control: no-store`, and `X-Content-Type-Options: nosniff` (anti-clickjacking / no-cache).
+- **`be_users` `starttime`/`endtime` enforced** when bootstrapping a backend user from a token, so a token for a time-limited account stops working outside its validity window.
+- **Registrar-based tools** (dynamic table CRUD, redirects, scheduler, workspaces) are now audit-logged like attribute tools, and no longer relay raw exception messages to the client.
+- **Raw exception messages are no longer leaked** to MCP clients (`ErrorHandlingProxy` returns a generic message; full detail is logged server-side).
+- **Token endpoint returns a generic `invalid_grant`** instead of distinct per-step error strings (enumeration oracle); the specific reason is logged server-side.
+- **`WWW-Authenticate` metadata URL is derived from the trustedHostsPattern-validated host** rather than the raw `Host` header.
+- **Audit-log writes hardened**: the error message is kept out of the `details` format string and stripped of control characters, and failures are logged at level `error`.
+- **Rate limiting no longer fails open** when the client IP is unresolved (such requests are bucketed under a shared key), and **LIKE search wildcards are escaped**.
+- **Defense-in-depth**: condition field identifiers are quoted in `RecordService`; loopback redirect URIs must match the query string (only the port may vary); batch UID lists are capped (500) and negative pagination offsets clamped.
+
+### Fixed
+- A malformed `Mcp-Session-Id` header returned HTTP 500 (uncaught `Uuid::fromString` exception); it now returns a clean 400.
+
+### Documentation
+- README Tools Reference now documents the Permissions (`permission_check_*`), Redirects (`redirect_*`), and Scheduler (`scheduler_*`) tools, and corrects the dynamic extension tools from 6 to 9 per table (the `*_delete_batch` / `*_update_batch` / `*_move_batch` variants).
+
+### Internal
+- **Tests grew from 637 to 660.** PHPStan max + PHPCS green. Shared helpers extracted for registrar tool execution (`RegistrarToolRunner`) and batch UID parsing (`UidListParser`).
+
 ## [0.12.0] - 2026-06-02
 
 ### Changed
