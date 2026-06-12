@@ -90,6 +90,7 @@ readonly class RecordService
         $this->assertReadAccess($table);
 
         $limit = min(max($limit, 1), 500);
+        $offset = max($offset, 0);
 
         $queryBuilder = $this->connectionPool->getQueryBuilderForTable($table);
         $queryBuilder->getRestrictions()->removeAll();
@@ -157,6 +158,7 @@ readonly class RecordService
         $this->assertReadAccess($table);
 
         $limit = min(max($limit, 1), 500);
+        $offset = max($offset, 0);
 
         if (!in_array($orderDirection, ['ASC', 'DESC'], true)) {
             $orderDirection = 'ASC';

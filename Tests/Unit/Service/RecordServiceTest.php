@@ -339,6 +339,46 @@ final class RecordServiceTest extends TestCase
         self::assertContains('%50\\%\\_x%', $captured);
     }
 
+    public function testFindByPidClampsNegativeOffsetToZero(): void
+    {
+        $countResult = $this->createStub(Result::class);
+        $countResult->method('fetchOne')->willReturn(0);
+        $listResult = $this->createStub(Result::class);
+        $listResult->method('fetchAllAssociative')->willReturn([]);
+
+        $capturedOffsets = [];
+
+        $queryBuilder = $this->createQueryBuilderStub();
+        $queryBuilder->method('select')->willReturnSelf();
+        $queryBuilder->method('count')->willReturnSelf();
+        $queryBuilder->method('from')->willReturnSelf();
+        $queryBuilder->method('where')->willReturnSelf();
+        $queryBuilder->method('andWhere')->willReturnSelf();
+        $queryBuilder->method('setMaxResults')->willReturnSelf();
+        $queryBuilder->method('orderBy')->willReturnSelf();
+        $queryBuilder->method('setFirstResult')
+            ->willReturnCallback(function (int $offset) use (&$capturedOffsets, $queryBuilder): QueryBuilder {
+                $capturedOffsets[] = $offset;
+
+                return $queryBuilder;
+            });
+        $callCount = 0;
+        $queryBuilder->method('executeQuery')
+            ->willReturnCallback(function () use (&$callCount, $listResult, $countResult): Result {
+                $callCount++;
+
+                return $callCount === 1 ? $countResult : $listResult;
+            });
+
+        $connectionPool = $this->createStub(ConnectionPool::class);
+        $connectionPool->method('getQueryBuilderForTable')->willReturn($queryBuilder);
+
+        $service = new RecordService($connectionPool, new WorkspaceContextService(), $this->createAllowingPermissionService());
+        $service->findByPid('pages', 1, 20, -50, ['uid', 'title']);
+
+        self::assertSame([0], $capturedOffsets);
+    }
+
     public function testSearchQuotesConditionFieldIdentifiers(): void
     {
         $result = $this->createStub(Result::class);

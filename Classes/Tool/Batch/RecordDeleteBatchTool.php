@@ -6,6 +6,7 @@ namespace MarekSkopal\MsMcpServer\Tool\Batch;
 
 use MarekSkopal\MsMcpServer\Service\DataHandlerService;
 use MarekSkopal\MsMcpServer\Service\RecordService;
+use MarekSkopal\MsMcpServer\Tool\Helper\UidListParser;
 use MarekSkopal\MsMcpServer\Tool\Result\BatchRecordsDeletedResult;
 use Mcp\Capability\Attribute\McpTool;
 use Mcp\Exception\ToolCallException;
@@ -24,7 +25,7 @@ readonly class RecordDeleteBatchTool
     )]
     public function execute(string $tableName, string $uids): BatchRecordsDeletedResult
     {
-        $uidList = $this->parseUids($uids);
+        $uidList = UidListParser::parse($uids);
         $existingUids = $this->recordService->findExistingUids($tableName, $uidList);
 
         if ($existingUids === []) {
@@ -35,14 +36,5 @@ readonly class RecordDeleteBatchTool
         $this->dataHandlerService->deleteRecords($tableName, $existingUids);
 
         return new BatchRecordsDeletedResult($existingUids, count($existingUids), $skippedUids);
-    }
-
-    /** @return list<int> */
-    private function parseUids(string $uids): array
-    {
-        return array_values(array_filter(
-            array_map('intval', array_filter(explode(',', $uids), static fn(string $v): bool => $v !== '')),
-            static fn(int $v): bool => $v > 0,
-        ));
     }
 }

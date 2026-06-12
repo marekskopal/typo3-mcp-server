@@ -11,6 +11,7 @@ use MarekSkopal\MsMcpServer\Service\RecordService;
 use MarekSkopal\MsMcpServer\Service\TcaSchemaService;
 use MarekSkopal\MsMcpServer\Tool\Helper\MoveTarget;
 use MarekSkopal\MsMcpServer\Tool\Helper\RegistrarToolRunner;
+use MarekSkopal\MsMcpServer\Tool\Helper\UidListParser;
 use MarekSkopal\MsMcpServer\Tool\Result\BatchRecordsDeletedResult;
 use MarekSkopal\MsMcpServer\Tool\Result\BatchRecordsMovedResult;
 use MarekSkopal\MsMcpServer\Tool\Result\BatchRecordsUpdatedResult;
@@ -562,7 +563,7 @@ readonly class DynamicToolRegistrar
                     $auditLogger,
                     $logger,
                     static function () use ($recordService, $dataHandlerService, $tableName, $uids): BatchRecordsDeletedResult {
-                        $uidList = self::parseUids($uids);
+                        $uidList = UidListParser::parse($uids);
                         $existingUids = $recordService->findExistingUids($tableName, $uidList);
 
                         if ($existingUids === []) {
@@ -615,7 +616,7 @@ readonly class DynamicToolRegistrar
                     $uids,
                     $fields,
                 ): BatchRecordsUpdatedResult {
-                    $uidList = self::parseUids($uids);
+                    $uidList = UidListParser::parse($uids);
                     $existingUids = $recordService->findExistingUids($tableName, $uidList);
 
                     if ($existingUids === []) {
@@ -695,7 +696,7 @@ readonly class DynamicToolRegistrar
                         return $target;
                     }
 
-                    $uidList = self::parseUids($uids);
+                    $uidList = UidListParser::parse($uids);
                     $existingUids = $recordService->findExistingUids($tableName, $uidList);
 
                     if ($existingUids === []) {
@@ -716,14 +717,5 @@ readonly class DynamicToolRegistrar
                 . ' or afterUid (place all after that sibling record).'
                 . ' Non-existent UIDs are skipped and reported in skippedUids.',
         );
-    }
-
-    /** @return list<int> */
-    private static function parseUids(string $uids): array
-    {
-        return array_values(array_filter(
-            array_map('intval', array_filter(explode(',', $uids), static fn(string $v): bool => $v !== '')),
-            static fn(int $v): bool => $v > 0,
-        ));
     }
 }

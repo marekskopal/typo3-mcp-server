@@ -7,6 +7,7 @@ namespace MarekSkopal\MsMcpServer\Tool\Batch;
 use MarekSkopal\MsMcpServer\Service\DataHandlerService;
 use MarekSkopal\MsMcpServer\Service\RecordService;
 use MarekSkopal\MsMcpServer\Service\TcaSchemaService;
+use MarekSkopal\MsMcpServer\Tool\Helper\UidListParser;
 use MarekSkopal\MsMcpServer\Tool\Result\BatchRecordsUpdatedResult;
 use Mcp\Capability\Attribute\McpTool;
 use Mcp\Exception\ToolCallException;
@@ -30,7 +31,7 @@ readonly class RecordUpdateBatchTool
     )]
     public function execute(string $tableName, string $uids, string $fields): BatchRecordsUpdatedResult
     {
-        $uidList = $this->parseUids($uids);
+        $uidList = UidListParser::parse($uids);
         $existingUids = $this->recordService->findExistingUids($tableName, $uidList);
 
         if ($existingUids === []) {
@@ -66,14 +67,5 @@ readonly class RecordUpdateBatchTool
             $ignoredFields,
             $skippedUids,
         );
-    }
-
-    /** @return list<int> */
-    private function parseUids(string $uids): array
-    {
-        return array_values(array_filter(
-            array_map('intval', array_filter(explode(',', $uids), static fn(string $v): bool => $v !== '')),
-            static fn(int $v): bool => $v > 0,
-        ));
     }
 }
