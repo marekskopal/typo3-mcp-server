@@ -339,6 +339,42 @@ final class RecordServiceTest extends TestCase
         self::assertContains('%50\\%\\_x%', $captured);
     }
 
+    public function testSearchQuotesConditionFieldIdentifiers(): void
+    {
+        $result = $this->createStub(Result::class);
+        $result->method('fetchOne')->willReturn(0);
+        $result->method('fetchAllAssociative')->willReturn([]);
+
+        $quoted = [];
+
+        $queryBuilder = $this->createStub(QueryBuilder::class);
+        $queryBuilder->method('getRestrictions')->willReturn($this->createStub(QueryRestrictionContainerInterface::class));
+        $queryBuilder->method('expr')->willReturn($this->createStub(ExpressionBuilder::class));
+        $queryBuilder->method('createNamedParameter')->willReturn("'p'");
+        $queryBuilder->method('quoteIdentifier')
+            ->willReturnCallback(function (string $identifier) use (&$quoted): string {
+                $quoted[] = $identifier;
+
+                return '`' . $identifier . '`';
+            });
+        $queryBuilder->method('select')->willReturnSelf();
+        $queryBuilder->method('count')->willReturnSelf();
+        $queryBuilder->method('from')->willReturnSelf();
+        $queryBuilder->method('andWhere')->willReturnSelf();
+        $queryBuilder->method('setMaxResults')->willReturnSelf();
+        $queryBuilder->method('setFirstResult')->willReturnSelf();
+        $queryBuilder->method('orderBy')->willReturnSelf();
+        $queryBuilder->method('executeQuery')->willReturn($result);
+
+        $connectionPool = $this->createStub(ConnectionPool::class);
+        $connectionPool->method('getQueryBuilderForTable')->willReturn($queryBuilder);
+
+        $service = new RecordService($connectionPool, new WorkspaceContextService(), $this->createAllowingPermissionService());
+        $service->search('pages', ['title' => ['operator' => 'eq', 'value' => 'Home']], 20, 0, ['uid', 'title']);
+
+        self::assertContains('title', $quoted);
+    }
+
     public function testSearchWithEqOperator(): void
     {
         $expectedRecords = [['uid' => 1, 'title' => 'Home']];

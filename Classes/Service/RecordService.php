@@ -226,6 +226,11 @@ readonly class RecordService
         $value = $condition['value'];
         $expr = $queryBuilder->expr();
 
+        // Callers validate field names against the table's TCA, but the expr() methods below do
+        // not quote identifiers (unlike from()/orderBy()). Quote here so a future caller that
+        // skips validation cannot turn a field name into an injection vector.
+        $field = $queryBuilder->quoteIdentifier($field);
+
         $queryBuilder->andWhere(match ($operator) {
             'eq' => $expr->eq($field, $queryBuilder->createNamedParameter($value)),
             'neq' => $expr->neq($field, $queryBuilder->createNamedParameter($value)),
