@@ -110,7 +110,8 @@ readonly class AuthorizationService
             throw new \RuntimeException('PKCE verification failed', 1712100015);
         }
 
-        $tokenPair = $this->issueTokenPair($clientId, (int) $row['be_user']);
+        // Start a new token family for this authorization; rotated refresh tokens inherit it.
+        $tokenPair = $this->issueTokenPair($clientId, (int) $row['be_user'], bin2hex(random_bytes(16)));
 
         // Clear authorization code after successful exchange
         $connection = $this->connectionPool->getConnectionForTable(self::TABLE);
@@ -129,9 +130,9 @@ readonly class AuthorizationService
         $queryBuilder = $this->connectionPool->getQueryBuilderForTable(self::TABLE);
         $queryBuilder->getRestrictions()->removeAll();
 
-        /** @var array{uid: int|string, client_id: string, be_user: int|string, refresh_token_expires: int|string, revoked: int|string}|false $row */
+        /** @var array{uid: int|string, client_id: string, be_user: int|string, token_family: string, refresh_token_expires: int|string, revoked: int|string}|false $row */
         $row = $queryBuilder
-            ->select('uid', 'client_id', 'be_user', 'refresh_token_expires', 'revoked')
+            ->select('uid', 'client_id', 'be_user', 'token_family', 'refresh_token_expires', 'revoked')
             ->from(self::TABLE)
             ->where(
                 $queryBuilder->expr()->eq('refresh_token_hash', $queryBuilder->createNamedParameter($refreshTokenHash)),
@@ -144,6 +145,11 @@ readonly class AuthorizationService
         }
 
         if ((int) $row['revoked'] === 1) {
+            // The refresh token was already rotated or revoked, yet it's being presented again:
+            // treat this as token theft (OAuth 2.1 §6.1) and revoke the whole token family so
+            // the descendant tokens issued from it can no longer be used either.
+            $this->revokeFamily($row['token_family']);
+
             throw new \RuntimeException('Refresh token has been revoked', 1712100021);
         }
 
@@ -161,7 +167,18 @@ readonly class AuthorizationService
             'revoked' => 1,
         ], ['uid' => (int) $row['uid']]);
 
-        return $this->issueTokenPair($clientId, (int) $row['be_user']);
+        return $this->issueTokenPair($clientId, (int) $row['be_user'], $row['token_family']);
+    }
+
+    /** Revoke every active token in a family. No-op for legacy rows with an empty family. */
+    private function revokeFamily(string $tokenFamily): void
+    {
+        if ($tokenFamily === '') {
+            return;
+        }
+
+        $connection = $this->connectionPool->getConnectionForTable(self::TABLE);
+        $connection->update(self::TABLE, ['revoked' => 1], ['token_family' => $tokenFamily]);
     }
 
     public function validateAccessToken(string $accessToken): int
@@ -232,7 +249,7 @@ readonly class AuthorizationService
         ], ['uid' => (int) $row['uid']]);
     }
 
-    private function issueTokenPair(string $clientId, int $beUserUid): OAuthTokenPair
+    private function issueTokenPair(string $clientId, int $beUserUid, string $tokenFamily): OAuthTokenPair
     {
         $accessToken = bin2hex(random_bytes(32));
         $refreshToken = bin2hex(random_bytes(32));
@@ -243,6 +260,7 @@ readonly class AuthorizationService
             'be_user' => $beUserUid,
             'access_token_hash' => hash('sha256', $accessToken),
             'refresh_token_hash' => hash('sha256', $refreshToken),
+            'token_family' => $tokenFamily,
             'access_token_expires' => time() + $this->accessTokenLifetime,
             'refresh_token_expires' => time() + $this->refreshTokenLifetime,
         ]);

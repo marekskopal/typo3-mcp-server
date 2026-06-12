@@ -128,6 +128,7 @@ final class AuthorizationServiceTest extends TestCase
             'uid' => 1,
             'client_id' => 'client-123',
             'be_user' => 42,
+            'token_family' => 'fam-1',
             'refresh_token_expires' => time() + 3600,
             'revoked' => 1,
         ];
@@ -145,6 +146,37 @@ final class AuthorizationServiceTest extends TestCase
         $this->expectExceptionCode(1712100021);
 
         $service->refreshToken('some-refresh-token', 'client-123');
+    }
+
+    public function testRefreshTokenReuseRevokesEntireFamily(): void
+    {
+        $row = [
+            'uid' => 1,
+            'client_id' => 'client-123',
+            'be_user' => 42,
+            'token_family' => 'fam-1',
+            'refresh_token_expires' => time() + 3600,
+            'revoked' => 1,
+        ];
+
+        $connection = $this->createMock(Connection::class);
+        $connection->expects(self::once())
+            ->method('update')
+            ->with('tx_msmcpserver_oauth_authorization', ['revoked' => 1], ['token_family' => 'fam-1']);
+
+        $connectionPool = $this->createConnectionPoolWithQueryAndConnection($row, $connection);
+
+        $service = new AuthorizationService(
+            $connectionPool,
+            new PkceVerifier(),
+            new ClientRepository($this->createStub(ConnectionPool::class)),
+            $this->createStub(ExtensionConfiguration::class),
+        );
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionCode(1712100021);
+
+        $service->refreshToken('stolen-refresh-token', 'client-123');
     }
 
     public function testRefreshTokenThrowsOnExpiredToken(): void
