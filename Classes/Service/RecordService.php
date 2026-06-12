@@ -11,8 +11,11 @@ use TYPO3\CMS\Core\Database\Query\QueryBuilder;
 
 readonly class RecordService
 {
-    public function __construct(private ConnectionPool $connectionPool, private WorkspaceContextService $workspaceContext,)
-    {
+    public function __construct(
+        private ConnectionPool $connectionPool,
+        private WorkspaceContextService $workspaceContext,
+        private PermissionService $permissionService,
+    ) {
     }
 
     /**
@@ -21,6 +24,8 @@ readonly class RecordService
      */
     public function findByUid(string $table, int $uid, array $fields): ?array
     {
+        $this->assertReadAccess($table);
+
         $queryBuilder = $this->connectionPool->getQueryBuilderForTable($table);
         $queryBuilder->getRestrictions()->removeAll();
         $this->workspaceContext->applyRestriction($queryBuilder, $table);
@@ -82,6 +87,8 @@ readonly class RecordService
         ?int $sysLanguageUid = null,
         ?string $languageField = null,
     ): array {
+        $this->assertReadAccess($table);
+
         $limit = min(max($limit, 1), 500);
 
         $queryBuilder = $this->connectionPool->getQueryBuilderForTable($table);
@@ -147,6 +154,8 @@ readonly class RecordService
         string $orderDirection = 'ASC',
     ): array
     {
+        $this->assertReadAccess($table);
+
         $limit = min(max($limit, 1), 500);
 
         if (!in_array($orderDirection, ['ASC', 'DESC'], true)) {
@@ -195,6 +204,21 @@ readonly class RecordService
         ];
     }
 
+    /**
+     * Enforce the backend user's `tables_select` grant before reading a table.
+     * Without this, the QueryBuilder (which performs no permission checks of its own)
+     * would let any authenticated user read every TCA table, e.g. be_users or fe_users.
+     */
+    private function assertReadAccess(string $table): void
+    {
+        if (!$this->permissionService->canSelectTable($table)) {
+            throw new \RuntimeException(
+                sprintf('Access denied: you do not have read permission for table "%s".', $table),
+                1718100000,
+            );
+        }
+    }
+
     /** @param array{operator: string, value: string} $condition */
     private function applyCondition(QueryBuilder $queryBuilder, string $field, array $condition): void
     {
@@ -229,6 +253,8 @@ readonly class RecordService
      */
     public function count(string $table, ?int $pid = null, array $searchConditions = []): int
     {
+        $this->assertReadAccess($table);
+
         $queryBuilder = $this->connectionPool->getQueryBuilderForTable($table);
         $queryBuilder->getRestrictions()->removeAll();
         $this->workspaceContext->applyRestriction($queryBuilder, $table);

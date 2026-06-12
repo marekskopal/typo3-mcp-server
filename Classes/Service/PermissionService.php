@@ -72,6 +72,15 @@ readonly class PermissionService
         return $this->getBackendUser()->checkLanguageAccess($languageId);
     }
 
+    /**
+     * Whether the current backend user may read records of the given table.
+     * Admins always pass; for everyone else this honours the `tables_select` grant.
+     */
+    public function canSelectTable(string $table): bool
+    {
+        return $this->getBackendUser()->check('tables_select', $table);
+    }
+
     public function isAdmin(): bool
     {
         return $this->getBackendUser()->isAdmin();

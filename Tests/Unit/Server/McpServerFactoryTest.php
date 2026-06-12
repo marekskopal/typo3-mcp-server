@@ -19,6 +19,7 @@ use MarekSkopal\MsMcpServer\Service\BackendLayoutService;
 use MarekSkopal\MsMcpServer\Service\CacheService;
 use MarekSkopal\MsMcpServer\Service\DataHandlerService;
 use MarekSkopal\MsMcpServer\Service\FileService;
+use MarekSkopal\MsMcpServer\Service\PermissionService;
 use MarekSkopal\MsMcpServer\Service\RecordService;
 use MarekSkopal\MsMcpServer\Service\SiteLanguageService;
 use MarekSkopal\MsMcpServer\Service\TcaSchemaService;
@@ -107,7 +108,7 @@ final class McpServerFactoryTest extends TestCase
         $connectionPool = $this->createStub(ConnectionPool::class);
         $storageRepository = $this->createStub(StorageRepository::class);
         $siteFinder = $this->createStub(SiteFinder::class);
-        $recordService = new RecordService($connectionPool, new WorkspaceContextService());
+        $recordService = new RecordService($connectionPool, new WorkspaceContextService(), $this->createStub(PermissionService::class));
         $dataHandlerService = new DataHandlerService($this->createStub(SiteFinder::class));
         $fileService = new FileService($storageRepository, $connectionPool);
         $logger = new NullLogger();
