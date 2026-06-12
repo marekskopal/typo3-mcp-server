@@ -4,13 +4,14 @@ declare(strict_types=1);
 
 namespace MarekSkopal\MsMcpServer\Tool\Redirect;
 
+use MarekSkopal\MsMcpServer\Logging\AuditLogger;
 use MarekSkopal\MsMcpServer\Service\DataHandlerService;
 use MarekSkopal\MsMcpServer\Service\RecordService;
+use MarekSkopal\MsMcpServer\Tool\Helper\RegistrarToolRunner;
 use MarekSkopal\MsMcpServer\Tool\Result\ErrorResult;
 use MarekSkopal\MsMcpServer\Tool\Result\RecordCreatedResult;
 use MarekSkopal\MsMcpServer\Tool\Result\RecordDeletedResult;
 use MarekSkopal\MsMcpServer\Tool\Result\RecordUpdatedResult;
-use Mcp\Exception\ToolCallException;
 use Mcp\Server\Builder;
 use Psr\Log\LoggerInterface;
 use TYPO3\CMS\Core\Utility\ExtensionManagementUtility;
@@ -71,6 +72,7 @@ readonly class RedirectToolRegistrar
         private RecordService $recordService,
         private DataHandlerService $dataHandlerService,
         private LoggerInterface $logger,
+        private AuditLogger $auditLogger,
     ) {
     }
 
@@ -91,6 +93,7 @@ readonly class RedirectToolRegistrar
     {
         $recordService = $this->recordService;
         $logger = $this->logger;
+        $auditLogger = $this->auditLogger;
 
         $builder->addTool(
             handler: static function (
@@ -103,25 +106,35 @@ readonly class RedirectToolRegistrar
                 int $disabled = -1,
             ) use (
                 $recordService,
-                $logger
+                $logger,
+                $auditLogger
             ): string {
-                /** @var array<string, array{operator: string, value: string}> $conditions */
-                $conditions = [];
+                return RegistrarToolRunner::run('redirect_list', $auditLogger, $logger, static function () use (
+                    $recordService,
+                    $pid,
+                    $limit,
+                    $offset,
+                    $sourceHost,
+                    $sourcePath,
+                    $target,
+                    $disabled,
+                ): string {
+                    /** @var array<string, array{operator: string, value: string}> $conditions */
+                    $conditions = [];
 
-                if ($sourceHost !== '') {
-                    $conditions['source_host'] = ['operator' => 'like', 'value' => $sourceHost];
-                }
-                if ($sourcePath !== '') {
-                    $conditions['source_path'] = ['operator' => 'like', 'value' => $sourcePath];
-                }
-                if ($target !== '') {
-                    $conditions['target'] = ['operator' => 'like', 'value' => $target];
-                }
-                if ($disabled >= 0) {
-                    $conditions['disabled'] = ['operator' => 'eq', 'value' => (string) $disabled];
-                }
+                    if ($sourceHost !== '') {
+                        $conditions['source_host'] = ['operator' => 'like', 'value' => $sourceHost];
+                    }
+                    if ($sourcePath !== '') {
+                        $conditions['source_path'] = ['operator' => 'like', 'value' => $sourcePath];
+                    }
+                    if ($target !== '') {
+                        $conditions['target'] = ['operator' => 'like', 'value' => $target];
+                    }
+                    if ($disabled >= 0) {
+                        $conditions['disabled'] = ['operator' => 'eq', 'value' => (string) $disabled];
+                    }
 
-                try {
                     $result = $recordService->search(
                         self::TABLE,
                         $conditions,
@@ -132,13 +145,9 @@ readonly class RedirectToolRegistrar
                         'uid',
                         'DESC',
                     );
-                } catch (\Throwable $e) {
-                    $logger->error('redirect list tool failed', ['exception' => $e]);
 
-                    throw new ToolCallException($e->getMessage(), (int) $e->getCode(), $e);
-                }
-
-                return json_encode($result, JSON_THROW_ON_ERROR);
+                    return json_encode($result, JSON_THROW_ON_ERROR);
+                });
             },
             name: 'redirect_list',
             description: 'List redirect records with pagination and optional filtering.'
@@ -151,22 +160,24 @@ readonly class RedirectToolRegistrar
     {
         $recordService = $this->recordService;
         $logger = $this->logger;
+        $auditLogger = $this->auditLogger;
 
         $builder->addTool(
-            handler: static function (int $uid) use ($recordService, $logger): string {
-                try {
-                    $record = $recordService->findByUid(self::TABLE, $uid, self::READ_FIELDS);
-                } catch (\Throwable $e) {
-                    $logger->error('redirect get tool failed', ['exception' => $e]);
+            handler: static function (int $uid) use ($recordService, $logger, $auditLogger): string {
+                return RegistrarToolRunner::run(
+                    'redirect_get',
+                    $auditLogger,
+                    $logger,
+                    static function () use ($recordService, $uid): string {
+                        $record = $recordService->findByUid(self::TABLE, $uid, self::READ_FIELDS);
 
-                    throw new ToolCallException($e->getMessage(), (int) $e->getCode(), $e);
-                }
+                        if ($record === null) {
+                            return json_encode(['error' => 'Redirect record not found'], JSON_THROW_ON_ERROR);
+                        }
 
-                if ($record === null) {
-                    return json_encode(['error' => 'Redirect record not found'], JSON_THROW_ON_ERROR);
-                }
-
-                return json_encode($record, JSON_THROW_ON_ERROR);
+                        return json_encode($record, JSON_THROW_ON_ERROR);
+                    },
+                );
             },
             name: 'redirect_get',
             description: 'Get a single redirect record by its uid.',
@@ -177,6 +188,7 @@ readonly class RedirectToolRegistrar
     {
         $dataHandlerService = $this->dataHandlerService;
         $logger = $this->logger;
+        $auditLogger = $this->auditLogger;
 
         $builder->addTool(
             handler: static function (
@@ -188,39 +200,44 @@ readonly class RedirectToolRegistrar
                 string $fields = '',
             ) use (
                 $dataHandlerService,
-                $logger
+                $logger,
+                $auditLogger
             ): RecordCreatedResult {
-                $required = [
-                    'source_host' => $sourceHost,
-                    'source_path' => $sourcePath,
-                    'target' => $target,
-                    'target_statuscode' => $targetStatuscode,
-                ];
+                return RegistrarToolRunner::run('redirect_create', $auditLogger, $logger, static function () use (
+                    $dataHandlerService,
+                    $sourceHost,
+                    $sourcePath,
+                    $target,
+                    $pid,
+                    $targetStatuscode,
+                    $fields,
+                ): RecordCreatedResult {
+                    $required = [
+                        'source_host' => $sourceHost,
+                        'source_path' => $sourcePath,
+                        'target' => $target,
+                        'target_statuscode' => $targetStatuscode,
+                    ];
 
-                if ($fields !== '') {
-                    /** @var array<string, mixed> $extra */
-                    $extra = json_decode($fields, true, 512, JSON_THROW_ON_ERROR);
-                    // Explicit params take precedence over fields JSON
-                    $merged = array_merge($extra, $required);
-                } else {
-                    $merged = $required;
-                }
+                    if ($fields !== '') {
+                        /** @var array<string, mixed> $extra */
+                        $extra = json_decode($fields, true, 512, JSON_THROW_ON_ERROR);
+                        // Explicit params take precedence over fields JSON
+                        $merged = array_merge($extra, $required);
+                    } else {
+                        $merged = $required;
+                    }
 
-                $filteredData = array_intersect_key($merged, array_flip(self::WRITABLE_FIELDS));
-                $ignoredFields = array_map(
-                    'strval',
-                    array_values(array_diff(array_keys($merged), array_keys($filteredData))),
-                );
+                    $filteredData = array_intersect_key($merged, array_flip(self::WRITABLE_FIELDS));
+                    $ignoredFields = array_map(
+                        'strval',
+                        array_values(array_diff(array_keys($merged), array_keys($filteredData))),
+                    );
 
-                try {
                     $uid = $dataHandlerService->createRecord(self::TABLE, $pid, $filteredData);
-                } catch (\Throwable $e) {
-                    $logger->error('redirect create tool failed', ['exception' => $e]);
 
-                    throw new ToolCallException($e->getMessage(), (int) $e->getCode(), $e);
-                }
-
-                return new RecordCreatedResult($uid, $ignoredFields);
+                    return new RecordCreatedResult($uid, $ignoredFields);
+                });
             },
             name: 'redirect_create',
             description: 'Create a new redirect record. Required: sourceHost (domain or "*"), sourcePath, target (URL or t3:// link).'
@@ -234,28 +251,30 @@ readonly class RedirectToolRegistrar
     {
         $dataHandlerService = $this->dataHandlerService;
         $logger = $this->logger;
+        $auditLogger = $this->auditLogger;
 
         $builder->addTool(
-            handler: static function (int $uid, string $fields) use ($dataHandlerService, $logger): RecordUpdatedResult|ErrorResult {
-                /** @var array<string, mixed> $data */
-                $data = json_decode($fields, true, 512, JSON_THROW_ON_ERROR);
+            handler: static function (int $uid, string $fields) use ($dataHandlerService, $logger, $auditLogger): RecordUpdatedResult|ErrorResult {
+                return RegistrarToolRunner::run(
+                    'redirect_update',
+                    $auditLogger,
+                    $logger,
+                    static function () use ($dataHandlerService, $uid, $fields): RecordUpdatedResult|ErrorResult {
+                        /** @var array<string, mixed> $data */
+                        $data = json_decode($fields, true, 512, JSON_THROW_ON_ERROR);
 
-                $filteredData = array_intersect_key($data, array_flip(self::WRITABLE_FIELDS));
-                $ignoredFields = array_values(array_diff(array_keys($data), array_keys($filteredData)));
+                        $filteredData = array_intersect_key($data, array_flip(self::WRITABLE_FIELDS));
+                        $ignoredFields = array_values(array_diff(array_keys($data), array_keys($filteredData)));
 
-                if ($filteredData === []) {
-                    return new ErrorResult('No valid fields provided', ['ignoredFields' => $ignoredFields]);
-                }
+                        if ($filteredData === []) {
+                            return new ErrorResult('No valid fields provided', ['ignoredFields' => $ignoredFields]);
+                        }
 
-                try {
-                    $dataHandlerService->updateRecord(self::TABLE, $uid, $filteredData);
-                } catch (\Throwable $e) {
-                    $logger->error('redirect update tool failed', ['exception' => $e]);
+                        $dataHandlerService->updateRecord(self::TABLE, $uid, $filteredData);
 
-                    throw new ToolCallException($e->getMessage(), (int) $e->getCode(), $e);
-                }
-
-                return new RecordUpdatedResult($uid, array_keys($filteredData), $ignoredFields);
+                        return new RecordUpdatedResult($uid, array_keys($filteredData), $ignoredFields);
+                    },
+                );
             },
             name: 'redirect_update',
             description: 'Update an existing redirect record. Pass fields as a JSON object string.'
@@ -267,18 +286,20 @@ readonly class RedirectToolRegistrar
     {
         $dataHandlerService = $this->dataHandlerService;
         $logger = $this->logger;
+        $auditLogger = $this->auditLogger;
 
         $builder->addTool(
-            handler: static function (int $uid) use ($dataHandlerService, $logger): RecordDeletedResult {
-                try {
-                    $dataHandlerService->deleteRecord(self::TABLE, $uid);
-                } catch (\Throwable $e) {
-                    $logger->error('redirect delete tool failed', ['exception' => $e]);
+            handler: static function (int $uid) use ($dataHandlerService, $logger, $auditLogger): RecordDeletedResult {
+                return RegistrarToolRunner::run(
+                    'redirect_delete',
+                    $auditLogger,
+                    $logger,
+                    static function () use ($dataHandlerService, $uid): RecordDeletedResult {
+                        $dataHandlerService->deleteRecord(self::TABLE, $uid);
 
-                    throw new ToolCallException($e->getMessage(), (int) $e->getCode(), $e);
-                }
-
-                return new RecordDeletedResult($uid);
+                        return new RecordDeletedResult($uid);
+                    },
+                );
             },
             name: 'redirect_delete',
             description: 'Delete a redirect record by its uid.',

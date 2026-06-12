@@ -187,14 +187,15 @@ final class McpServerFactoryTest extends TestCase
             },
         );
 
+        $auditLogger = $this->createStub(\MarekSkopal\MsMcpServer\Logging\AuditLogger::class);
+
         $discoveredTableRepository = $this->createStub(DiscoveredTableRepository::class);
         $discoveredTableRepository->method('findEnabled')->willReturn([]);
-        $dynamicToolRegistrar = new DynamicToolRegistrar($recordService, $dataHandlerService, $tcaSchemaService, $discoveredTableRepository, $logger);
-        $redirectToolRegistrar = new RedirectToolRegistrar($recordService, $dataHandlerService, $logger);
-        $schedulerToolRegistrar = new SchedulerToolRegistrar($recordService, $dataHandlerService, $connectionPool, $logger);
-        $workspaceToolRegistrar = new WorkspaceToolRegistrar($recordService, $dataHandlerService, $connectionPool, $logger);
+        $dynamicToolRegistrar = new DynamicToolRegistrar($recordService, $dataHandlerService, $tcaSchemaService, $discoveredTableRepository, $logger, $auditLogger);
+        $redirectToolRegistrar = new RedirectToolRegistrar($recordService, $dataHandlerService, $logger, $auditLogger);
+        $schedulerToolRegistrar = new SchedulerToolRegistrar($recordService, $dataHandlerService, $connectionPool, $logger, $auditLogger);
+        $workspaceToolRegistrar = new WorkspaceToolRegistrar($recordService, $dataHandlerService, $connectionPool, $logger, $auditLogger);
 
-        $auditLogger = $this->createStub(\MarekSkopal\MsMcpServer\Logging\AuditLogger::class);
         $sessionRepository = $this->createStub(McpSessionRepository::class);
         $extensionConfiguration = $this->createStub(ExtensionConfiguration::class);
         $extensionConfiguration->method('get')->willReturn(['sessionLifetime' => 86400]);

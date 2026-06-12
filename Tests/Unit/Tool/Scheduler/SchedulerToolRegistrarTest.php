@@ -6,6 +6,7 @@ namespace MarekSkopal\MsMcpServer\Tests\Unit\Tool\Scheduler;
 
 use Doctrine\DBAL\Schema\AbstractSchemaManager;
 use Doctrine\DBAL\Schema\Table;
+use MarekSkopal\MsMcpServer\Logging\AuditLogger;
 use MarekSkopal\MsMcpServer\Service\DataHandlerService;
 use MarekSkopal\MsMcpServer\Service\RecordService;
 use MarekSkopal\MsMcpServer\Tool\Result\ErrorResult;
@@ -211,7 +212,7 @@ final class SchedulerToolRegistrarTest extends TestCase
         $closure = $this->getRegisteredClosure($recordService, $this->createStub(DataHandlerService::class), 'list');
 
         $this->expectException(ToolCallException::class);
-        $this->expectExceptionMessage('DB error');
+        $this->expectExceptionMessage('An internal error occurred');
 
         $closure();
     }
@@ -346,6 +347,7 @@ final class SchedulerToolRegistrarTest extends TestCase
                 'nextexecution', 'lastexecution_time', 'lastexecution_failure', 'lastexecution_context',
             ]),
             new NullLogger(),
+            $this->createStub(AuditLogger::class),
         );
     }
 

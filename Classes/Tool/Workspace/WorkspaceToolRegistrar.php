@@ -5,12 +5,13 @@ declare(strict_types=1);
 namespace MarekSkopal\MsMcpServer\Tool\Workspace;
 
 use Doctrine\DBAL\ParameterType;
+use MarekSkopal\MsMcpServer\Logging\AuditLogger;
 use MarekSkopal\MsMcpServer\Service\DataHandlerService;
 use MarekSkopal\MsMcpServer\Service\RecordService;
+use MarekSkopal\MsMcpServer\Tool\Helper\RegistrarToolRunner;
 use MarekSkopal\MsMcpServer\Tool\Result\ErrorResult;
 use MarekSkopal\MsMcpServer\Tool\Result\RecordDeletedResult;
 use MarekSkopal\MsMcpServer\Tool\Result\RecordUpdatedResult;
-use Mcp\Exception\ToolCallException;
 use Mcp\Server\Builder;
 use Psr\Log\LoggerInterface;
 use TYPO3\CMS\Core\Authentication\BackendUserAuthentication;
@@ -39,6 +40,7 @@ readonly class WorkspaceToolRegistrar
         private DataHandlerService $dataHandlerService,
         private ConnectionPool $connectionPool,
         private LoggerInterface $logger,
+        private AuditLogger $auditLogger,
     ) {
     }
 
@@ -61,10 +63,11 @@ readonly class WorkspaceToolRegistrar
     {
         $recordService = $this->recordService;
         $logger = $this->logger;
+        $auditLogger = $this->auditLogger;
 
         $builder->addTool(
-            handler: static function () use ($recordService, $logger): string {
-                try {
+            handler: static function () use ($recordService, $logger, $auditLogger): string {
+                return RegistrarToolRunner::run('workspace_list', $auditLogger, $logger, static function () use ($recordService): string {
                     $beUser = self::requireBackendUser();
 
                     $result = $recordService->search(
@@ -103,11 +106,7 @@ readonly class WorkspaceToolRegistrar
                     }
 
                     return json_encode($accessible, JSON_THROW_ON_ERROR);
-                } catch (\Throwable $e) {
-                    $logger->error('workspace list tool failed', ['exception' => $e]);
-
-                    throw new ToolCallException($e->getMessage(), (int) $e->getCode(), $e);
-                }
+                });
             },
             name: 'workspace_list',
             description: 'List workspaces accessible to the current backend user, including the implicit live workspace (uid 0).'
@@ -119,41 +118,43 @@ readonly class WorkspaceToolRegistrar
     {
         $recordService = $this->recordService;
         $logger = $this->logger;
+        $auditLogger = $this->auditLogger;
 
         $builder->addTool(
-            handler: static function (int $workspaceId) use ($recordService, $logger): string {
-                try {
-                    $beUser = self::requireBackendUser();
-                    // @phpstan-ignore method.internal
-                    $access = $beUser->checkWorkspace($workspaceId);
-                    if ($access === false) {
-                        return json_encode(['error' => 'Workspace not accessible to current user'], JSON_THROW_ON_ERROR);
-                    }
+            handler: static function (int $workspaceId) use ($recordService, $logger, $auditLogger): string {
+                return RegistrarToolRunner::run(
+                    'workspace_get',
+                    $auditLogger,
+                    $logger,
+                    static function () use ($recordService, $workspaceId): string {
+                        $beUser = self::requireBackendUser();
+                        // @phpstan-ignore method.internal
+                        $access = $beUser->checkWorkspace($workspaceId);
+                        if ($access === false) {
+                            return json_encode(['error' => 'Workspace not accessible to current user'], JSON_THROW_ON_ERROR);
+                        }
 
-                    /** @var string $accessLabel */
-                    $accessLabel = $access['_ACCESS'] ?? '';
+                        /** @var string $accessLabel */
+                        $accessLabel = $access['_ACCESS'] ?? '';
 
-                    if ($workspaceId === 0) {
-                        return json_encode([
-                            'uid' => 0,
-                            'title' => 'Live workspace',
-                            'access' => $accessLabel !== '' ? $accessLabel : 'online',
-                        ], JSON_THROW_ON_ERROR);
-                    }
+                        if ($workspaceId === 0) {
+                            return json_encode([
+                                'uid' => 0,
+                                'title' => 'Live workspace',
+                                'access' => $accessLabel !== '' ? $accessLabel : 'online',
+                            ], JSON_THROW_ON_ERROR);
+                        }
 
-                    $record = $recordService->findByUid(self::WORKSPACE_TABLE, $workspaceId, self::WORKSPACE_LIST_FIELDS);
-                    if ($record === null) {
-                        return json_encode(['error' => 'Workspace not found'], JSON_THROW_ON_ERROR);
-                    }
+                        $record = $recordService->findByUid(self::WORKSPACE_TABLE, $workspaceId, self::WORKSPACE_LIST_FIELDS);
+                        if ($record === null) {
+                            return json_encode(['error' => 'Workspace not found'], JSON_THROW_ON_ERROR);
+                        }
 
-                    $record['access'] = $accessLabel;
+                        $record['access'] = $accessLabel;
 
-                    return json_encode($record, JSON_THROW_ON_ERROR);
-                } catch (\Throwable $e) {
-                    $logger->error('workspace get tool failed', ['exception' => $e]);
-
-                    throw new ToolCallException($e->getMessage(), (int) $e->getCode(), $e);
-                }
+                        return json_encode($record, JSON_THROW_ON_ERROR);
+                    },
+                );
             },
             name: 'workspace_get',
             description: 'Get workspace metadata by uid. Returns title, custom_stages flag, and current user access level.'
@@ -164,36 +165,38 @@ readonly class WorkspaceToolRegistrar
     private function registerSwitchTool(Builder $builder): void
     {
         $logger = $this->logger;
+        $auditLogger = $this->auditLogger;
 
         $builder->addTool(
-            handler: static function (int $workspaceId) use ($logger): RecordUpdatedResult|ErrorResult {
-                try {
-                    $beUser = self::requireBackendUser();
-                    // @phpstan-ignore method.internal
-                    $access = $beUser->checkWorkspace($workspaceId);
-                    if ($access === false) {
-                        return new ErrorResult('Workspace not accessible to current user', ['workspaceId' => $workspaceId]);
-                    }
+            handler: static function (int $workspaceId) use ($logger, $auditLogger): RecordUpdatedResult|ErrorResult {
+                return RegistrarToolRunner::run(
+                    'workspace_switch',
+                    $auditLogger,
+                    $logger,
+                    static function () use ($workspaceId): RecordUpdatedResult|ErrorResult {
+                        $beUser = self::requireBackendUser();
+                        // @phpstan-ignore method.internal
+                        $access = $beUser->checkWorkspace($workspaceId);
+                        if ($access === false) {
+                            return new ErrorResult('Workspace not accessible to current user', ['workspaceId' => $workspaceId]);
+                        }
 
-                    // setWorkspace persists to be_users.workspace_id and falls back to default if invalid.
-                    // @phpstan-ignore method.internal
-                    $beUser->setWorkspace($workspaceId);
+                        // setWorkspace persists to be_users.workspace_id and falls back to default if invalid.
+                        // @phpstan-ignore method.internal
+                        $beUser->setWorkspace($workspaceId);
 
-                    // @phpstan-ignore property.internal
-                    $userArr = $beUser->user;
-                    $userUid = 0;
-                    if (is_array($userArr)) {
-                        /** @var int|string $rawUid */
-                        $rawUid = $userArr['uid'] ?? 0;
-                        $userUid = (int) $rawUid;
-                    }
+                        // @phpstan-ignore property.internal
+                        $userArr = $beUser->user;
+                        $userUid = 0;
+                        if (is_array($userArr)) {
+                            /** @var int|string $rawUid */
+                            $rawUid = $userArr['uid'] ?? 0;
+                            $userUid = (int) $rawUid;
+                        }
 
-                    return new RecordUpdatedResult($userUid, ['workspace_id']);
-                } catch (\Throwable $e) {
-                    $logger->error('workspace switch tool failed', ['exception' => $e]);
-
-                    throw new ToolCallException($e->getMessage(), (int) $e->getCode(), $e);
-                }
+                        return new RecordUpdatedResult($userUid, ['workspace_id']);
+                    },
+                );
             },
             name: 'workspace_switch',
             description: 'Switch the active workspace for the current backend user. Persists to be_users.workspace_id.'
@@ -205,78 +208,80 @@ readonly class WorkspaceToolRegistrar
     {
         $connectionPool = $this->connectionPool;
         $logger = $this->logger;
+        $auditLogger = $this->auditLogger;
 
         $builder->addTool(
-            handler: static function (string $table = '', int $limit = 100) use ($connectionPool, $logger): string {
-                try {
-                    $beUser = self::requireBackendUser();
-                    $workspaceId = (int) $beUser->workspace;
+            handler: static function (string $table = '', int $limit = 100) use ($connectionPool, $logger, $auditLogger): string {
+                return RegistrarToolRunner::run(
+                    'workspace_changes_list',
+                    $auditLogger,
+                    $logger,
+                    static function () use ($connectionPool, $table, $limit): string {
+                        $beUser = self::requireBackendUser();
+                        $workspaceId = (int) $beUser->workspace;
 
-                    if ($workspaceId === 0) {
-                        return json_encode(['workspaceId' => 0, 'tables' => []], JSON_THROW_ON_ERROR);
-                    }
-
-                    $tables = self::workspaceAwareTables();
-                    if ($table !== '') {
-                        $tables = in_array($table, $tables, true) ? [$table] : [];
-                    }
-
-                    $limit = min(max($limit, 1), 500);
-                    $changes = [];
-
-                    foreach ($tables as $tableName) {
-                        $queryBuilder = $connectionPool->getQueryBuilderForTable($tableName);
-                        $queryBuilder->getRestrictions()->removeAll();
-
-                        $rows = $queryBuilder
-                            ->select('uid', 'pid', 't3ver_oid', 't3ver_state', 't3ver_stage', 't3ver_wsid')
-                            ->from($tableName)
-                            ->where(
-                                $queryBuilder->expr()->eq(
-                                    't3ver_wsid',
-                                    $queryBuilder->createNamedParameter($workspaceId, ParameterType::INTEGER),
-                                ),
-                            )
-                            ->setMaxResults($limit)
-                            ->orderBy('uid', 'DESC')
-                            ->executeQuery()
-                            ->fetchAllAssociative();
-
-                        if ($rows === []) {
-                            continue;
+                        if ($workspaceId === 0) {
+                            return json_encode(['workspaceId' => 0, 'tables' => []], JSON_THROW_ON_ERROR);
                         }
 
-                        $changes[$tableName] = array_map(
-                            static function (array $row): array {
-                                /** @var int|string $uid */
-                                $uid = $row['uid'] ?? 0;
-                                /** @var int|string $pid */
-                                $pid = $row['pid'] ?? 0;
-                                /** @var int|string $oid */
-                                $oid = $row['t3ver_oid'] ?? 0;
-                                /** @var int|string $state */
-                                $state = $row['t3ver_state'] ?? 0;
-                                /** @var int|string $stage */
-                                $stage = $row['t3ver_stage'] ?? 0;
+                        $tables = self::workspaceAwareTables();
+                        if ($table !== '') {
+                            $tables = in_array($table, $tables, true) ? [$table] : [];
+                        }
 
-                                return [
-                                    'uid' => (int) $uid,
-                                    'pid' => (int) $pid,
-                                    'liveUid' => (int) $oid,
-                                    'state' => self::stateLabel((int) $state),
-                                    'stage' => (int) $stage,
-                                ];
-                            },
-                            $rows,
-                        );
-                    }
+                        $limit = min(max($limit, 1), 500);
+                        $changes = [];
 
-                    return json_encode(['workspaceId' => $workspaceId, 'tables' => $changes], JSON_THROW_ON_ERROR);
-                } catch (\Throwable $e) {
-                    $logger->error('workspace changes list tool failed', ['exception' => $e]);
+                        foreach ($tables as $tableName) {
+                            $queryBuilder = $connectionPool->getQueryBuilderForTable($tableName);
+                            $queryBuilder->getRestrictions()->removeAll();
 
-                    throw new ToolCallException($e->getMessage(), (int) $e->getCode(), $e);
-                }
+                            $rows = $queryBuilder
+                                ->select('uid', 'pid', 't3ver_oid', 't3ver_state', 't3ver_stage', 't3ver_wsid')
+                                ->from($tableName)
+                                ->where(
+                                    $queryBuilder->expr()->eq(
+                                        't3ver_wsid',
+                                        $queryBuilder->createNamedParameter($workspaceId, ParameterType::INTEGER),
+                                    ),
+                                )
+                                ->setMaxResults($limit)
+                                ->orderBy('uid', 'DESC')
+                                ->executeQuery()
+                                ->fetchAllAssociative();
+
+                            if ($rows === []) {
+                                continue;
+                            }
+
+                            $changes[$tableName] = array_map(
+                                static function (array $row): array {
+                                    /** @var int|string $uid */
+                                    $uid = $row['uid'] ?? 0;
+                                    /** @var int|string $pid */
+                                    $pid = $row['pid'] ?? 0;
+                                    /** @var int|string $oid */
+                                    $oid = $row['t3ver_oid'] ?? 0;
+                                    /** @var int|string $state */
+                                    $state = $row['t3ver_state'] ?? 0;
+                                    /** @var int|string $stage */
+                                    $stage = $row['t3ver_stage'] ?? 0;
+
+                                    return [
+                                        'uid' => (int) $uid,
+                                        'pid' => (int) $pid,
+                                        'liveUid' => (int) $oid,
+                                        'state' => self::stateLabel((int) $state),
+                                        'stage' => (int) $stage,
+                                    ];
+                                },
+                                $rows,
+                            );
+                        }
+
+                        return json_encode(['workspaceId' => $workspaceId, 'tables' => $changes], JSON_THROW_ON_ERROR);
+                    },
+                );
             },
             name: 'workspace_changes_list',
             description: 'List records modified in the current workspace, grouped by table.'
@@ -291,6 +296,7 @@ readonly class WorkspaceToolRegistrar
         $dataHandlerService = $this->dataHandlerService;
         $connectionPool = $this->connectionPool;
         $logger = $this->logger;
+        $auditLogger = $this->auditLogger;
 
         $builder->addTool(
             handler: static function (
@@ -299,9 +305,15 @@ readonly class WorkspaceToolRegistrar
             ) use (
                 $dataHandlerService,
                 $connectionPool,
-                $logger
+                $logger,
+                $auditLogger
             ): RecordUpdatedResult|ErrorResult {
-                try {
+                return RegistrarToolRunner::run('workspace_publish', $auditLogger, $logger, static function () use (
+                    $dataHandlerService,
+                    $connectionPool,
+                    $table,
+                    $workspaceVersionUid,
+                ): RecordUpdatedResult|ErrorResult {
                     $row = self::loadVersionRow($connectionPool, $table, $workspaceVersionUid);
                     if ($row === null) {
                         return new ErrorResult('Workspace version not found', ['table' => $table, 'uid' => $workspaceVersionUid]);
@@ -324,11 +336,7 @@ readonly class WorkspaceToolRegistrar
                     ]);
 
                     return new RecordUpdatedResult($cmdKey, ['published']);
-                } catch (\Throwable $e) {
-                    $logger->error('workspace publish tool failed', ['exception' => $e]);
-
-                    throw new ToolCallException($e->getMessage(), (int) $e->getCode(), $e);
-                }
+                });
             },
             name: 'workspace_publish',
             description: 'Publish a workspace version to live (swap). Pass table and workspaceVersionUid.'
@@ -342,6 +350,7 @@ readonly class WorkspaceToolRegistrar
         $dataHandlerService = $this->dataHandlerService;
         $connectionPool = $this->connectionPool;
         $logger = $this->logger;
+        $auditLogger = $this->auditLogger;
 
         $builder->addTool(
             handler: static function (
@@ -350,9 +359,15 @@ readonly class WorkspaceToolRegistrar
             ) use (
                 $dataHandlerService,
                 $connectionPool,
-                $logger
+                $logger,
+                $auditLogger
             ): RecordDeletedResult|ErrorResult {
-                try {
+                return RegistrarToolRunner::run('workspace_discard', $auditLogger, $logger, static function () use (
+                    $dataHandlerService,
+                    $connectionPool,
+                    $table,
+                    $workspaceVersionUid,
+                ): RecordDeletedResult|ErrorResult {
                     $row = self::loadVersionRow($connectionPool, $table, $workspaceVersionUid);
                     if ($row === null) {
                         return new ErrorResult('Workspace version not found', ['table' => $table, 'uid' => $workspaceVersionUid]);
@@ -368,11 +383,7 @@ readonly class WorkspaceToolRegistrar
                     ]);
 
                     return new RecordDeletedResult($workspaceVersionUid);
-                } catch (\Throwable $e) {
-                    $logger->error('workspace discard tool failed', ['exception' => $e]);
-
-                    throw new ToolCallException($e->getMessage(), (int) $e->getCode(), $e);
-                }
+                });
             },
             name: 'workspace_discard',
             description: 'Discard a workspace version, dropping unpublished changes. Pass table and workspaceVersionUid.'
@@ -385,6 +396,7 @@ readonly class WorkspaceToolRegistrar
         $dataHandlerService = $this->dataHandlerService;
         $connectionPool = $this->connectionPool;
         $logger = $this->logger;
+        $auditLogger = $this->auditLogger;
 
         $builder->addTool(
             handler: static function (
@@ -394,9 +406,16 @@ readonly class WorkspaceToolRegistrar
             ) use (
                 $dataHandlerService,
                 $connectionPool,
-                $logger
+                $logger,
+                $auditLogger
             ): RecordUpdatedResult|ErrorResult {
-                try {
+                return RegistrarToolRunner::run('workspace_stage_set', $auditLogger, $logger, static function () use (
+                    $dataHandlerService,
+                    $connectionPool,
+                    $table,
+                    $workspaceVersionUid,
+                    $stage,
+                ): RecordUpdatedResult|ErrorResult {
                     $beUser = self::requireBackendUser();
                     // @phpstan-ignore method.internal
                     if (!$beUser->workspaceCheckStageForCurrent($stage)) {
@@ -411,11 +430,7 @@ readonly class WorkspaceToolRegistrar
                     $dataHandlerService->updateRecord($table, $workspaceVersionUid, ['t3ver_stage' => $stage]);
 
                     return new RecordUpdatedResult($workspaceVersionUid, ['t3ver_stage']);
-                } catch (\Throwable $e) {
-                    $logger->error('workspace stage set tool failed', ['exception' => $e]);
-
-                    throw new ToolCallException($e->getMessage(), (int) $e->getCode(), $e);
-                }
+                });
             },
             name: 'workspace_stage_set',
             description: 'Move a workspace version to a different stage. Pass table, workspaceVersionUid, and stage.'

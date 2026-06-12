@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace MarekSkopal\MsMcpServer\Tests\Unit\Tool\Workspace;
 
 use Doctrine\DBAL\Result;
+use MarekSkopal\MsMcpServer\Logging\AuditLogger;
 use MarekSkopal\MsMcpServer\Service\DataHandlerService;
 use MarekSkopal\MsMcpServer\Service\RecordService;
 use MarekSkopal\MsMcpServer\Tool\Result\ErrorResult;
@@ -480,6 +481,7 @@ final class WorkspaceToolRegistrarTest extends TestCase
             $dataHandlerService ?? $this->createStub(DataHandlerService::class),
             $connectionPool ?? $this->createStub(ConnectionPool::class),
             new NullLogger(),
+            $this->createStub(AuditLogger::class),
         );
     }
 

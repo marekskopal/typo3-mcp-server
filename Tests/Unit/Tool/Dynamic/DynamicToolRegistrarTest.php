@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace MarekSkopal\MsMcpServer\Tests\Unit\Tool\Dynamic;
 
+use MarekSkopal\MsMcpServer\Logging\AuditLogger;
 use MarekSkopal\MsMcpServer\Repository\DiscoveredTableRepository;
 use MarekSkopal\MsMcpServer\Service\DataHandlerService;
 use MarekSkopal\MsMcpServer\Service\RecordService;
@@ -98,6 +99,7 @@ final class DynamicToolRegistrarTest extends TestCase
             new TcaSchemaService(),
             $this->createEmptyDiscoveredTableRepository(),
             new NullLogger(),
+            $this->createStub(AuditLogger::class),
         );
 
         $builder = Server::builder();
@@ -167,7 +169,7 @@ final class DynamicToolRegistrarTest extends TestCase
         $closure = $this->getRegisteredClosure($recordService, $this->createStub(DataHandlerService::class),'list');
 
         $this->expectException(ToolCallException::class);
-        $this->expectExceptionMessage('DB error');
+        $this->expectExceptionMessage('An internal error occurred');
 
         $closure(10);
     }
@@ -499,6 +501,7 @@ final class DynamicToolRegistrarTest extends TestCase
             new TcaSchemaService(),
             $this->createEmptyDiscoveredTableRepository(),
             new NullLogger(),
+            $this->createStub(AuditLogger::class),
         );
 
         $builder = Server::builder();
@@ -559,6 +562,7 @@ final class DynamicToolRegistrarTest extends TestCase
             new TcaSchemaService(),
             $this->createEmptyDiscoveredTableRepository(),
             new NullLogger(),
+            $this->createStub(AuditLogger::class),
         );
 
         $builder = Server::builder();
@@ -844,6 +848,7 @@ final class DynamicToolRegistrarTest extends TestCase
             new TcaSchemaService(),
             $discoveredTableRepository ?? $this->createEmptyDiscoveredTableRepository(),
             new NullLogger(),
+            $this->createStub(AuditLogger::class),
         );
     }
 
@@ -864,7 +869,7 @@ final class DynamicToolRegistrarTest extends TestCase
         DataHandlerService $dataHandlerService,
         string $toolType,
     ): \Closure {
-        $registrar = new DynamicToolRegistrar($recordService, $dataHandlerService, new TcaSchemaService(), $this->createEmptyDiscoveredTableRepository(), new NullLogger());
+        $registrar = new DynamicToolRegistrar($recordService, $dataHandlerService, new TcaSchemaService(), $this->createEmptyDiscoveredTableRepository(), new NullLogger(), $this->createStub(AuditLogger::class));
 
         $builder = Server::builder();
         $registrar->register($builder);

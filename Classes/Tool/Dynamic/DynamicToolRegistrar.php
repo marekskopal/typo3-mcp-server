@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace MarekSkopal\MsMcpServer\Tool\Dynamic;
 
+use MarekSkopal\MsMcpServer\Logging\AuditLogger;
 use MarekSkopal\MsMcpServer\Repository\DiscoveredTableRepository;
 use MarekSkopal\MsMcpServer\Service\DataHandlerService;
 use MarekSkopal\MsMcpServer\Service\RecordService;
 use MarekSkopal\MsMcpServer\Service\TcaSchemaService;
 use MarekSkopal\MsMcpServer\Tool\Helper\MoveTarget;
+use MarekSkopal\MsMcpServer\Tool\Helper\RegistrarToolRunner;
 use MarekSkopal\MsMcpServer\Tool\Result\BatchRecordsDeletedResult;
 use MarekSkopal\MsMcpServer\Tool\Result\BatchRecordsMovedResult;
 use MarekSkopal\MsMcpServer\Tool\Result\BatchRecordsUpdatedResult;
@@ -30,6 +32,7 @@ readonly class DynamicToolRegistrar
         private TcaSchemaService $tcaSchemaService,
         private DiscoveredTableRepository $discoveredTableRepository,
         private LoggerInterface $logger,
+        private AuditLogger $auditLogger,
     ) {
     }
 
@@ -155,6 +158,8 @@ readonly class DynamicToolRegistrar
     {
         $recordService = $this->recordService;
         $logger = $this->logger;
+        $auditLogger = $this->auditLogger;
+        $toolName = $config['prefix'] . '_list';
         $defaultFields = $config['listFields'];
         $readFields = $config['readFields'];
         $languageField = $config['translationConfig']['languageField'];
@@ -188,20 +193,34 @@ readonly class DynamicToolRegistrar
                 ) use (
                     $recordService,
                     $logger,
+                    $auditLogger,
+                    $toolName,
                     $tableName,
                     $defaultFields,
                     $readFields,
                     $languageField,
                     $resolveFields,
                 ): string {
-                    /** @var list<string> $fields */
-                    $fields = $resolveFields($selectFields, $defaultFields, $readFields);
+                    return RegistrarToolRunner::run($toolName, $auditLogger, $logger, static function () use (
+                        $recordService,
+                        $tableName,
+                        $pid,
+                        $limit,
+                        $offset,
+                        $sysLanguageUid,
+                        $defaultFields,
+                        $readFields,
+                        $languageField,
+                        $resolveFields,
+                        $selectFields,
+                    ): string {
+                        /** @var list<string> $fields */
+                        $fields = $resolveFields($selectFields, $defaultFields, $readFields);
 
-                    if (!in_array($languageField, $fields, true)) {
-                        $fields[] = $languageField;
-                    }
+                        if (!in_array($languageField, $fields, true)) {
+                            $fields[] = $languageField;
+                        }
 
-                    try {
                         $result = $recordService->findByPid(
                             $tableName,
                             $pid,
@@ -211,15 +230,11 @@ readonly class DynamicToolRegistrar
                             $sysLanguageUid >= 0 ? $sysLanguageUid : null,
                             $sysLanguageUid >= 0 ? $languageField : null,
                         );
-                    } catch (\Throwable $e) {
-                        $logger->error($tableName . ' list tool failed', ['exception' => $e]);
 
-                        throw new ToolCallException($e->getMessage(), (int) $e->getCode(), $e);
-                    }
-
-                    return json_encode($result, JSON_THROW_ON_ERROR);
+                        return json_encode($result, JSON_THROW_ON_ERROR);
+                    });
                 },
-                name: $config['prefix'] . '_list',
+                name: $toolName,
                 description: 'List ' . $config['label'] . ' records by parent page ID with pagination.'
                     . ' Use sysLanguageUid to filter by language (0 = default, -1 = all).'
                     . ' Use selectFields (comma-separated) to choose which fields to return.',
@@ -234,25 +249,33 @@ readonly class DynamicToolRegistrar
                 ) use (
                     $recordService,
                     $logger,
+                    $auditLogger,
+                    $toolName,
                     $tableName,
                     $defaultFields,
                     $readFields,
                     $resolveFields,
                 ): string {
-                    /** @var list<string> $fields */
-                    $fields = $resolveFields($selectFields, $defaultFields, $readFields);
+                    return RegistrarToolRunner::run($toolName, $auditLogger, $logger, static function () use (
+                        $recordService,
+                        $tableName,
+                        $pid,
+                        $limit,
+                        $offset,
+                        $defaultFields,
+                        $readFields,
+                        $resolveFields,
+                        $selectFields,
+                    ): string {
+                        /** @var list<string> $fields */
+                        $fields = $resolveFields($selectFields, $defaultFields, $readFields);
 
-                    try {
                         $result = $recordService->findByPid($tableName, $pid, $limit, $offset, $fields);
-                    } catch (\Throwable $e) {
-                        $logger->error($tableName . ' list tool failed', ['exception' => $e]);
 
-                        throw new ToolCallException($e->getMessage(), (int) $e->getCode(), $e);
-                    }
-
-                    return json_encode($result, JSON_THROW_ON_ERROR);
+                        return json_encode($result, JSON_THROW_ON_ERROR);
+                    });
                 },
-                name: $config['prefix'] . '_list',
+                name: $toolName,
                 description: 'List ' . $config['label'] . ' records by parent page ID with pagination.'
                     . ' Use selectFields (comma-separated) to choose which fields to return.',
             );
@@ -264,43 +287,54 @@ readonly class DynamicToolRegistrar
     {
         $recordService = $this->recordService;
         $logger = $this->logger;
+        $auditLogger = $this->auditLogger;
+        $toolName = $config['prefix'] . '_get';
         $fields = $config['readFields'];
         $label = $config['label'];
         $languageField = $config['translationConfig']['languageField'];
         $transOrigPointerField = $config['translationConfig']['transOrigPointerField'];
 
         $builder->addTool(
-            handler: static function (int $uid) use ($recordService, $logger, $tableName, $fields, $label, $languageField, $transOrigPointerField): string {
-                try {
+            handler: static function (int $uid) use ($recordService, $logger, $auditLogger, $toolName, $tableName, $fields, $label, $languageField, $transOrigPointerField): string {
+                return RegistrarToolRunner::run($toolName, $auditLogger, $logger, static function () use (
+                    $recordService,
+                    $tableName,
+                    $uid,
+                    $fields,
+                    $label,
+                    $languageField,
+                    $transOrigPointerField,
+                ): string {
                     $record = $recordService->findByUid($tableName, $uid, $fields);
-                } catch (\Throwable $e) {
-                    $logger->error($tableName . ' get tool failed', ['exception' => $e]);
 
-                    throw new ToolCallException($e->getMessage(), (int) $e->getCode(), $e);
-                }
+                    if ($record === null) {
+                        return json_encode(['error' => $label . ' record not found'], JSON_THROW_ON_ERROR);
+                    }
 
-                if ($record === null) {
-                    return json_encode(['error' => $label . ' record not found'], JSON_THROW_ON_ERROR);
-                }
-
-                $langValue = $record[$languageField ?? ''] ?? -1;
-                if (
-                    $languageField !== null
-                    && $transOrigPointerField !== null
-                    && (
-                        is_int($langValue)
-                        || is_string(
-                            $langValue,
+                    $langValue = $record[$languageField ?? ''] ?? -1;
+                    if (
+                        $languageField !== null
+                        && $transOrigPointerField !== null
+                        && (
+                            is_int($langValue)
+                            || is_string(
+                                $langValue,
+                            )
                         )
-                    )
-                    && (int) $langValue === 0
-                ) {
-                    $record['translations'] = $recordService->findTranslations($tableName, $uid, $languageField, $transOrigPointerField);
-                }
+                        && (int) $langValue === 0
+                    ) {
+                        $record['translations'] = $recordService->findTranslations(
+                            $tableName,
+                            $uid,
+                            $languageField,
+                            $transOrigPointerField,
+                        );
+                    }
 
-                return json_encode($record, JSON_THROW_ON_ERROR);
+                    return json_encode($record, JSON_THROW_ON_ERROR);
+                });
             },
-            name: $config['prefix'] . '_get',
+            name: $toolName,
             description: 'Get a single ' . $config['label'] . ' record by its uid.',
         );
     }
@@ -310,6 +344,8 @@ readonly class DynamicToolRegistrar
     {
         $dataHandlerService = $this->dataHandlerService;
         $logger = $this->logger;
+        $auditLogger = $this->auditLogger;
+        $toolName = $config['prefix'] . '_create';
         $writableFields = $config['writableFields'];
         $languageField = $config['translationConfig']['languageField'];
 
@@ -321,32 +357,38 @@ readonly class DynamicToolRegistrar
         ) use (
             $dataHandlerService,
             $logger,
+            $auditLogger,
+            $toolName,
             $tableName,
             $writableFields,
             $languageField,
         ): RecordCreatedResult|ErrorResult {
-            $filteredData = array_intersect_key($data, array_flip($writableFields));
+            return RegistrarToolRunner::run($toolName, $auditLogger, $logger, static function () use (
+                $dataHandlerService,
+                $tableName,
+                $writableFields,
+                $languageField,
+                $data,
+                $pid,
+                $sysLanguageUid,
+            ): RecordCreatedResult|ErrorResult {
+                $filteredData = array_intersect_key($data, array_flip($writableFields));
 
-            if ($languageField !== null) {
-                $filteredData[$languageField] = $sysLanguageUid;
-                unset($data[$languageField]);
-            }
+                if ($languageField !== null) {
+                    $filteredData[$languageField] = $sysLanguageUid;
+                    unset($data[$languageField]);
+                }
 
-            $ignoredFields = array_map('strval', array_values(array_diff(array_keys($data), array_keys($filteredData))));
+                $ignoredFields = array_map('strval', array_values(array_diff(array_keys($data), array_keys($filteredData))));
 
-            if ($filteredData === []) {
-                return new ErrorResult('No valid fields provided', ['ignoredFields' => $ignoredFields]);
-            }
+                if ($filteredData === []) {
+                    return new ErrorResult('No valid fields provided', ['ignoredFields' => $ignoredFields]);
+                }
 
-            try {
                 $uid = $dataHandlerService->createRecord($tableName, $pid, $filteredData);
-            } catch (\Throwable $e) {
-                $logger->error($tableName . ' create tool failed', ['exception' => $e]);
 
-                throw new ToolCallException($e->getMessage(), (int) $e->getCode(), $e);
-            }
-
-            return new RecordCreatedResult($uid, $ignoredFields);
+                return new RecordCreatedResult($uid, $ignoredFields);
+            });
         };
 
         $description = 'Create a new ' . $config['label'] . ' record. Pass fields as a JSON object string.'
@@ -390,6 +432,8 @@ readonly class DynamicToolRegistrar
     {
         $dataHandlerService = $this->dataHandlerService;
         $logger = $this->logger;
+        $auditLogger = $this->auditLogger;
+        $toolName = $config['prefix'] . '_update';
         $writableFields = $config['writableFields'];
 
         $builder->addTool(
@@ -399,30 +443,34 @@ readonly class DynamicToolRegistrar
             ) use (
                 $dataHandlerService,
                 $logger,
+                $auditLogger,
+                $toolName,
                 $tableName,
                 $writableFields,
             ): RecordUpdatedResult|ErrorResult {
-                /** @var array<string, mixed> $data */
-                $data = json_decode($fields, true, 512, JSON_THROW_ON_ERROR);
+                return RegistrarToolRunner::run($toolName, $auditLogger, $logger, static function () use (
+                    $dataHandlerService,
+                    $tableName,
+                    $writableFields,
+                    $uid,
+                    $fields,
+                ): RecordUpdatedResult|ErrorResult {
+                    /** @var array<string, mixed> $data */
+                    $data = json_decode($fields, true, 512, JSON_THROW_ON_ERROR);
 
-                $filteredData = array_intersect_key($data, array_flip($writableFields));
-                $ignoredFields = array_values(array_diff(array_keys($data), array_keys($filteredData)));
+                    $filteredData = array_intersect_key($data, array_flip($writableFields));
+                    $ignoredFields = array_values(array_diff(array_keys($data), array_keys($filteredData)));
 
-                if ($filteredData === []) {
-                    return new ErrorResult('No valid fields provided', ['ignoredFields' => $ignoredFields]);
-                }
+                    if ($filteredData === []) {
+                        return new ErrorResult('No valid fields provided', ['ignoredFields' => $ignoredFields]);
+                    }
 
-                try {
                     $dataHandlerService->updateRecord($tableName, $uid, $filteredData);
-                } catch (\Throwable $e) {
-                    $logger->error($tableName . ' update tool failed', ['exception' => $e]);
 
-                    throw new ToolCallException($e->getMessage(), (int) $e->getCode(), $e);
-                }
-
-                return new RecordUpdatedResult($uid, array_keys($filteredData), $ignoredFields);
+                    return new RecordUpdatedResult($uid, array_keys($filteredData), $ignoredFields);
+                });
             },
-            name: $config['prefix'] . '_update',
+            name: $toolName,
             description: 'Update an existing ' . $config['label'] . ' record. Pass fields as a JSON object string'
                 . ' with field names and their new values. Available fields: '
                 . implode(', ', $config['writableFields']) . '.',
@@ -434,20 +482,23 @@ readonly class DynamicToolRegistrar
     {
         $dataHandlerService = $this->dataHandlerService;
         $logger = $this->logger;
+        $auditLogger = $this->auditLogger;
+        $toolName = $config['prefix'] . '_delete';
 
         $builder->addTool(
-            handler: static function (int $uid) use ($dataHandlerService, $logger, $tableName): RecordDeletedResult {
-                try {
-                    $dataHandlerService->deleteRecord($tableName, $uid);
-                } catch (\Throwable $e) {
-                    $logger->error($tableName . ' delete tool failed', ['exception' => $e]);
+            handler: static function (int $uid) use ($dataHandlerService, $logger, $auditLogger, $toolName, $tableName): RecordDeletedResult {
+                return RegistrarToolRunner::run(
+                    $toolName,
+                    $auditLogger,
+                    $logger,
+                    static function () use ($dataHandlerService, $tableName, $uid): RecordDeletedResult {
+                        $dataHandlerService->deleteRecord($tableName, $uid);
 
-                    throw new ToolCallException($e->getMessage(), (int) $e->getCode(), $e);
-                }
-
-                return new RecordDeletedResult($uid);
+                        return new RecordDeletedResult($uid);
+                    },
+                );
             },
-            name: $config['prefix'] . '_delete',
+            name: $toolName,
             description: 'Delete a ' . $config['label'] . ' record by its uid.',
         );
     }
@@ -457,6 +508,8 @@ readonly class DynamicToolRegistrar
     {
         $dataHandlerService = $this->dataHandlerService;
         $logger = $this->logger;
+        $auditLogger = $this->auditLogger;
+        $toolName = $config['prefix'] . '_move';
 
         $builder->addTool(
             handler: static function (
@@ -466,24 +519,28 @@ readonly class DynamicToolRegistrar
             ) use (
                 $dataHandlerService,
                 $logger,
+                $auditLogger,
+                $toolName,
                 $tableName
             ): RecordMovedResult|ErrorResult {
-                $target = MoveTarget::resolve($targetPid, $afterUid);
-                if ($target instanceof ErrorResult) {
-                    return $target;
-                }
+                return RegistrarToolRunner::run($toolName, $auditLogger, $logger, static function () use (
+                    $dataHandlerService,
+                    $tableName,
+                    $uid,
+                    $targetPid,
+                    $afterUid,
+                ): RecordMovedResult|ErrorResult {
+                    $target = MoveTarget::resolve($targetPid, $afterUid);
+                    if ($target instanceof ErrorResult) {
+                        return $target;
+                    }
 
-                try {
                     $dataHandlerService->moveRecord($tableName, $uid, $target);
-                } catch (\Throwable $e) {
-                    $logger->error($tableName . ' move tool failed', ['exception' => $e]);
 
-                    throw new ToolCallException($e->getMessage(), (int) $e->getCode(), $e);
-                }
-
-                return new RecordMovedResult($uid, $target);
+                    return new RecordMovedResult($uid, $target);
+                });
             },
-            name: $config['prefix'] . '_move',
+            name: $toolName,
             description: 'Move a ' . $config['label'] . ' record to a new position. Provide exactly one of:'
                 . ' targetPid (move to the top of that page) or afterUid (place after that sibling record).',
         );
@@ -495,29 +552,32 @@ readonly class DynamicToolRegistrar
         $recordService = $this->recordService;
         $dataHandlerService = $this->dataHandlerService;
         $logger = $this->logger;
+        $auditLogger = $this->auditLogger;
+        $toolName = $config['prefix'] . '_delete_batch';
 
         $builder->addTool(
-            handler: static function (string $uids) use ($recordService, $dataHandlerService, $logger, $tableName): BatchRecordsDeletedResult {
-                $uidList = self::parseUids($uids);
-                $existingUids = $recordService->findExistingUids($tableName, $uidList);
+            handler: static function (string $uids) use ($recordService, $dataHandlerService, $logger, $auditLogger, $toolName, $tableName): BatchRecordsDeletedResult {
+                return RegistrarToolRunner::run(
+                    $toolName,
+                    $auditLogger,
+                    $logger,
+                    static function () use ($recordService, $dataHandlerService, $tableName, $uids): BatchRecordsDeletedResult {
+                        $uidList = self::parseUids($uids);
+                        $existingUids = $recordService->findExistingUids($tableName, $uidList);
 
-                if ($existingUids === []) {
-                    throw new ToolCallException('None of the provided UIDs exist in table ' . $tableName);
-                }
+                        if ($existingUids === []) {
+                            throw new ToolCallException('None of the provided UIDs exist in table ' . $tableName);
+                        }
 
-                $skippedUids = array_values(array_diff($uidList, $existingUids));
+                        $skippedUids = array_values(array_diff($uidList, $existingUids));
 
-                try {
-                    $dataHandlerService->deleteRecords($tableName, $existingUids);
-                } catch (\Throwable $e) {
-                    $logger->error($tableName . ' delete batch tool failed', ['exception' => $e]);
+                        $dataHandlerService->deleteRecords($tableName, $existingUids);
 
-                    throw new ToolCallException($e->getMessage(), (int) $e->getCode(), $e);
-                }
-
-                return new BatchRecordsDeletedResult($existingUids, count($existingUids), $skippedUids);
+                        return new BatchRecordsDeletedResult($existingUids, count($existingUids), $skippedUids);
+                    },
+                );
             },
-            name: $config['prefix'] . '_delete_batch',
+            name: $toolName,
             description: 'Delete multiple ' . $config['label'] . ' records in a single operation.'
                 . ' Pass UIDs as a comma-separated string (e.g. "1,2,3").'
                 . ' Non-existent UIDs are skipped and reported in skippedUids.',
@@ -530,6 +590,8 @@ readonly class DynamicToolRegistrar
         $recordService = $this->recordService;
         $dataHandlerService = $this->dataHandlerService;
         $logger = $this->logger;
+        $auditLogger = $this->auditLogger;
+        $toolName = $config['prefix'] . '_update_batch';
         $writableFields = $config['writableFields'];
 
         $builder->addTool(
@@ -540,52 +602,57 @@ readonly class DynamicToolRegistrar
                 $recordService,
                 $dataHandlerService,
                 $logger,
+                $auditLogger,
+                $toolName,
                 $tableName,
                 $writableFields,
             ): BatchRecordsUpdatedResult {
-                $uidList = self::parseUids($uids);
-                $existingUids = $recordService->findExistingUids($tableName, $uidList);
+                return RegistrarToolRunner::run($toolName, $auditLogger, $logger, static function () use (
+                    $recordService,
+                    $dataHandlerService,
+                    $tableName,
+                    $writableFields,
+                    $uids,
+                    $fields,
+                ): BatchRecordsUpdatedResult {
+                    $uidList = self::parseUids($uids);
+                    $existingUids = $recordService->findExistingUids($tableName, $uidList);
 
-                if ($existingUids === []) {
-                    throw new ToolCallException('None of the provided UIDs exist in table ' . $tableName);
-                }
-
-                $skippedUids = array_values(array_diff($uidList, $existingUids));
-
-                /** @var array<string, mixed> $fieldData */
-                $fieldData = json_decode($fields, true, 512, JSON_THROW_ON_ERROR);
-
-                $validFields = [];
-                $ignoredFields = [];
-                foreach ($fieldData as $field => $value) {
-                    if (in_array($field, $writableFields, true)) {
-                        $validFields[$field] = $value;
-                    } else {
-                        $ignoredFields[] = $field;
+                    if ($existingUids === []) {
+                        throw new ToolCallException('None of the provided UIDs exist in table ' . $tableName);
                     }
-                }
 
-                if ($validFields === []) {
-                    throw new ToolCallException('No valid writable fields provided');
-                }
+                    $skippedUids = array_values(array_diff($uidList, $existingUids));
 
-                try {
+                    /** @var array<string, mixed> $fieldData */
+                    $fieldData = json_decode($fields, true, 512, JSON_THROW_ON_ERROR);
+
+                    $validFields = [];
+                    $ignoredFields = [];
+                    foreach ($fieldData as $field => $value) {
+                        if (in_array($field, $writableFields, true)) {
+                            $validFields[$field] = $value;
+                        } else {
+                            $ignoredFields[] = $field;
+                        }
+                    }
+
+                    if ($validFields === []) {
+                        throw new ToolCallException('No valid writable fields provided');
+                    }
+
                     $dataHandlerService->updateRecords($tableName, $existingUids, $validFields);
-                } catch (\Throwable $e) {
-                    $logger->error($tableName . ' update batch tool failed', ['exception' => $e]);
 
-                    throw new ToolCallException($e->getMessage(), (int) $e->getCode(), $e);
-                }
-
-                return new BatchRecordsUpdatedResult(
-                    $existingUids,
-                    count($existingUids),
-                    array_keys($validFields),
-                    $ignoredFields,
-                    $skippedUids,
-                );
+                    return new BatchRecordsUpdatedResult(
+                        $existingUids,
+                        count($existingUids),
+                        array_keys($validFields),
+                        $ignoredFields,
+                        $skippedUids,
+                    );
+                });
             },
-            name: $config['prefix'] . '_update_batch',
+            name: $toolName,
             description: 'Update the same fields on multiple ' . $config['label'] . ' records.'
                 . ' Pass UIDs as comma-separated (e.g. "1,2,3") and fields as a JSON object (e.g. {"hidden":1}).'
                 . ' Available fields: ' . implode(', ', $config['writableFields']) . '.'
@@ -599,6 +666,8 @@ readonly class DynamicToolRegistrar
         $recordService = $this->recordService;
         $dataHandlerService = $this->dataHandlerService;
         $logger = $this->logger;
+        $auditLogger = $this->auditLogger;
+        $toolName = $config['prefix'] . '_move_batch';
 
         $builder->addTool(
             handler: static function (
@@ -609,33 +678,38 @@ readonly class DynamicToolRegistrar
                 $recordService,
                 $dataHandlerService,
                 $logger,
+                $auditLogger,
+                $toolName,
                 $tableName
             ): BatchRecordsMovedResult|ErrorResult {
-                $target = MoveTarget::resolve($targetPid, $afterUid);
-                if ($target instanceof ErrorResult) {
-                    return $target;
-                }
+                return RegistrarToolRunner::run($toolName, $auditLogger, $logger, static function () use (
+                    $recordService,
+                    $dataHandlerService,
+                    $tableName,
+                    $uids,
+                    $targetPid,
+                    $afterUid,
+                ): BatchRecordsMovedResult|ErrorResult {
+                    $target = MoveTarget::resolve($targetPid, $afterUid);
+                    if ($target instanceof ErrorResult) {
+                        return $target;
+                    }
 
-                $uidList = self::parseUids($uids);
-                $existingUids = $recordService->findExistingUids($tableName, $uidList);
+                    $uidList = self::parseUids($uids);
+                    $existingUids = $recordService->findExistingUids($tableName, $uidList);
 
-                if ($existingUids === []) {
-                    throw new ToolCallException('None of the provided UIDs exist in table ' . $tableName);
-                }
+                    if ($existingUids === []) {
+                        throw new ToolCallException('None of the provided UIDs exist in table ' . $tableName);
+                    }
 
-                $skippedUids = array_values(array_diff($uidList, $existingUids));
+                    $skippedUids = array_values(array_diff($uidList, $existingUids));
 
-                try {
                     $dataHandlerService->moveRecords($tableName, $existingUids, $target);
-                } catch (\Throwable $e) {
-                    $logger->error($tableName . ' move batch tool failed', ['exception' => $e]);
 
-                    throw new ToolCallException($e->getMessage(), (int) $e->getCode(), $e);
-                }
-
-                return new BatchRecordsMovedResult($existingUids, count($existingUids), $target, $skippedUids);
+                    return new BatchRecordsMovedResult($existingUids, count($existingUids), $target, $skippedUids);
+                });
             },
-            name: $config['prefix'] . '_move_batch',
+            name: $toolName,
             description: 'Move multiple ' . $config['label'] . ' records to a new position in a single operation.'
                 . ' Pass UIDs as comma-separated (e.g. "1,2,3").'
                 . ' Provide exactly one of: targetPid (move all to the top of that page)'

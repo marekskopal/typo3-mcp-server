@@ -4,12 +4,13 @@ declare(strict_types=1);
 
 namespace MarekSkopal\MsMcpServer\Tool\Scheduler;
 
+use MarekSkopal\MsMcpServer\Logging\AuditLogger;
 use MarekSkopal\MsMcpServer\Service\DataHandlerService;
 use MarekSkopal\MsMcpServer\Service\RecordService;
+use MarekSkopal\MsMcpServer\Tool\Helper\RegistrarToolRunner;
 use MarekSkopal\MsMcpServer\Tool\Result\ErrorResult;
 use MarekSkopal\MsMcpServer\Tool\Result\RecordDeletedResult;
 use MarekSkopal\MsMcpServer\Tool\Result\RecordUpdatedResult;
-use Mcp\Exception\ToolCallException;
 use Mcp\Server\Builder;
 use Psr\Log\LoggerInterface;
 use TYPO3\CMS\Core\Database\ConnectionPool;
@@ -44,6 +45,7 @@ readonly class SchedulerToolRegistrar
         private DataHandlerService $dataHandlerService,
         private ConnectionPool $connectionPool,
         private LoggerInterface $logger,
+        private AuditLogger $auditLogger,
     ) {
     }
 
@@ -94,6 +96,7 @@ readonly class SchedulerToolRegistrar
     {
         $recordService = $this->recordService;
         $logger = $this->logger;
+        $auditLogger = $this->auditLogger;
         $hasTasktype = in_array('tasktype', $fields, true);
         $hasTaskGroup = in_array('task_group', $fields, true);
         $hasDisable = in_array('disable', $fields, true);
@@ -108,25 +111,37 @@ readonly class SchedulerToolRegistrar
             ) use (
                 $recordService,
                 $logger,
+                $auditLogger,
                 $fields,
                 $hasTasktype,
                 $hasTaskGroup,
                 $hasDisable,
             ): string {
-                /** @var array<string, array{operator: string, value: string}> $conditions */
-                $conditions = [];
+                return RegistrarToolRunner::run('scheduler_list', $auditLogger, $logger, static function () use (
+                    $recordService,
+                    $fields,
+                    $hasTasktype,
+                    $hasTaskGroup,
+                    $hasDisable,
+                    $limit,
+                    $offset,
+                    $tasktype,
+                    $taskGroup,
+                    $disable,
+                ): string {
+                    /** @var array<string, array{operator: string, value: string}> $conditions */
+                    $conditions = [];
 
-                if ($tasktype !== '' && $hasTasktype) {
-                    $conditions['tasktype'] = ['operator' => 'like', 'value' => $tasktype];
-                }
-                if ($taskGroup >= 0 && $hasTaskGroup) {
-                    $conditions['task_group'] = ['operator' => 'eq', 'value' => (string) $taskGroup];
-                }
-                if ($disable >= 0 && $hasDisable) {
-                    $conditions['disable'] = ['operator' => 'eq', 'value' => (string) $disable];
-                }
+                    if ($tasktype !== '' && $hasTasktype) {
+                        $conditions['tasktype'] = ['operator' => 'like', 'value' => $tasktype];
+                    }
+                    if ($taskGroup >= 0 && $hasTaskGroup) {
+                        $conditions['task_group'] = ['operator' => 'eq', 'value' => (string) $taskGroup];
+                    }
+                    if ($disable >= 0 && $hasDisable) {
+                        $conditions['disable'] = ['operator' => 'eq', 'value' => (string) $disable];
+                    }
 
-                try {
                     $result = $recordService->search(
                         self::TABLE,
                         $conditions,
@@ -137,13 +152,9 @@ readonly class SchedulerToolRegistrar
                         'uid',
                         'ASC',
                     );
-                } catch (\Throwable $e) {
-                    $logger->error('scheduler list tool failed', ['exception' => $e]);
 
-                    throw new ToolCallException($e->getMessage(), (int) $e->getCode(), $e);
-                }
-
-                return json_encode($result, JSON_THROW_ON_ERROR);
+                    return json_encode($result, JSON_THROW_ON_ERROR);
+                });
             },
             name: 'scheduler_list',
             description: 'List scheduler tasks with pagination and optional filtering.'
@@ -157,22 +168,24 @@ readonly class SchedulerToolRegistrar
     {
         $recordService = $this->recordService;
         $logger = $this->logger;
+        $auditLogger = $this->auditLogger;
 
         $builder->addTool(
-            handler: static function (int $uid) use ($recordService, $logger, $fields): string {
-                try {
-                    $record = $recordService->findByUid(self::TABLE, $uid, $fields);
-                } catch (\Throwable $e) {
-                    $logger->error('scheduler get tool failed', ['exception' => $e]);
+            handler: static function (int $uid) use ($recordService, $logger, $auditLogger, $fields): string {
+                return RegistrarToolRunner::run(
+                    'scheduler_get',
+                    $auditLogger,
+                    $logger,
+                    static function () use ($recordService, $uid, $fields): string {
+                        $record = $recordService->findByUid(self::TABLE, $uid, $fields);
 
-                    throw new ToolCallException($e->getMessage(), (int) $e->getCode(), $e);
-                }
+                        if ($record === null) {
+                            return json_encode(['error' => 'Scheduler task not found'], JSON_THROW_ON_ERROR);
+                        }
 
-                if ($record === null) {
-                    return json_encode(['error' => 'Scheduler task not found'], JSON_THROW_ON_ERROR);
-                }
-
-                return json_encode($record, JSON_THROW_ON_ERROR);
+                        return json_encode($record, JSON_THROW_ON_ERROR);
+                    },
+                );
             },
             name: 'scheduler_get',
             description: 'Get a single scheduler task by its uid.',
@@ -184,6 +197,7 @@ readonly class SchedulerToolRegistrar
     {
         $dataHandlerService = $this->dataHandlerService;
         $logger = $this->logger;
+        $auditLogger = $this->auditLogger;
 
         $builder->addTool(
             handler: static function (
@@ -192,27 +206,29 @@ readonly class SchedulerToolRegistrar
             ) use (
                 $dataHandlerService,
                 $logger,
+                $auditLogger,
                 $writableFields,
             ): RecordUpdatedResult|ErrorResult {
-                /** @var array<string, mixed> $data */
-                $data = json_decode($fields, true, 512, JSON_THROW_ON_ERROR);
+                return RegistrarToolRunner::run('scheduler_update', $auditLogger, $logger, static function () use (
+                    $dataHandlerService,
+                    $writableFields,
+                    $uid,
+                    $fields,
+                ): RecordUpdatedResult|ErrorResult {
+                    /** @var array<string, mixed> $data */
+                    $data = json_decode($fields, true, 512, JSON_THROW_ON_ERROR);
 
-                $filteredData = array_intersect_key($data, array_flip($writableFields));
-                $ignoredFields = array_values(array_diff(array_keys($data), array_keys($filteredData)));
+                    $filteredData = array_intersect_key($data, array_flip($writableFields));
+                    $ignoredFields = array_values(array_diff(array_keys($data), array_keys($filteredData)));
 
-                if ($filteredData === []) {
-                    return new ErrorResult('No valid fields provided', ['ignoredFields' => $ignoredFields]);
-                }
+                    if ($filteredData === []) {
+                        return new ErrorResult('No valid fields provided', ['ignoredFields' => $ignoredFields]);
+                    }
 
-                try {
                     $dataHandlerService->updateRecord(self::TABLE, $uid, $filteredData);
-                } catch (\Throwable $e) {
-                    $logger->error('scheduler update tool failed', ['exception' => $e]);
 
-                    throw new ToolCallException($e->getMessage(), (int) $e->getCode(), $e);
-                }
-
-                return new RecordUpdatedResult($uid, array_keys($filteredData), $ignoredFields);
+                    return new RecordUpdatedResult($uid, array_keys($filteredData), $ignoredFields);
+                });
             },
             name: 'scheduler_update',
             description: 'Update a scheduler task. Pass fields as a JSON object string.'
@@ -224,18 +240,20 @@ readonly class SchedulerToolRegistrar
     {
         $dataHandlerService = $this->dataHandlerService;
         $logger = $this->logger;
+        $auditLogger = $this->auditLogger;
 
         $builder->addTool(
-            handler: static function (int $uid) use ($dataHandlerService, $logger): RecordDeletedResult {
-                try {
-                    $dataHandlerService->deleteRecord(self::TABLE, $uid);
-                } catch (\Throwable $e) {
-                    $logger->error('scheduler delete tool failed', ['exception' => $e]);
+            handler: static function (int $uid) use ($dataHandlerService, $logger, $auditLogger): RecordDeletedResult {
+                return RegistrarToolRunner::run(
+                    'scheduler_delete',
+                    $auditLogger,
+                    $logger,
+                    static function () use ($dataHandlerService, $uid): RecordDeletedResult {
+                        $dataHandlerService->deleteRecord(self::TABLE, $uid);
 
-                    throw new ToolCallException($e->getMessage(), (int) $e->getCode(), $e);
-                }
-
-                return new RecordDeletedResult($uid);
+                        return new RecordDeletedResult($uid);
+                    },
+                );
             },
             name: 'scheduler_delete',
             description: 'Delete a scheduler task by its uid.',

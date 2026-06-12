@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace MarekSkopal\MsMcpServer\Tests\Unit\Tool\Redirect;
 
+use MarekSkopal\MsMcpServer\Logging\AuditLogger;
 use MarekSkopal\MsMcpServer\Service\DataHandlerService;
 use MarekSkopal\MsMcpServer\Service\RecordService;
 use MarekSkopal\MsMcpServer\Tool\Redirect\RedirectToolRegistrar;
@@ -224,7 +225,7 @@ final class RedirectToolRegistrarTest extends TestCase
         $closure = $this->getRegisteredClosure($recordService, $this->createStub(DataHandlerService::class), 'list');
 
         $this->expectException(ToolCallException::class);
-        $this->expectExceptionMessage('DB error');
+        $this->expectExceptionMessage('An internal error occurred');
 
         $closure();
     }
@@ -477,6 +478,7 @@ final class RedirectToolRegistrarTest extends TestCase
             $recordService ?? $this->createStub(RecordService::class),
             $dataHandlerService ?? $this->createStub(DataHandlerService::class),
             new NullLogger(),
+            $this->createStub(AuditLogger::class),
         );
     }
 
@@ -485,7 +487,7 @@ final class RedirectToolRegistrarTest extends TestCase
         DataHandlerService $dataHandlerService,
         string $toolType,
     ): \Closure {
-        $registrar = new RedirectToolRegistrar($recordService, $dataHandlerService, new NullLogger());
+        $registrar = new RedirectToolRegistrar($recordService, $dataHandlerService, new NullLogger(), $this->createStub(AuditLogger::class));
 
         $builder = Server::builder();
         $registrar->register($builder);
