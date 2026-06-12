@@ -318,6 +318,11 @@ readonly class OAuthMiddleware implements MiddlewareInterface
             );
         }
 
+        $redirectUriError = $this->clientRepository->validateRedirectUrisForRegistration($redirectUris);
+        if ($redirectUriError !== null) {
+            return $this->createJsonResponse(400, ['error' => 'invalid_redirect_uri', 'error_description' => $redirectUriError]);
+        }
+
         $client = $this->clientRepository->registerClient($clientName, $redirectUris);
 
         return $this->createJsonResponse(201, [

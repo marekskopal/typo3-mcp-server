@@ -114,6 +114,34 @@ final class ClientRepositoryTest extends TestCase
         self::assertNotEmpty($result['client_id']);
     }
 
+    public function testValidateRedirectUrisForRegistrationAcceptsHttpsAndLoopbackAndPrivateScheme(): void
+    {
+        $repository = new ClientRepository($this->createStub(ConnectionPool::class));
+
+        self::assertNull($repository->validateRedirectUrisForRegistration([
+            'https://client.example/cb',
+            'http://127.0.0.1:1234/callback',
+            'http://localhost/cb',
+            'com.example.app:/oauth',
+        ]));
+    }
+
+    public function testValidateRedirectUrisForRegistrationRejectsPlainHttpRemoteHost(): void
+    {
+        $repository = new ClientRepository($this->createStub(ConnectionPool::class));
+
+        self::assertNotNull($repository->validateRedirectUrisForRegistration(['http://evil.example/cb']));
+    }
+
+    public function testValidateRedirectUrisForRegistrationRejectsTooMany(): void
+    {
+        $repository = new ClientRepository($this->createStub(ConnectionPool::class));
+
+        $uris = array_fill(0, ClientRepository::MAX_REDIRECT_URIS + 1, 'https://client.example/cb');
+
+        self::assertNotNull($repository->validateRedirectUrisForRegistration($uris));
+    }
+
     /**
      * @param array<string, mixed>|false $row
      */
