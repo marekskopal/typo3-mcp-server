@@ -210,6 +210,20 @@ readonly class OAuthMiddleware implements MiddlewareInterface
         $codeChallengeMethod = (string) ($body['code_challenge_method'] ?? '');
         $state = (string) ($body['state'] ?? '');
 
+        // The POST is the path that actually mints the code, so re-run the full authorize
+        // validation here (not just on the GET). Otherwise a crafted POST could issue a code
+        // bound to an empty or non-S256 PKCE challenge, dropping the PKCE guarantee.
+        $validationError = $this->authorizeParamsValidator->validate([
+            'response_type' => 'code',
+            'client_id' => $clientId,
+            'redirect_uri' => $redirectUri,
+            'code_challenge' => $codeChallenge,
+            'code_challenge_method' => $codeChallengeMethod,
+        ]);
+        if ($validationError !== null) {
+            return $this->createJsonResponse(400, ['error' => 'invalid_request', 'error_description' => $validationError]);
+        }
+
         try {
             $code = $this->authorizationService->createAuthorizationCode(
                 $clientId,

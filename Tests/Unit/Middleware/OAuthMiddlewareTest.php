@@ -365,6 +365,13 @@ final class OAuthMiddlewareTest extends TestCase
         ]);
 
         $clientRepository = $this->createStub(ClientRepository::class);
+        $clientRepository->method('findByClientId')->willReturn([
+            'uid' => 1,
+            'client_id' => 'client-abc',
+            'client_name' => 'Test Client',
+            'redirect_uris' => '["https://client.example/cb"]',
+            'be_user' => 0,
+        ]);
         $clientRepository->method('validateRedirectUri')->willReturn(true);
 
         $authorizationService = $this->createMock(AuthorizationService::class);
@@ -388,6 +395,50 @@ final class OAuthMiddlewareTest extends TestCase
         self::assertStringContainsString('https://client.example/cb?', $location);
         self::assertStringContainsString('code=auth-code-xyz', $location);
         self::assertStringContainsString('state=opaque-state', $location);
+    }
+
+    public function testAuthorizePostRejectsNonS256Challenge(): void
+    {
+        $beUser = $this->createStub(BackendUserAuthentication::class);
+        $beUser->method('getUserId')->willReturn(42);
+        $GLOBALS['BE_USER'] = $beUser;
+
+        $request = $this->createRequest('/mcp/oauth/authorize', 'POST');
+        $csrf = bin2hex(random_bytes(16));
+        $request->method('getCookieParams')->willReturn(['mcp_csrf' => $csrf]);
+        $request->method('getParsedBody')->willReturn([
+            'csrf_token' => $csrf,
+            'client_id' => 'client-abc',
+            'redirect_uri' => 'https://client.example/cb',
+            'code_challenge' => 'challenge-value',
+            'code_challenge_method' => 'plain',
+            'state' => 'opaque-state',
+        ]);
+
+        $clientRepository = $this->createStub(ClientRepository::class);
+        $clientRepository->method('findByClientId')->willReturn([
+            'uid' => 1,
+            'client_id' => 'client-abc',
+            'client_name' => 'Test Client',
+            'redirect_uris' => '["https://client.example/cb"]',
+            'be_user' => 0,
+        ]);
+        $clientRepository->method('validateRedirectUri')->willReturn(true);
+
+        $authorizationService = $this->createMock(AuthorizationService::class);
+        $authorizationService->expects(self::never())->method('createAuthorizationCode');
+
+        $handler = $this->createMock(RequestHandlerInterface::class);
+        $handler->expects(self::never())->method('handle');
+
+        $middleware = $this->createMiddlewareWithCapture(
+            clientRepository: $clientRepository,
+            authorizationService: $authorizationService,
+        );
+        $middleware->process($request, $handler);
+
+        self::assertSame(400, $this->capturedStatusCode);
+        self::assertStringContainsString('code_challenge_method must be', $this->capturedBodies[0] ?? '');
     }
 
     public function testRegisterEndpointRequiresJsonContentType(): void
