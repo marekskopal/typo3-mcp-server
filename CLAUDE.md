@@ -143,3 +143,10 @@ readonly class MyTool
 - CleanupExpiredTokensCommand
 
 Classes are not `final`, so they can be mocked with PHPUnit. Uses `dg/bypass-finals` for TYPO3 final classes (ModuleTemplateFactory). Use `createStub()` (not `createMock()`) when no `expects()` is configured. `TcaSchemaService` is instantiated directly in tests with `$GLOBALS['TCA']` set up in `setUp()`.
+
+## Releasing
+
+1. Bump the version in **both** `ext_emconf.php` and `McpServerFactory::VERSION`, and add a `CHANGELOG.md` entry.
+2. Push the release commit to `main` and **wait until every GitHub Actions workflow passes on that commit before creating the tag or release.** There are two workflows — `CI` (PHPStan + PHPCS + PHPUnit) and `Integration Tests` (runs the tools against a real TYPO3 + database). The local `vendor/bin/phpunit` suite does **not** exercise the integration suite, so a green local run is not enough. Check with `gh run list` and only proceed once both are `success`.
+3. Only then create the tag and GitHub release (`git tag` + `gh release create`).
+4. **Never move or re-tag a published version** — Packagist pins a tag to its original commit and will not pick up a moved tag. If a tagged release is broken, ship a new patch version instead.
