@@ -215,6 +215,83 @@ final class McpServerMiddlewareTest extends TestCase
         $middleware->process($request, $handler);
     }
 
+    public function testMalformedSessionIdReturns400(): void
+    {
+        $uri = $this->createStub(UriInterface::class);
+        $uri->method('getPath')->willReturn('/mcp');
+
+        $request = $this->createStub(ServerRequestInterface::class);
+        $request->method('getUri')->willReturn($uri);
+        $request->method('getMethod')->willReturn('POST');
+        $request->method('getServerParams')->willReturn([]);
+        $request->method('getHeaderLine')->willReturnCallback(
+            static fn(string $name): string => match ($name) {
+                'Authorization' => 'Bearer valid-token',
+                'Mcp-Session-Id' => 'not-a-uuid',
+                default => '',
+            },
+        );
+
+        $result = $this->createStub(Result::class);
+        $result->method('fetchAssociative')->willReturn(['be_user' => 1, 'access_token_expires' => time() + 9999, 'revoked' => 0]);
+
+        $expressionBuilder = $this->createStub(ExpressionBuilder::class);
+        $queryBuilder = $this->createStub(QueryBuilder::class);
+        $queryBuilder->method('select')->willReturnSelf();
+        $queryBuilder->method('from')->willReturnSelf();
+        $queryBuilder->method('where')->willReturnSelf();
+        $queryBuilder->method('expr')->willReturn($expressionBuilder);
+        $queryBuilder->method('createNamedParameter')->willReturn("'dummy'");
+        $queryBuilder->method('executeQuery')->willReturn($result);
+        $queryBuilder->method('getRestrictions')->willReturn($this->createStub(QueryRestrictionContainerInterface::class));
+
+        $connectionPool = $this->createStub(ConnectionPool::class);
+        $connectionPool->method('getQueryBuilderForTable')->willReturn($queryBuilder);
+
+        $authorizationService = new AuthorizationService(
+            $connectionPool,
+            new PkceVerifier(),
+            new ClientRepository($connectionPool),
+            $this->createStub(ExtensionConfiguration::class),
+        );
+
+        $stream = $this->createStub(StreamInterface::class);
+        $streamFactory = $this->createStub(StreamFactoryInterface::class);
+        $streamFactory->method('createStream')->willReturn($stream);
+
+        $capturedStatus = null;
+        $response = $this->createStub(ResponseInterface::class);
+        $response->method('withHeader')->willReturnSelf();
+        $response->method('withBody')->willReturnSelf();
+        $responseFactory = $this->createStub(ResponseFactoryInterface::class);
+        $responseFactory->method('createResponse')->willReturnCallback(
+            function (int $status = 200) use ($response, &$capturedStatus): ResponseInterface {
+                $capturedStatus = $status;
+
+                return $response;
+            },
+        );
+
+        $mcpServerFactory = $this->createMock(McpServerFactory::class);
+        $mcpServerFactory->expects(self::never())->method('create');
+
+        $handler = $this->createMock(RequestHandlerInterface::class);
+        $handler->expects(self::never())->method('handle');
+
+        $middleware = new McpServerMiddleware(
+            $authorizationService,
+            $this->createStub(BackendUserBootstrap::class),
+            $mcpServerFactory,
+            $this->createPathProvider(),
+            $responseFactory,
+            $streamFactory,
+        );
+
+        $middleware->process($request, $handler);
+
+        self::assertSame(400, $capturedStatus);
+    }
+
     public function testIsSessionNotFoundResponseDetectsSdkSessionExpired(): void
     {
         $middleware = new McpServerMiddleware(

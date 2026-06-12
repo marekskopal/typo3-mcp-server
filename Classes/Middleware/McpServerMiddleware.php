@@ -17,6 +17,7 @@ use Psr\Http\Message\ServerRequestInterface;
 use Psr\Http\Message\StreamFactoryInterface;
 use Psr\Http\Server\MiddlewareInterface;
 use Psr\Http\Server\RequestHandlerInterface;
+use Symfony\Component\Uid\Uuid;
 use TYPO3\CMS\Core\Http\NormalizedParams;
 use const JSON_THROW_ON_ERROR;
 
@@ -53,6 +54,13 @@ readonly class McpServerMiddleware implements MiddlewareInterface
             $this->backendUserBootstrap->bootstrap($beUserUid);
         } catch (\RuntimeException) {
             return $this->withCorsHeaders($this->createUnauthorizedResponse($request, 'Authentication failed'));
+        }
+
+        // The SDK calls Uuid::fromString() on this header with no guard; an invalid value would
+        // throw out of the middleware as an uncaught 500. Reject it with a clean 400 instead.
+        $sessionId = $request->getHeaderLine('Mcp-Session-Id');
+        if ($sessionId !== '' && !Uuid::isValid($sessionId)) {
+            return $this->withCorsHeaders($this->createBadRequestResponse('Invalid Mcp-Session-Id header'));
         }
 
         $server = $this->mcpServerFactory->create($beUserUid);
@@ -151,6 +159,16 @@ readonly class McpServerMiddleware implements MiddlewareInterface
         }
 
         return $baseUrl;
+    }
+
+    private function createBadRequestResponse(string $error): ResponseInterface
+    {
+        $body = $this->streamFactory->createStream(json_encode(['error' => $error], JSON_THROW_ON_ERROR));
+
+        return $this->responseFactory
+            ->createResponse(400)
+            ->withHeader('Content-Type', 'application/json')
+            ->withBody($body);
     }
 
     private function withCorsHeaders(ResponseInterface $response): ResponseInterface
