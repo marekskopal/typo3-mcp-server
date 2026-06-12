@@ -90,4 +90,44 @@ final class ErrorHandlingProxyTest extends TestCase
         $this->expectException(ToolCallException::class);
         $proxy->execute();
     }
+
+    public function testUnexpectedExceptionMessageIsNotLeakedToClient(): void
+    {
+        $inner = new class () {
+            public function execute(): never
+            {
+                throw new \RuntimeException('SQLSTATE near "SELECT * FROM be_users" at /var/www/app');
+            }
+        };
+
+        $proxy = new ErrorHandlingProxy($inner, new NullLogger(), $this->createStub(AuditLogger::class), 'tool');
+
+        try {
+            $proxy->execute();
+            self::fail('Expected ToolCallException');
+        } catch (ToolCallException $e) {
+            self::assertStringNotContainsString('be_users', $e->getMessage());
+            self::assertStringNotContainsString('/var/www', $e->getMessage());
+            self::assertStringContainsString('internal error', $e->getMessage());
+        }
+    }
+
+    public function testDeliberateToolCallExceptionMessageIsPreserved(): void
+    {
+        $inner = new class () {
+            public function execute(): never
+            {
+                throw new ToolCallException('None of the provided UIDs exist in table pages');
+            }
+        };
+
+        $proxy = new ErrorHandlingProxy($inner, new NullLogger(), $this->createStub(AuditLogger::class), 'tool');
+
+        try {
+            $proxy->execute();
+            self::fail('Expected ToolCallException');
+        } catch (ToolCallException $e) {
+            self::assertSame('None of the provided UIDs exist in table pages', $e->getMessage());
+        }
+    }
 }
