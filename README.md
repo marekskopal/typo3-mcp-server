@@ -457,6 +457,39 @@ Restricted to admin backend users only. Sensitive `be_users` columns (`password`
 | `backend_group_list` | List `be_groups` with optional title search; paginated. |
 | `backend_group_get` | Get a single backend group by uid with permission and mount details. |
 
+### Permissions
+
+Tools for inspecting the authenticated backend user's effective permissions.
+
+| Tool | Description |
+|------|-------------|
+| `permission_check_table` | Check whether the current user can read (select) and/or write (modify) a specific table. |
+| `permission_check_page` | Check what the current user can do on a page: show, edit, delete, create subpages, edit content. |
+| `permission_check_summary` | Summary of the current user's permissions: admin status, allowed tables for read/write, languages, file permissions, web/file mounts. |
+
+### Redirects
+
+Registered only when `typo3/cms-redirects` is installed. Operates on the `sys_redirect` table through DataHandler.
+
+| Tool | Description |
+|------|-------------|
+| `redirect_list` | List redirects with pagination; filter by `sourceHost`, `sourcePath`, `target` (LIKE) and `disabled`. |
+| `redirect_get` | Get a single redirect record by uid. |
+| `redirect_create` | Create a redirect. Required: `sourceHost`, `sourcePath`, `target`; optional `targetStatuscode` and extra `fields` JSON. |
+| `redirect_update` | Update an existing redirect. Pass fields as a JSON object. |
+| `redirect_delete` | Delete a redirect by uid. |
+
+### Scheduler
+
+Registered only when `typo3/cms-scheduler` is installed. Operates on the `tx_scheduler_task` table.
+
+| Tool | Description |
+|------|-------------|
+| `scheduler_list` | List scheduler tasks with pagination; filter by `tasktype` (LIKE), `taskGroup`, `disable`. |
+| `scheduler_get` | Get a single scheduler task by uid. |
+| `scheduler_update` | Update a task. Writable fields: `disable`, `description`, `task_group`. |
+| `scheduler_delete` | Delete a scheduler task by uid. |
+
 ### Workspaces
 
 Registered only when `typo3/cms-workspaces` is installed. Direct (live-mode) operation is the primary use case for this extension — these tools enable a secondary draft/publish workflow when review is required. After `workspace_switch`, all subsequent reads and writes (`pages_*`, `content_*`, etc.) operate on the chosen workspace.
@@ -473,7 +506,7 @@ Registered only when `typo3/cms-workspaces` is installed. Direct (live-mode) ope
 
 ### Dynamic Extension Tools
 
-Additional CRUD tools are registered automatically for tables configured via `EXTCONF` or enabled through the **Extension Tables** backend module (auto-discovery). News is pre-configured and generates 6 tools:
+Additional CRUD tools are registered automatically for tables configured via `EXTCONF` or enabled through the **Extension Tables** backend module (auto-discovery). News is pre-configured and generates 9 tools:
 
 | Tool | Description |
 |------|-------------|
@@ -483,6 +516,9 @@ Additional CRUD tools are registered automatically for tables configured via `EX
 | `news_update` | Update news record fields |
 | `news_delete` | Delete a news record |
 | `news_move` | Move a news record |
+| `news_delete_batch` | Delete multiple news records by comma-separated UIDs |
+| `news_update_batch` | Update the same fields on multiple news records |
+| `news_move_batch` | Move multiple news records to a target position |
 
 See [Adding Support for Other Extensions](#adding-support-for-other-extensions) to register your own tables.
 
@@ -529,7 +565,7 @@ $GLOBALS['TYPO3_CONF_VARS']['EXTCONF']['ms_mcp_server']['tables']['tx_blog_domai
 ];
 ```
 
-This automatically creates 6 tools (`blog_post_list`, `blog_post_get`, `blog_post_create`, `blog_post_update`, `blog_post_delete`, `blog_post_move`) with fields resolved from TCA.
+This automatically creates 9 tools (`blog_post_list`, `blog_post_get`, `blog_post_create`, `blog_post_update`, `blog_post_delete`, `blog_post_move`, plus the batch variants `blog_post_delete_batch`, `blog_post_update_batch`, `blog_post_move_batch`) with fields resolved from TCA.
 
 Optional overrides:
 
