@@ -146,11 +146,13 @@ readonly class ClientRepository
         $allowedHost = $allowedParsed['host'] ?? '';
         $requestedHost = $requestedParsed['host'] ?? '';
 
-        // Allow localhost with any port per OAuth 2.1
+        // Allow loopback redirect URIs to vary only by port (RFC 8252 §7.3); scheme, host,
+        // path, and query must still match exactly.
         if (in_array($allowedHost, ['localhost', '127.0.0.1', '::1'], true)
             && $allowedHost === $requestedHost
             && ($allowedParsed['scheme'] ?? '') === ($requestedParsed['scheme'] ?? '')
             && ($allowedParsed['path'] ?? '/') === ($requestedParsed['path'] ?? '/')
+            && ($allowedParsed['query'] ?? '') === ($requestedParsed['query'] ?? '')
         ) {
             return true;
         }

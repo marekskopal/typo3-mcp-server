@@ -80,6 +80,23 @@ final class ClientRepositoryTest extends TestCase
         self::assertTrue($repository->validateRedirectUri('test-client-id', 'http://localhost:8080/callback'));
     }
 
+    public function testValidateRedirectUriReturnsFalseForLocalhostDifferentQuery(): void
+    {
+        $client = [
+            'uid' => 1,
+            'client_id' => 'test-client-id',
+            'client_name' => 'Test Client',
+            'redirect_uris' => json_encode(['http://localhost:3000/callback'], JSON_THROW_ON_ERROR),
+            'be_user' => 0,
+        ];
+
+        $connectionPool = $this->createConnectionPoolWithQueryResult($client);
+
+        $repository = new ClientRepository($connectionPool);
+
+        self::assertFalse($repository->validateRedirectUri('test-client-id', 'http://localhost:8080/callback?next=//evil'));
+    }
+
     public function testValidateRedirectUriReturnsFalseForNonMatchingUri(): void
     {
         $client = [
