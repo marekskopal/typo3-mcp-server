@@ -41,6 +41,20 @@ readonly class BackendUserBootstrap
             throw new \RuntimeException('Backend user not found', 1712000010);
         }
 
+        // be_users declares starttime/endtime enable-columns. Honour them so a token issued
+        // for a time-limited account stops working once the account's validity window closes
+        // (or before it opens), matching TYPO3's own login behaviour.
+        $now = time();
+        $starttime = (int) ($userRow['starttime'] ?? 0);
+        if ($starttime > 0 && $starttime > $now) {
+            throw new \RuntimeException('Backend user not found', 1712000010);
+        }
+
+        $endtime = (int) ($userRow['endtime'] ?? 0);
+        if ($endtime > 0 && $endtime < $now) {
+            throw new \RuntimeException('Backend user not found', 1712000010);
+        }
+
         $backendUser = new BackendUserAuthentication();
         // @phpstan-ignore property.internal
         $backendUser->user = $userRow;

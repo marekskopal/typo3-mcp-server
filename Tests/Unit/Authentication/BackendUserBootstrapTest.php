@@ -67,6 +67,42 @@ final class BackendUserBootstrapTest extends TestCase
         $bootstrap->bootstrap(1);
     }
 
+    public function testBootstrapThrowsWhenStarttimeInFuture(): void
+    {
+        $result = $this->createStub(Result::class);
+        $result->method('fetchAssociative')->willReturn([
+            'uid' => 1,
+            'username' => 'admin',
+            'starttime' => time() + 3600,
+        ]);
+
+        $languageServiceFactory = $this->createStub(LanguageServiceFactory::class);
+        $bootstrap = new BackendUserBootstrap($this->createConnectionPool($result), $languageServiceFactory);
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionCode(1712000010);
+
+        $bootstrap->bootstrap(1);
+    }
+
+    public function testBootstrapThrowsWhenEndtimeInPast(): void
+    {
+        $result = $this->createStub(Result::class);
+        $result->method('fetchAssociative')->willReturn([
+            'uid' => 1,
+            'username' => 'admin',
+            'endtime' => time() - 3600,
+        ]);
+
+        $languageServiceFactory = $this->createStub(LanguageServiceFactory::class);
+        $bootstrap = new BackendUserBootstrap($this->createConnectionPool($result), $languageServiceFactory);
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionCode(1712000010);
+
+        $bootstrap->bootstrap(1);
+    }
+
     /**
      * Full bootstrap test requires TYPO3 DI (GeneralUtility::makeInstance for GroupResolver).
      * Error path tests above verify the query and validation logic.
