@@ -26,10 +26,23 @@ final class RateLimitServiceTest extends TestCase
         self::assertNull($service->check('127.0.0.1', 'authorize_post'));
     }
 
-    public function testCheckReturnsNullWhenIpIsEmpty(): void
+    public function testCheckBucketsEmptyIpUnderSharedKey(): void
     {
-        $service = $this->createService();
+        $connection = $this->createMock(Connection::class);
+        $connection->expects(self::once())
+            ->method('insert')
+            ->with('tx_msmcpserver_rate_limit', self::callback(static function (array $data): bool {
+                self::assertSame('unknown', $data['ip_address']);
 
+                return true;
+            }));
+
+        $connectionPool = $this->createStub(ConnectionPool::class);
+        $connectionPool->method('getConnectionForTable')->willReturn($connection);
+
+        $service = $this->createService(connectionPool: $connectionPool);
+
+        // An unresolved IP is bucketed (not allowed through) and still counts toward the limit.
         self::assertNull($service->check('', 'authorize_post'));
     }
 

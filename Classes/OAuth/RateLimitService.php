@@ -56,8 +56,14 @@ readonly class RateLimitService
      */
     public function check(string $ipAddress, string $endpoint): ?int
     {
-        if (!$this->enabled || $ipAddress === '') {
+        if (!$this->enabled) {
             return null;
+        }
+
+        // Don't fail open when the client IP can't be resolved: bucket all such requests
+        // together under a shared key so they are still subject to the limit.
+        if ($ipAddress === '') {
+            $ipAddress = 'unknown';
         }
 
         $config = $this->endpointLimits[$endpoint] ?? null;
