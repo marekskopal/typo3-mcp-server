@@ -171,6 +171,12 @@ readonly class OAuthMiddleware implements MiddlewareInterface
 
         return $this->responseFactory->createResponse(200)
             ->withHeader('Content-Type', 'text/html; charset=utf-8')
+            // Prevent the consent screen from being framed (clickjacking the "Authorize"
+            // button) or cached (it carries a live CSRF token and reflected params).
+            ->withHeader('X-Frame-Options', 'DENY')
+            ->withHeader('Content-Security-Policy', "frame-ancestors 'none'")
+            ->withHeader('Cache-Control', 'no-store')
+            ->withHeader('X-Content-Type-Options', 'nosniff')
             ->withHeader('Set-Cookie', sprintf(
                 'mcp_csrf=%s; Path=%s; HttpOnly; SameSite=Strict; Secure; Max-Age=600',
                 $csrfToken,

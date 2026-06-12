@@ -309,6 +309,9 @@ final class OAuthMiddlewareTest extends TestCase
         self::assertStringContainsString('Authorize Access', $body);
         self::assertStringNotContainsString('<input type="password"', $body);
         self::assertStringNotContainsString('name="username"', $body);
+        self::assertSame('DENY', $this->capturedHeaders['X-Frame-Options'] ?? null);
+        self::assertSame("frame-ancestors 'none'", $this->capturedHeaders['Content-Security-Policy'] ?? null);
+        self::assertSame('no-store', $this->capturedHeaders['Cache-Control'] ?? null);
     }
 
     public function testAuthorizePostWithoutBackendSessionReturns401(): void
