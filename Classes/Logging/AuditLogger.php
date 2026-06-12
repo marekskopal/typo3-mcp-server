@@ -38,7 +38,9 @@ readonly class AuditLogger
             type: $type,
             executionTimeMs: $executionTimeMs,
             error: 2,
-            details: sprintf('MCP %s %s failed: %s (%dms)', $type, $handlerName, $errorMessage, $executionTimeMs),
+            // The error message is attacker-influenceable, so keep it out of `details` (which
+            // the backend log module treats as an sprintf format string) — it lives in log_data.
+            details: sprintf('MCP %s %s failed (%dms)', $type, $handlerName, $executionTimeMs),
             errorMessage: $errorMessage,
         );
     }
@@ -64,7 +66,9 @@ readonly class AuditLogger
             ];
 
             if ($errorMessage !== '') {
-                $data['error'] = $errorMessage;
+                // Strip control characters so a crafted error message can't inject newlines or
+                // terminal escapes into the audit trail.
+                $data['error'] = (string) preg_replace('/[\x00-\x1F\x7F]/', ' ', $errorMessage);
             }
 
             $connection = $this->connectionPool->getConnectionForTable(self::TABLE);
@@ -72,7 +76,7 @@ readonly class AuditLogger
                 'userid' => $backendUser->getUserId() ?? 0,
                 'type' => 4,
                 'channel' => 'default',
-                'level' => 'info',
+                'level' => $error === 0 ? 'info' : 'error',
                 'action' => 0,
                 'error' => $error,
                 'details' => $details,

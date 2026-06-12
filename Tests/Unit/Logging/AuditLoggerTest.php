@@ -68,8 +68,10 @@ final class AuditLoggerTest extends TestCase
                 'sys_log',
                 self::callback(static function (array $data): bool {
                     self::assertSame(2, $data['error']);
+                    self::assertSame('error', $data['level']);
                     self::assertStringContainsString('failed', $data['details']);
-                    self::assertStringContainsString('Record not found', $data['details']);
+                    // The raw error message must not be interpolated into the format-string details.
+                    self::assertStringNotContainsString('Record not found', $data['details']);
 
                     $logData = json_decode($data['log_data'], true, 512, JSON_THROW_ON_ERROR);
                     self::assertSame('Record not found', $logData['error']);
