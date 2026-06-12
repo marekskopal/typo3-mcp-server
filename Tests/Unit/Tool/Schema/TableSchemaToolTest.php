@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace MarekSkopal\MsMcpServer\Tests\Unit\Tool\Schema;
 
+use MarekSkopal\MsMcpServer\Service\PermissionService;
 use MarekSkopal\MsMcpServer\Service\TcaSchemaService;
 use MarekSkopal\MsMcpServer\Tool\Schema\TableSchemaTool;
 use PHPUnit\Framework\Attributes\CoversClass;
@@ -46,7 +47,7 @@ final class TableSchemaToolTest extends TestCase
             ],
         ];
 
-        $tool = new TableSchemaTool(new TcaSchemaService());
+        $tool = new TableSchemaTool(new TcaSchemaService(), $this->createPermissionService(true));
         $result = json_decode($tool->execute('tx_test'), true, 512, JSON_THROW_ON_ERROR);
 
         self::assertSame('tx_test', $result['table']);
@@ -60,10 +61,29 @@ final class TableSchemaToolTest extends TestCase
 
     public function testExecuteReturnsErrorWhenTableNotFound(): void
     {
-        $tool = new TableSchemaTool(new TcaSchemaService());
+        $tool = new TableSchemaTool(new TcaSchemaService(), $this->createPermissionService(true));
         $result = json_decode($tool->execute('nonexistent_table'), true, 512, JSON_THROW_ON_ERROR);
 
         self::assertArrayHasKey('error', $result);
         self::assertStringContainsString('nonexistent_table', $result['error']);
+    }
+
+    public function testExecuteDeniesAccessWithoutSelectPermission(): void
+    {
+        $GLOBALS['TCA']['be_users'] = ['ctrl' => [], 'columns' => ['username' => ['config' => ['type' => 'input']]]];
+
+        $tool = new TableSchemaTool(new TcaSchemaService(), $this->createPermissionService(false));
+        $result = json_decode($tool->execute('be_users'), true, 512, JSON_THROW_ON_ERROR);
+
+        self::assertArrayHasKey('error', $result);
+        self::assertStringContainsString('Access denied', $result['error']);
+    }
+
+    private function createPermissionService(bool $canSelect): PermissionService
+    {
+        $permissionService = $this->createStub(PermissionService::class);
+        $permissionService->method('canSelectTable')->willReturn($canSelect);
+
+        return $permissionService;
     }
 }

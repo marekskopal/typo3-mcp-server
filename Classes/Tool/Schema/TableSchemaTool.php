@@ -4,13 +4,14 @@ declare(strict_types=1);
 
 namespace MarekSkopal\MsMcpServer\Tool\Schema;
 
+use MarekSkopal\MsMcpServer\Service\PermissionService;
 use MarekSkopal\MsMcpServer\Service\TcaSchemaService;
 use Mcp\Capability\Attribute\McpTool;
 use const JSON_THROW_ON_ERROR;
 
 readonly class TableSchemaTool
 {
-    public function __construct(private TcaSchemaService $tcaSchemaService)
+    public function __construct(private TcaSchemaService $tcaSchemaService, private PermissionService $permissionService)
     {
     }
 
@@ -21,6 +22,10 @@ readonly class TableSchemaTool
     )]
     public function execute(string $tableName): string
     {
+        if (!$this->permissionService->canSelectTable($tableName)) {
+            return json_encode(['error' => 'Access denied: you do not have read permission for table: ' . $tableName], JSON_THROW_ON_ERROR);
+        }
+
         $schema = $this->tcaSchemaService->getFieldsSchema($tableName);
 
         if ($schema['fields'] === []) {
