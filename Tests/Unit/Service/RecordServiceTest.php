@@ -299,6 +299,46 @@ final class RecordServiceTest extends TestCase
         self::assertSame(0, $result['total']);
     }
 
+    public function testSearchEscapesLikeWildcards(): void
+    {
+        $result = $this->createStub(Result::class);
+        $result->method('fetchOne')->willReturn(0);
+        $result->method('fetchAllAssociative')->willReturn([]);
+
+        $captured = [];
+
+        $expr = $this->createStub(ExpressionBuilder::class);
+        $restrictions = $this->createStub(QueryRestrictionContainerInterface::class);
+
+        $queryBuilder = $this->createStub(QueryBuilder::class);
+        $queryBuilder->method('getRestrictions')->willReturn($restrictions);
+        $queryBuilder->method('expr')->willReturn($expr);
+        $queryBuilder->method('escapeLikeWildcards')
+            ->willReturnCallback(static fn(string $v): string => str_replace(['%', '_'], ['\\%', '\\_'], $v));
+        $queryBuilder->method('createNamedParameter')
+            ->willReturnCallback(function (mixed $value) use (&$captured): string {
+                $captured[] = $value;
+
+                return "'p'";
+            });
+        $queryBuilder->method('select')->willReturnSelf();
+        $queryBuilder->method('count')->willReturnSelf();
+        $queryBuilder->method('from')->willReturnSelf();
+        $queryBuilder->method('andWhere')->willReturnSelf();
+        $queryBuilder->method('setMaxResults')->willReturnSelf();
+        $queryBuilder->method('setFirstResult')->willReturnSelf();
+        $queryBuilder->method('orderBy')->willReturnSelf();
+        $queryBuilder->method('executeQuery')->willReturn($result);
+
+        $connectionPool = $this->createStub(ConnectionPool::class);
+        $connectionPool->method('getQueryBuilderForTable')->willReturn($queryBuilder);
+
+        $service = new RecordService($connectionPool, new WorkspaceContextService(), $this->createAllowingPermissionService());
+        $service->search('pages', ['title' => ['operator' => 'like', 'value' => '50%_x']], 20, 0, ['uid', 'title']);
+
+        self::assertContains('%50\\%\\_x%', $captured);
+    }
+
     public function testSearchWithEqOperator(): void
     {
         $expectedRecords = [['uid' => 1, 'title' => 'Home']];

@@ -242,7 +242,10 @@ readonly class RecordService
             ),
             'null' => $expr->isNull($field),
             'notNull' => $expr->isNotNull($field),
-            default => $expr->like($field, $queryBuilder->createNamedParameter('%' . $value . '%')),
+            default => $expr->like(
+                $field,
+                $queryBuilder->createNamedParameter('%' . $queryBuilder->escapeLikeWildcards($value) . '%'),
+            ),
         });
     }
 
