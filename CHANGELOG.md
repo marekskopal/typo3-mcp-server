@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+## [0.12.3] - 2026-06-17
+
+### Fixed
+- **Incompatible with a language prefix on the default language.** On installations where every language — including the default — carries a URL prefix (e.g. `/de/`), `typo3/cms-frontend/base-redirect-resolver` 404'd the prefix-less `/mcp` endpoint and the `/.well-known/...` discovery paths before the MCP middlewares ran. Both frontend middlewares now run *before* `typo3/cms-frontend/site` (and therefore before the base-redirect resolver), short-circuiting their own paths ahead of site/language resolution and passing every other request straight through. The bogus `after: typo3/cms-frontend/normalize-params` dependency (a non-existent identifier that was silently ignored) is corrected to `typo3/cms-core/normalized-params-attribute`. Thanks to @koehnlein for the report (#3).
+
 ## [0.12.2] - 2026-06-12
 
 Re-release of 0.12.1. **Use 0.12.2, not 0.12.1** — the 0.12.1 tag was first pushed at a commit whose integration tests failed; the fix below moved the tag, but Packagist pins a tag to its original commit and won't pick up a moved tag, so this is published as a new patch. 0.12.2 contains everything in 0.12.1 (see below) plus the fixes here. The `database:updateschema` note from 0.12.1 still applies.
