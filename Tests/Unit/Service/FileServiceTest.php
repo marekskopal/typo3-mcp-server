@@ -7,8 +7,12 @@ namespace MarekSkopal\MsMcpServer\Tests\Unit\Service;
 use MarekSkopal\MsMcpServer\Service\FileService;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
+use Doctrine\DBAL\Result;
 use TYPO3\CMS\Core\Authentication\BackendUserAuthentication;
 use TYPO3\CMS\Core\Database\ConnectionPool;
+use TYPO3\CMS\Core\Database\Query\Expression\ExpressionBuilder;
+use TYPO3\CMS\Core\Database\Query\QueryBuilder;
+use TYPO3\CMS\Core\Database\Query\Restriction\QueryRestrictionContainerInterface;
 use TYPO3\CMS\Core\Resource\File;
 use TYPO3\CMS\Core\Resource\Folder;
 use TYPO3\CMS\Core\Resource\ResourceStorage;
@@ -425,5 +429,61 @@ final class FileServiceTest extends TestCase
         $this->expectExceptionCode(1712002000);
 
         $service->listDirectory(999, '/', 20, 0);
+    }
+
+    public function testSearchFilesThrowsWhenStorageNotAccessibleToBackendUser(): void
+    {
+        $backendUser = $this->createStub(BackendUserAuthentication::class);
+        $backendUser->method('getFileStorages')->willReturn([]);
+        $GLOBALS['BE_USER'] = $backendUser;
+
+        try {
+            $service = new FileService($this->createStub(StorageRepository::class), $this->createStub(ConnectionPool::class));
+
+            $this->expectException(\RuntimeException::class);
+            $this->expectExceptionMessage('Storage not found or not accessible: 7');
+
+            $service->searchFiles(7, 'foo', '', 20, 0);
+        } finally {
+            unset($GLOBALS['BE_USER']);
+        }
+    }
+
+    public function testSearchFilesQueriesWhenStorageAccessible(): void
+    {
+        $storage = $this->createStub(ResourceStorage::class);
+        $backendUser = $this->createStub(BackendUserAuthentication::class);
+        $backendUser->method('getFileStorages')->willReturn([7 => $storage]);
+        $GLOBALS['BE_USER'] = $backendUser;
+
+        try {
+            $dbResult = $this->createStub(Result::class);
+            $dbResult->method('fetchOne')->willReturn(0);
+            $dbResult->method('fetchAllAssociative')->willReturn([]);
+
+            $queryBuilder = $this->createStub(QueryBuilder::class);
+            $queryBuilder->method('select')->willReturnSelf();
+            $queryBuilder->method('count')->willReturnSelf();
+            $queryBuilder->method('from')->willReturnSelf();
+            $queryBuilder->method('andWhere')->willReturnSelf();
+            $queryBuilder->method('setMaxResults')->willReturnSelf();
+            $queryBuilder->method('setFirstResult')->willReturnSelf();
+            $queryBuilder->method('orderBy')->willReturnSelf();
+            $queryBuilder->method('expr')->willReturn($this->createStub(ExpressionBuilder::class));
+            $queryBuilder->method('createNamedParameter')->willReturn("'x'");
+            $queryBuilder->method('getRestrictions')->willReturn($this->createStub(QueryRestrictionContainerInterface::class));
+            $queryBuilder->method('executeQuery')->willReturn($dbResult);
+
+            $connectionPool = $this->createStub(ConnectionPool::class);
+            $connectionPool->method('getQueryBuilderForTable')->willReturn($queryBuilder);
+
+            $service = new FileService($this->createStub(StorageRepository::class), $connectionPool);
+            $result = $service->searchFiles(7, 'foo', '', 20, 0);
+
+            self::assertSame([], $result['files']);
+            self::assertSame(0, $result['total']);
+        } finally {
+            unset($GLOBALS['BE_USER']);
+        }
     }
 }

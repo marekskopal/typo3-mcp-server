@@ -380,6 +380,12 @@ readonly class FileService
     /** @return array{files: list<array{name: string, identifier: string, size: int, mimeType: string, extension: string, storage: int}>, total: int} */
     public function searchFiles(int $storageUid, string $namePattern, string $extension, int $limit, int $offset): array
     {
+        // Enforce storage access before querying sys_file directly: every other file operation
+        // resolves through getStorage() (backed by the user's accessible storages), but this method
+        // reads the table straight, so without this gate any user could enumerate file metadata of
+        // any storage uid, including storages they have no access to.
+        $this->getStorage($storageUid);
+
         $limit = min(max($limit, 1), 500);
 
         $queryBuilder = $this->connectionPool->getQueryBuilderForTable('sys_file');
