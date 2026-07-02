@@ -229,6 +229,164 @@ final class AuthorizationServiceTest extends TestCase
         $service->refreshToken('some-refresh-token', 'wrong-client');
     }
 
+    public function testRefreshTokenRotatesWhenConditionalUpdateSucceeds(): void
+    {
+        $row = [
+            'uid' => 1,
+            'client_id' => 'client-123',
+            'be_user' => 42,
+            'token_family' => 'fam-1',
+            'refresh_token_expires' => time() + 3600,
+            'revoked' => 0,
+        ];
+
+        // The atomic rotation UPDATE affects exactly one row (we won the race).
+        $connection = $this->createMock(Connection::class);
+        $connection->expects(self::once())
+            ->method('update')
+            ->with('tx_msmcpserver_oauth_authorization', ['revoked' => 1], ['uid' => 1, 'revoked' => 0])
+            ->willReturn(1);
+
+        $connectionPool = $this->createConnectionPoolWithQueryAndConnection($row, $connection);
+
+        $service = new AuthorizationService(
+            $connectionPool,
+            new PkceVerifier(),
+            new ClientRepository($this->createStub(ConnectionPool::class)),
+            $this->createStub(ExtensionConfiguration::class),
+        );
+
+        $pair = $service->refreshToken('some-refresh-token', 'client-123');
+
+        self::assertNotSame('', $pair->accessToken);
+        self::assertNotSame('', $pair->refreshToken);
+    }
+
+    public function testRefreshTokenConcurrentRotationRevokesFamily(): void
+    {
+        // Token passes every validation (still active), yet the conditional UPDATE affects zero
+        // rows because a concurrent request already flipped `revoked` — the TOCTOU race. That must
+        // be treated as reuse: revoke the family and reject, rather than mint a second token pair.
+        $row = [
+            'uid' => 1,
+            'client_id' => 'client-123',
+            'be_user' => 42,
+            'token_family' => 'fam-1',
+            'refresh_token_expires' => time() + 3600,
+            'revoked' => 0,
+        ];
+
+        $connection = $this->createMock(Connection::class);
+        $connection->expects(self::exactly(2))
+            ->method('update')
+            ->willReturnCallback(function (string $table, array $data, array $criteria): int {
+                if (array_key_exists('token_family', $criteria)) {
+                    self::assertSame(['token_family' => 'fam-1'], $criteria);
+
+                    return 1;
+                }
+
+                self::assertSame(['uid' => 1, 'revoked' => 0], $criteria);
+
+                // Lost the race.
+                return 0;
+            });
+
+        $connectionPool = $this->createConnectionPoolWithQueryAndConnection($row, $connection);
+
+        $service = new AuthorizationService(
+            $connectionPool,
+            new PkceVerifier(),
+            new ClientRepository($this->createStub(ConnectionPool::class)),
+            $this->createStub(ExtensionConfiguration::class),
+        );
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionCode(1712100021);
+
+        $service->refreshToken('some-refresh-token', 'client-123');
+    }
+
+    public function testExchangeCodeIssuesTokenPairWhenConditionalUpdateSucceeds(): void
+    {
+        $verifier = str_repeat('a', 64);
+        $challenge = rtrim(strtr(base64_encode(hash('sha256', $verifier, true)), '+/', '-_'), '=');
+
+        $row = [
+            'uid' => 7,
+            'client_id' => 'client-123',
+            'be_user' => 42,
+            'code_challenge' => $challenge,
+            'code_challenge_method' => 'S256',
+            'redirect_uri' => 'https://app/cb',
+            'code_expires' => time() + 60,
+            'revoked' => 0,
+        ];
+
+        $connection = $this->createMock(Connection::class);
+        $connection->expects(self::once())
+            ->method('update')
+            ->with(
+                'tx_msmcpserver_oauth_authorization',
+                ['authorization_code_hash' => '', 'revoked' => 1],
+                ['uid' => 7, 'revoked' => 0],
+            )
+            ->willReturn(1);
+
+        $connectionPool = $this->createConnectionPoolWithQueryAndConnection($row, $connection);
+
+        $service = new AuthorizationService(
+            $connectionPool,
+            new PkceVerifier(),
+            new ClientRepository($this->createStub(ConnectionPool::class)),
+            $this->createStub(ExtensionConfiguration::class),
+        );
+
+        $pair = $service->exchangeCode('some-code', $verifier, 'client-123', 'https://app/cb');
+
+        self::assertNotSame('', $pair->accessToken);
+        self::assertNotSame('', $pair->refreshToken);
+    }
+
+    public function testExchangeCodeThrowsWhenAlreadyConsumed(): void
+    {
+        // Valid code that passes PKCE, but the atomic consume UPDATE affects zero rows because a
+        // concurrent exchange (or replay) already consumed it. No token pair may be issued.
+        $verifier = str_repeat('a', 64);
+        $challenge = rtrim(strtr(base64_encode(hash('sha256', $verifier, true)), '+/', '-_'), '=');
+
+        $row = [
+            'uid' => 7,
+            'client_id' => 'client-123',
+            'be_user' => 42,
+            'code_challenge' => $challenge,
+            'code_challenge_method' => 'S256',
+            'redirect_uri' => 'https://app/cb',
+            'code_expires' => time() + 60,
+            'revoked' => 0,
+        ];
+
+        $connection = $this->createMock(Connection::class);
+        // Lost the race / replay: the atomic consume affects zero rows.
+        $connection->expects(self::once())
+            ->method('update')
+            ->willReturn(0);
+
+        $connectionPool = $this->createConnectionPoolWithQueryAndConnection($row, $connection);
+
+        $service = new AuthorizationService(
+            $connectionPool,
+            new PkceVerifier(),
+            new ClientRepository($this->createStub(ConnectionPool::class)),
+            $this->createStub(ExtensionConfiguration::class),
+        );
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionCode(1712100016);
+
+        $service->exchangeCode('some-code', $verifier, 'client-123', 'https://app/cb');
+    }
+
     public function testRevokeTokenRevokesExistingToken(): void
     {
         $row = ['uid' => 5];
