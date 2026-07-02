@@ -15,7 +15,7 @@ use Psr\Log\LoggerInterface;
  */
 readonly class ErrorHandlingContainer implements ContainerInterface
 {
-    /** @param array<class-string, 'tool'|'resource'> $handlerTypes */
+    /** @param array<class-string, 'tool'|'resource'|'prompt'> $handlerTypes */
     public function __construct(
         private ContainerInterface $inner,
         private LoggerInterface $logger,

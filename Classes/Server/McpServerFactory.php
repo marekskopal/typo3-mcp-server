@@ -125,7 +125,7 @@ readonly class McpServerFactory
         return $attributes[0]->newInstance();
     }
 
-    /** @return array<class-string, 'tool'|'resource'> */
+    /** @return array<class-string, 'tool'|'resource'|'prompt'> */
     private function buildHandlerTypeMap(): array
     {
         $map = [];
@@ -136,6 +136,10 @@ readonly class McpServerFactory
 
         foreach ($this->resources as $resource) {
             $map[$resource::class] = 'resource';
+        }
+
+        foreach ($this->prompts as $prompt) {
+            $map[$prompt::class] = 'prompt';
         }
 
         return $map;
