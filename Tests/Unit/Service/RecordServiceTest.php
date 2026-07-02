@@ -10,10 +10,12 @@ use MarekSkopal\MsMcpServer\Service\RecordService;
 use MarekSkopal\MsMcpServer\Service\WorkspaceContextService;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
+use TYPO3\CMS\Core\Context\UserAspect;
 use TYPO3\CMS\Core\Database\ConnectionPool;
 use TYPO3\CMS\Core\Database\Query\Expression\ExpressionBuilder;
 use TYPO3\CMS\Core\Database\Query\QueryBuilder;
 use TYPO3\CMS\Core\Database\Query\Restriction\DeletedRestriction;
+use TYPO3\CMS\Core\Database\Query\Restriction\PagePermissionRestriction;
 use TYPO3\CMS\Core\Database\Query\Restriction\QueryRestrictionContainerInterface;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
 
@@ -680,6 +682,125 @@ final class RecordServiceTest extends TestCase
         self::assertSame(2, $translations[1]['sys_language_uid']);
     }
 
+    public function testSearchAppliesPagePermissionRestrictionForNonAdminOnPagesTable(): void
+    {
+        $addedToListRestrictions = [];
+
+        $listRestrictions = $this->createStub(QueryRestrictionContainerInterface::class);
+        $listRestrictions->method('add')
+            ->willReturnCallback(function (object $restriction) use (&$addedToListRestrictions, $listRestrictions) {
+                $addedToListRestrictions[] = $restriction;
+
+                return $listRestrictions;
+            });
+
+        $listResult = $this->createStub(Result::class);
+        $listResult->method('fetchAllAssociative')->willReturn([]);
+        $countResult = $this->createStub(Result::class);
+        $countResult->method('fetchOne')->willReturn(0);
+
+        $listQueryBuilder = $this->createStub(QueryBuilder::class);
+        $listQueryBuilder->method('getRestrictions')->willReturn($listRestrictions);
+        $listQueryBuilder->method('expr')->willReturn($this->createStub(ExpressionBuilder::class));
+        $listQueryBuilder->method('createNamedParameter')->willReturn("'0'");
+        $listQueryBuilder->method('select')->willReturnSelf();
+        $listQueryBuilder->method('from')->willReturnSelf();
+        $listQueryBuilder->method('andWhere')->willReturnSelf();
+        $listQueryBuilder->method('setMaxResults')->willReturnSelf();
+        $listQueryBuilder->method('setFirstResult')->willReturnSelf();
+        $listQueryBuilder->method('orderBy')->willReturnSelf();
+        $listQueryBuilder->method('executeQuery')->willReturn($listResult);
+
+        $countQueryBuilder = $this->createQueryBuilderStub();
+        $countQueryBuilder->method('count')->willReturnSelf();
+        $countQueryBuilder->method('from')->willReturnSelf();
+        $countQueryBuilder->method('andWhere')->willReturnSelf();
+        $countQueryBuilder->method('executeQuery')->willReturn($countResult);
+
+        $callCount = 0;
+        $connectionPool = $this->createStub(ConnectionPool::class);
+        $connectionPool->method('getQueryBuilderForTable')
+            ->willReturnCallback(function () use (&$callCount, $listQueryBuilder, $countQueryBuilder): QueryBuilder {
+                $callCount++;
+
+                return $callCount === 1 ? $listQueryBuilder : $countQueryBuilder;
+            });
+
+        $service = new RecordService($connectionPool, new WorkspaceContextService(), $this->createEditorPermissionService());
+        $service->search('pages', ['title' => ['operator' => 'eq', 'value' => 'x']], 20, 0, ['uid', 'title']);
+
+        $pagePermissionRestrictions = array_filter(
+            $addedToListRestrictions,
+            static fn(object $restriction): bool => $restriction instanceof PagePermissionRestriction,
+        );
+        self::assertNotEmpty($pagePermissionRestrictions);
+    }
+
+    public function testSearchConstrainsNonPageTableToAccessiblePagesForNonAdmin(): void
+    {
+        $requestedTables = [];
+        $listAndWhereCalled = false;
+
+        $listResult = $this->createStub(Result::class);
+        $listResult->method('fetchAllAssociative')->willReturn([]);
+        $countResult = $this->createStub(Result::class);
+        $countResult->method('fetchOne')->willReturn(0);
+
+        $listQueryBuilder = $this->createQueryBuilderStub();
+        $listQueryBuilder->method('select')->willReturnSelf();
+        $listQueryBuilder->method('from')->willReturnSelf();
+        $listQueryBuilder->method('setMaxResults')->willReturnSelf();
+        $listQueryBuilder->method('setFirstResult')->willReturnSelf();
+        $listQueryBuilder->method('orderBy')->willReturnSelf();
+        $listQueryBuilder->method('executeQuery')->willReturn($listResult);
+        $listQueryBuilder->method('andWhere')
+            ->willReturnCallback(function () use (&$listAndWhereCalled, $listQueryBuilder): QueryBuilder {
+                $listAndWhereCalled = true;
+
+                return $listQueryBuilder;
+            });
+
+        $countQueryBuilder = $this->createQueryBuilderStub();
+        $countQueryBuilder->method('count')->willReturnSelf();
+        $countQueryBuilder->method('from')->willReturnSelf();
+        $countQueryBuilder->method('andWhere')->willReturnSelf();
+        $countQueryBuilder->method('executeQuery')->willReturn($countResult);
+
+        // Subquery builder for the `pages` table used to resolve accessible pages.
+        $pagesQueryBuilder = $this->createQueryBuilderStub();
+        $pagesQueryBuilder->method('select')->willReturnSelf();
+        $pagesQueryBuilder->method('from')->willReturnSelf();
+        $pagesQueryBuilder->method('where')->willReturnSelf();
+        $pagesQueryBuilder->method('getSQL')->willReturn('SELECT uid FROM pages WHERE PERMS_CLAUSE');
+
+        $callCount = 0;
+        $connectionPool = $this->createStub(ConnectionPool::class);
+        $connectionPool->method('getQueryBuilderForTable')
+            ->willReturnCallback(function (string $table) use (
+                &$callCount,
+                &$requestedTables,
+                $listQueryBuilder,
+                $countQueryBuilder,
+                $pagesQueryBuilder,
+            ): QueryBuilder {
+                $requestedTables[] = $table;
+                $callCount++;
+
+                return match ($callCount) {
+                    1 => $listQueryBuilder,
+                    2 => $countQueryBuilder,
+                    default => $pagesQueryBuilder,
+                };
+            });
+
+        $service = new RecordService($connectionPool, new WorkspaceContextService(), $this->createEditorPermissionService());
+        $service->search('tt_content', ['header' => ['operator' => 'eq', 'value' => 'x']], 20, 0, ['uid', 'header']);
+
+        // The non-page table read must build a `pages` subquery and constrain the main query by it.
+        self::assertContains('pages', $requestedTables);
+        self::assertTrue($listAndWhereCalled);
+    }
+
     public function testFindByUidThrowsWhenTableNotSelectable(): void
     {
         $connectionPool = $this->createStub(ConnectionPool::class);
@@ -699,6 +820,19 @@ final class RecordServiceTest extends TestCase
     {
         $permissionService = $this->createStub(PermissionService::class);
         $permissionService->method('canSelectTable')->willReturn(true);
+        // Admin path: no page-permission constraint is added, so the query expectations in these
+        // tests reflect the unrestricted query. Non-admin behaviour is covered separately below.
+        $permissionService->method('isAdmin')->willReturn(true);
+
+        return $permissionService;
+    }
+
+    private function createEditorPermissionService(): PermissionService
+    {
+        $permissionService = $this->createStub(PermissionService::class);
+        $permissionService->method('canSelectTable')->willReturn(true);
+        $permissionService->method('isAdmin')->willReturn(false);
+        $permissionService->method('getUserAspect')->willReturn(new UserAspect());
 
         return $permissionService;
     }

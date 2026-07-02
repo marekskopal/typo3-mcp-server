@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace MarekSkopal\MsMcpServer\Service;
 
 use TYPO3\CMS\Core\Authentication\BackendUserAuthentication;
+use TYPO3\CMS\Core\Context\UserAspect;
 use TYPO3\CMS\Core\Type\Bitmask\Permission;
 
 readonly class PermissionService
@@ -84,6 +85,15 @@ readonly class PermissionService
     public function isAdmin(): bool
     {
         return $this->getBackendUser()->isAdmin();
+    }
+
+    /**
+     * The current backend user as a UserAspect, for feeding into permission-aware query
+     * restrictions such as PagePermissionRestriction.
+     */
+    public function getUserAspect(): UserAspect
+    {
+        return new UserAspect($this->getBackendUser());
     }
 
     private function getBackendUser(): BackendUserAuthentication
