@@ -27,7 +27,16 @@ readonly class DatabaseSessionStore implements SessionStoreInterface
 
     public function write(Uuid $id, string $data): bool
     {
-        $this->repository->upsert($id->toRfc4122(), $this->beUserUid, $data, time());
+        $sessionId = $id->toRfc4122();
+        $row = $this->repository->findBySessionId($sessionId);
+
+        // Never overwrite a session owned by another backend user; mirrors the ownership checks on
+        // read()/destroy() so a client cannot clobber or take over another user's session data.
+        if ($row !== null && $row['be_user'] !== $this->beUserUid) {
+            return false;
+        }
+
+        $this->repository->upsert($sessionId, $this->beUserUid, $data, time());
 
         return true;
     }

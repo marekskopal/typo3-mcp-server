@@ -118,6 +118,30 @@ final class DatabaseSessionStoreTest extends TestCase
         self::assertTrue($store->write($this->uuid, 'data'));
     }
 
+    public function testWriteUpdatesSessionOwnedByCurrentUser(): void
+    {
+        $repository = $this->createMock(McpSessionRepository::class);
+        $repository->method('findBySessionId')->willReturn($this->row(time()));
+        $repository->expects(self::once())
+            ->method('upsert')
+            ->with($this->sessionId, self::BE_USER, 'data', self::isInt());
+
+        $store = new DatabaseSessionStore($repository, 86400, self::BE_USER);
+
+        self::assertTrue($store->write($this->uuid, 'data'));
+    }
+
+    public function testWriteRefusesToOverwriteSessionOwnedByAnotherUser(): void
+    {
+        $repository = $this->createMock(McpSessionRepository::class);
+        $repository->method('findBySessionId')->willReturn($this->row(time(), 99));
+        $repository->expects(self::never())->method('upsert');
+
+        $store = new DatabaseSessionStore($repository, 86400, self::BE_USER);
+
+        self::assertFalse($store->write($this->uuid, 'data'));
+    }
+
     public function testDestroyDeletesWhenOwnedByCurrentUser(): void
     {
         $repository = $this->createMock(McpSessionRepository::class);
