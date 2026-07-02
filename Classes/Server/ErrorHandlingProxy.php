@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace MarekSkopal\MsMcpServer\Server;
 
 use MarekSkopal\MsMcpServer\Logging\AuditLogger;
+use Mcp\Exception\PromptGetException;
 use Mcp\Exception\ResourceReadException;
 use Mcp\Exception\ToolCallException;
 use Psr\Log\LoggerInterface;
@@ -32,7 +33,7 @@ final class ErrorHandlingProxy
             $this->auditLogger->logSuccess($this->getHandlerName(), $this->type, $arguments, $executionTimeMs);
 
             return $result;
-        } catch (ToolCallException | ResourceReadException $e) {
+        } catch (ToolCallException | ResourceReadException | PromptGetException $e) {
             $executionTimeMs = (int) ((hrtime(true) - $startTime) / 1000000);
             $this->auditLogger->logFailure(
                 $this->getHandlerName(),
@@ -56,11 +57,11 @@ final class ErrorHandlingProxy
             // themselves, which is re-thrown as-is by the catch branch above.
             $genericMessage = sprintf('An internal error occurred while executing this %s.', $this->type);
 
-            if ($this->type === 'resource') {
-                throw new ResourceReadException($genericMessage, (int) $e->getCode(), $e);
-            }
-
-            throw new ToolCallException($genericMessage, (int) $e->getCode(), $e);
+            throw match ($this->type) {
+                'resource' => new ResourceReadException($genericMessage, (int) $e->getCode(), $e),
+                'prompt' => new PromptGetException($genericMessage, (int) $e->getCode(), $e),
+                default => new ToolCallException($genericMessage, (int) $e->getCode(), $e),
+            };
         }
     }
 

@@ -20,7 +20,12 @@ class CleanupExpiredTokensCommand extends Command
 {
     private const string AUTHORIZATION_TABLE = 'tx_msmcpserver_oauth_authorization';
 
+    private const string CLIENT_TABLE = 'tx_msmcpserver_oauth_client';
+
     private const int DEFAULT_SESSION_LIFETIME = 86400;
+
+    /** Purge dynamically-registered clients that never obtained an authorization after this age. */
+    private const int UNUSED_CLIENT_LIFETIME = 2592000;
 
     private readonly int $sessionLifetime;
 
@@ -44,6 +49,9 @@ class CleanupExpiredTokensCommand extends Command
 
         $deletedAuthorizations = $this->deleteExpiredAuthorizations();
         $io->writeln(sprintf('Deleted %d expired/revoked OAuth authorizations.', $deletedAuthorizations));
+
+        $deletedClients = $this->deleteUnusedClients();
+        $io->writeln(sprintf('Deleted %d unused OAuth clients.', $deletedClients));
 
         $deletedSessions = $this->sessionRepository->deleteExpired(time() - $this->sessionLifetime);
         $io->writeln(sprintf('Deleted %d stale MCP sessions.', $deletedSessions));
@@ -94,6 +102,35 @@ class CleanupExpiredTokensCommand extends Command
                         ),
                     ),
                 ),
+            )
+            ->executeStatement();
+    }
+
+    /**
+     * Purge dynamically-registered clients that are older than UNUSED_CLIENT_LIFETIME and have no
+     * authorization rows. Registration is unauthenticated, so without this these rows accumulate
+     * indefinitely. Runs after deleteExpiredAuthorizations(), so clients whose authorizations have
+     * all expired are treated as unused too.
+     */
+    private function deleteUnusedClients(): int
+    {
+        $connection = $this->connectionPool->getConnectionForTable(self::CLIENT_TABLE);
+
+        $subQuery = $connection->createQueryBuilder();
+        $subQuery->getRestrictions()->removeAll();
+        $subQuery->select('client_id')->from(self::AUTHORIZATION_TABLE);
+
+        $queryBuilder = $connection->createQueryBuilder();
+        $queryBuilder->getRestrictions()->removeAll();
+
+        return (int) $queryBuilder
+            ->delete(self::CLIENT_TABLE)
+            ->where(
+                $queryBuilder->expr()->lt(
+                    'crdate',
+                    $queryBuilder->createNamedParameter(time() - self::UNUSED_CLIENT_LIFETIME, ParameterType::INTEGER),
+                ),
+                $queryBuilder->expr()->notIn('client_id', $subQuery->getSQL()),
             )
             ->executeStatement();
     }

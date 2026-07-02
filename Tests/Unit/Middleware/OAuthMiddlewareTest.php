@@ -460,6 +460,58 @@ final class OAuthMiddlewareTest extends TestCase
         self::assertStringContainsString('Content-Type must be application', $body);
     }
 
+    public function testRegisterEndpointRejectsMalformedJson(): void
+    {
+        $stream = $this->createStub(StreamInterface::class);
+        $stream->method('__toString')->willReturn('{ this is not valid json');
+
+        $request = $this->createRequest('/mcp/oauth/register', 'POST');
+        $request->method('getHeaderLine')->willReturn('application/json');
+        $request->method('getBody')->willReturn($stream);
+
+        $handler = $this->createMock(RequestHandlerInterface::class);
+        $handler->expects(self::never())->method('handle');
+
+        $middleware = $this->createMiddlewareWithCapture();
+        $middleware->process($request, $handler);
+
+        self::assertSame(400, $this->capturedStatusCode);
+        $body = $this->capturedBodies[0] ?? '';
+        self::assertStringContainsString('invalid_request', $body);
+        self::assertStringContainsString('valid JSON', $body);
+    }
+
+    public function testRegisterEndpointTruncatesOverlongClientName(): void
+    {
+        $longName = str_repeat('a', 300);
+        $stream = $this->createStub(StreamInterface::class);
+        $stream->method('__toString')->willReturn(
+            json_encode(['client_name' => $longName, 'redirect_uris' => ['https://app/cb']], JSON_THROW_ON_ERROR),
+        );
+
+        $request = $this->createRequest('/mcp/oauth/register', 'POST');
+        $request->method('getHeaderLine')->willReturn('application/json');
+        $request->method('getBody')->willReturn($stream);
+
+        $capturedName = null;
+        $clientRepository = $this->createStub(ClientRepository::class);
+        $clientRepository->method('validateRedirectUrisForRegistration')->willReturn(null);
+        $clientRepository->method('registerClient')
+            ->willReturnCallback(function (string $name) use (&$capturedName): array {
+                $capturedName = $name;
+
+                return ['client_id' => 'c1', 'client_name' => $name, 'redirect_uris' => ['https://app/cb']];
+            });
+
+        $handler = $this->createMock(RequestHandlerInterface::class);
+        $handler->expects(self::never())->method('handle');
+
+        $middleware = $this->createMiddlewareWithCapture(clientRepository: $clientRepository);
+        $middleware->process($request, $handler);
+
+        self::assertSame(255, mb_strlen((string) $capturedName));
+    }
+
     public function testRevokeEndpointRequiresTokenParameter(): void
     {
         $request = $this->createRequest('/mcp/oauth/revoke', 'POST');

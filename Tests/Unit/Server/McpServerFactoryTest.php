@@ -155,7 +155,7 @@ final class McpServerFactoryTest extends TestCase
             new RecordCountTool($recordService, $tcaSchemaService),
             new SiteLanguagesTool($siteLanguageService),
             new RecordTranslateTool($dataHandlerService, $recordService, $tcaSchemaService),
-            new CacheClearTool($cacheService),
+            new CacheClearTool($cacheService, $this->createStub(PermissionService::class)),
         ];
 
         $resources = [

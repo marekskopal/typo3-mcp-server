@@ -620,6 +620,40 @@ final class DynamicToolRegistrarTest extends TestCase
         unset($GLOBALS['TCA']['tx_discovered_domain_model_item']);
     }
 
+    public function testRegisterSkipsTamperedDiscoveredTables(): void
+    {
+        $GLOBALS['TYPO3_CONF_VARS']['EXTCONF']['ms_mcp_server']['tables'] = [];
+
+        $tca = ['ctrl' => ['label' => 'title'], 'columns' => ['title' => ['config' => ['type' => 'input']]]];
+        $GLOBALS['TCA']['tx_discovered_domain_model_item'] = $tca;
+        // Valid TCA for the tampered rows, so it is the validation — not a missing schema — that skips them.
+        $GLOBALS['TCA']['tx_evil_thing'] = $tca;
+        $GLOBALS['TCA']['tx_other_thing'] = $tca;
+
+        $repository = $this->createStub(DiscoveredTableRepository::class);
+        $repository->method('findEnabled')->willReturn([
+            ['uid' => 1, 'table_name' => 'tx_discovered_domain_model_item', 'label' => 'Discovered Item', 'prefix' => 'discovered_item', 'enabled' => 1],
+            // System table (excluded), reserved built-in prefix, and a malformed prefix respectively.
+            ['uid' => 2, 'table_name' => 'be_users', 'label' => 'Users', 'prefix' => 'sneaky', 'enabled' => 1],
+            ['uid' => 3, 'table_name' => 'tx_evil_thing', 'label' => 'Evil', 'prefix' => 'pages', 'enabled' => 1],
+            ['uid' => 4, 'table_name' => 'tx_other_thing', 'label' => 'Other', 'prefix' => 'Bad Prefix!', 'enabled' => 1],
+        ]);
+
+        $registrar = $this->createRegistrar(discoveredTableRepository: $repository);
+
+        $builder = Server::builder();
+        $registrar->register($builder);
+
+        $toolNames = array_column($this->getRegisteredTools($builder), 'name');
+
+        self::assertContains('discovered_item_list', $toolNames);
+        self::assertNotContains('sneaky_list', $toolNames);
+        self::assertNotContains('pages_list', $toolNames);
+        self::assertNotContains('Bad Prefix!_list', $toolNames);
+
+        unset($GLOBALS['TCA']['tx_discovered_domain_model_item'], $GLOBALS['TCA']['tx_evil_thing'], $GLOBALS['TCA']['tx_other_thing']);
+    }
+
     public function testExtconfTakesPrecedenceOverDiscoveredTables(): void
     {
         // Both EXTCONF and discovered have the same table - EXTCONF should win

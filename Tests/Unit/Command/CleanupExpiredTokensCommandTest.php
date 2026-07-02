@@ -46,6 +46,9 @@ final class CleanupExpiredTokensCommandTest extends TestCase
         $queryBuilder->method('getRestrictions')->willReturn($restrictions);
         $queryBuilder->method('delete')->willReturn($queryBuilder);
         $queryBuilder->method('where')->willReturn($queryBuilder);
+        $queryBuilder->method('select')->willReturn($queryBuilder);
+        $queryBuilder->method('from')->willReturn($queryBuilder);
+        $queryBuilder->method('getSQL')->willReturn('SELECT client_id FROM tx_msmcpserver_oauth_authorization');
         $queryBuilder->method('executeStatement')->willReturn(5);
 
         $expressionBuilder = $this->createStub(ExpressionBuilder::class);
@@ -85,6 +88,7 @@ final class CleanupExpiredTokensCommandTest extends TestCase
         $outputText = $output->fetch();
         self::assertSame(0, $exitCode);
         self::assertStringContainsString('5 expired/revoked OAuth authorizations', $outputText);
+        self::assertStringContainsString('5 unused OAuth clients', $outputText);
         self::assertStringContainsString('7 stale MCP sessions', $outputText);
         self::assertStringContainsString('3 expired rate limit entries', $outputText);
     }

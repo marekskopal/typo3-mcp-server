@@ -237,6 +237,7 @@ final class AuthorizationServiceTest extends TestCase
             'be_user' => 42,
             'token_family' => 'fam-1',
             'refresh_token_expires' => time() + 3600,
+            'family_expires' => 0,
             'revoked' => 0,
         ];
 
@@ -273,6 +274,7 @@ final class AuthorizationServiceTest extends TestCase
             'be_user' => 42,
             'token_family' => 'fam-1',
             'refresh_token_expires' => time() + 3600,
+            'family_expires' => 0,
             'revoked' => 0,
         ];
 
@@ -317,6 +319,7 @@ final class AuthorizationServiceTest extends TestCase
             'be_user' => 42,
             'token_family' => 'fam-1',
             'refresh_token_expires' => time() + 3600,
+            'family_expires' => 0,
             'revoked' => 0,
         ];
 
@@ -339,6 +342,40 @@ final class AuthorizationServiceTest extends TestCase
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionCode(1712100024);
+
+        $service->refreshToken('some-refresh-token', 'client-123');
+    }
+
+    public function testRefreshTokenRevokesFamilyWhenGrantMaxLifetimeExceeded(): void
+    {
+        // The token is otherwise valid, but the grant's absolute lifetime (family_expires) has
+        // passed. Rotation must not extend it: reject and revoke the whole family.
+        $row = [
+            'uid' => 1,
+            'client_id' => 'client-123',
+            'be_user' => 42,
+            'token_family' => 'fam-1',
+            'refresh_token_expires' => time() + 3600,
+            'family_expires' => time() - 10,
+            'revoked' => 0,
+        ];
+
+        $connection = $this->createMock(Connection::class);
+        $connection->expects(self::once())
+            ->method('update')
+            ->with('tx_msmcpserver_oauth_authorization', ['revoked' => 1], ['token_family' => 'fam-1']);
+
+        $connectionPool = $this->createConnectionPoolWithQueryAndConnection($row, $connection);
+
+        $service = new AuthorizationService(
+            $connectionPool,
+            new PkceVerifier(),
+            $this->clientRepositoryFindingClient(),
+            $this->createStub(ExtensionConfiguration::class),
+        );
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionCode(1712100025);
 
         $service->refreshToken('some-refresh-token', 'client-123');
     }

@@ -5,13 +5,14 @@ declare(strict_types=1);
 namespace MarekSkopal\MsMcpServer\Tool\Cache;
 
 use MarekSkopal\MsMcpServer\Service\CacheService;
+use MarekSkopal\MsMcpServer\Service\PermissionService;
 use MarekSkopal\MsMcpServer\Tool\Result\CacheClearedResult;
 use MarekSkopal\MsMcpServer\Tool\Result\ErrorResult;
 use Mcp\Capability\Attribute\McpTool;
 
 readonly class CacheClearTool
 {
-    public function __construct(private CacheService $cacheService)
+    public function __construct(private CacheService $cacheService, private PermissionService $permissionService)
     {
     }
 
@@ -28,6 +29,12 @@ readonly class CacheClearTool
 
         if ($scope === 'page' && $pageId === 0) {
             return new ErrorResult('pageId is required when scope is "page"');
+        }
+
+        // Flushing every cache (including system caches) is an admin-only action in TYPO3 core and
+        // is a cheap DoS lever on production, so restrict the "all" scope to administrators.
+        if ($scope === 'all' && !$this->permissionService->isAdmin()) {
+            return new ErrorResult('Clearing all caches requires administrator privileges.');
         }
 
         match ($scope) {

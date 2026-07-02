@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace MarekSkopal\MsMcpServer\Logging;
 
 use Psr\Http\Message\ServerRequestInterface;
+use Psr\Log\LoggerInterface;
 use TYPO3\CMS\Core\Authentication\BackendUserAuthentication;
 use TYPO3\CMS\Core\Database\ConnectionPool;
 use TYPO3\CMS\Core\Http\NormalizedParams;
@@ -14,7 +15,12 @@ readonly class AuditLogger
 {
     private const string TABLE = 'sys_log';
 
-    public function __construct(private ConnectionPool $connectionPool)
+    /** Cap on how many scalar arguments are recorded, and the max length of each string argument. */
+    private const int MAX_LOGGED_ARGUMENTS = 20;
+
+    private const int MAX_ARGUMENT_LENGTH = 100;
+
+    public function __construct(private ConnectionPool $connectionPool, private LoggerInterface $logger)
     {
     }
 
@@ -27,6 +33,7 @@ readonly class AuditLogger
             executionTimeMs: $executionTimeMs,
             error: 0,
             details: sprintf('MCP %s %s: OK (%dms)', $type, $handlerName, $executionTimeMs),
+            arguments: $arguments,
         );
     }
 
@@ -42,9 +49,11 @@ readonly class AuditLogger
             // the backend log module treats as an sprintf format string) — it lives in log_data.
             details: sprintf('MCP %s %s failed (%dms)', $type, $handlerName, $executionTimeMs),
             errorMessage: $errorMessage,
+            arguments: $arguments,
         );
     }
 
+    /** @param list<mixed> $arguments */
     private function writeLog(
         string $handlerName,
         string $type,
@@ -52,6 +61,7 @@ readonly class AuditLogger
         int $error,
         string $details,
         string $errorMessage = '',
+        array $arguments = [],
     ): void {
         try {
             $backendUser = $GLOBALS['BE_USER'] ?? null;
@@ -64,6 +74,11 @@ readonly class AuditLogger
                 'type' => $type,
                 'executionTimeMs' => $executionTimeMs,
             ];
+
+            $redactedArguments = $this->redactArguments($arguments);
+            if ($redactedArguments !== []) {
+                $data['args'] = $redactedArguments;
+            }
 
             if ($errorMessage !== '') {
                 // Strip control characters so a crafted error message can't inject newlines or
@@ -88,9 +103,37 @@ readonly class AuditLogger
                 'event_pid' => -1,
                 'workspace' => $backendUser->workspace,
             ]);
-        } catch (\Throwable) {
-            // Audit logging must never break tool execution
+        } catch (\Throwable $e) {
+            // Audit logging must never break tool execution, but a failed write should not vanish
+            // silently either — surface it to the PSR logger so the gap in the trail is detectable.
+            $this->logger->warning('MCP audit log write failed', ['exception' => $e]);
         }
+    }
+
+    /**
+     * Reduce raw positional arguments to a size-capped, scalar-only list for the audit trail.
+     * Scalars (uid, pid, table name, …) identify the affected target; arrays/objects — which carry
+     * record field payloads — are deliberately omitted so free-text content never lands in the log.
+     *
+     * @param list<mixed> $arguments
+     * @return list<string|int|float|bool>
+     */
+    private function redactArguments(array $arguments): array
+    {
+        $redacted = [];
+        foreach ($arguments as $argument) {
+            if (count($redacted) >= self::MAX_LOGGED_ARGUMENTS) {
+                break;
+            }
+
+            if (is_int($argument) || is_float($argument) || is_bool($argument)) {
+                $redacted[] = $argument;
+            } elseif (is_string($argument)) {
+                $redacted[] = mb_substr($argument, 0, self::MAX_ARGUMENT_LENGTH);
+            }
+        }
+
+        return $redacted;
     }
 
     private function resolveRemoteAddress(): string

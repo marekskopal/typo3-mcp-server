@@ -27,6 +27,29 @@ use const JSON_THROW_ON_ERROR;
 
 readonly class DynamicToolRegistrar
 {
+    /** A tool prefix must be a lowercase identifier; it becomes part of generated tool names. */
+    private const string PREFIX_PATTERN = '/^[a-z][a-z0-9_]{0,63}$/';
+
+    /** Table-name prefixes that discovery never exposes; re-checked here in case a row was tampered with. */
+    private const array EXCLUDED_TABLE_PREFIXES = ['sys_', 'be_', 'fe_', 'cache_', 'cf_', 'index_', 'tx_msmcpserver_'];
+
+    private const array EXCLUDED_TABLES = ['pages', 'tt_content'];
+
+    /** Prefixes owned by the built-in static tools; a discovered table may not shadow them. */
+    private const array RESERVED_PREFIXES = [
+        'pages',
+        'content',
+        'record',
+        'file',
+        'table',
+        'permission',
+        'redirect',
+        'scheduler',
+        'cache',
+        'be_user',
+        'be_group',
+    ];
+
     public function __construct(
         private RecordService $recordService,
         private DataHandlerService $dataHandlerService,
@@ -144,14 +167,60 @@ readonly class DynamicToolRegistrar
         }
 
         $tables = [];
+        $usedPrefixes = [];
         foreach ($rows as $row) {
-            $tables[$row['table_name']] = [
-                'label' => $row['label'],
-                'prefix' => $row['prefix'],
+            $tableName = $row['table_name'];
+            $prefix = $row['prefix'];
+
+            // Discovered-table rows come from the DB and could have been tampered with. Validate the
+            // table name and prefix before turning them into tool names/descriptions, so a bad row
+            // cannot register tools for a system table, shadow a built-in tool, or inject text.
+            if (!$this->isRegisterableTable($tableName) || !$this->isValidPrefix($prefix) || isset($usedPrefixes[$prefix])) {
+                $this->logger->warning(
+                    'Skipping discovered table with invalid or conflicting configuration',
+                    ['table' => $tableName, 'prefix' => $prefix],
+                );
+
+                continue;
+            }
+
+            $usedPrefixes[$prefix] = true;
+            $tables[$tableName] = [
+                'label' => $this->sanitizeLabel($row['label']),
+                'prefix' => $prefix,
             ];
         }
 
         return $tables;
+    }
+
+    private function isRegisterableTable(string $tableName): bool
+    {
+        if (in_array($tableName, self::EXCLUDED_TABLES, true)) {
+            return false;
+        }
+
+        foreach (self::EXCLUDED_TABLE_PREFIXES as $prefix) {
+            if (str_starts_with($tableName, $prefix)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private function isValidPrefix(string $prefix): bool
+    {
+        return preg_match(self::PREFIX_PATTERN, $prefix) === 1 && !in_array($prefix, self::RESERVED_PREFIXES, true);
+    }
+
+    private function sanitizeLabel(string $label): string
+    {
+        // Strip control characters (which could inject newlines/escapes into tool descriptions) and
+        // cap the length so a crafted label cannot bloat the tool metadata.
+        $sanitized = (string) preg_replace('/[\x00-\x1F\x7F]/', ' ', $label);
+
+        return mb_substr(trim($sanitized), 0, 128);
     }
 
     /** @param array{label: string, prefix: string, listFields: list<string>, readFields: list<string>, writableFields: list<string>, translationConfig: array{languageField: string|null, transOrigPointerField: string|null, translationSource: string|null}} $config */

@@ -15,11 +15,15 @@ readonly class AuthorizationService
 
     private const int DEFAULT_REFRESH_TOKEN_LIFETIME = 2592000;
 
+    private const int DEFAULT_REFRESH_TOKEN_MAX_LIFETIME = 7776000;
+
     private const int DEFAULT_CODE_LIFETIME = 60;
 
     private int $accessTokenLifetime;
 
     private int $refreshTokenLifetime;
+
+    private int $refreshTokenMaxLifetime;
 
     private int $codeLifetime;
 
@@ -32,11 +36,15 @@ readonly class AuthorizationService
         $config = $extensionConfiguration->get('ms_mcp_server');
         $accessTokenLifetime = is_array($config) ? ($config['accessTokenLifetime'] ?? null) : null;
         $refreshTokenLifetime = is_array($config) ? ($config['refreshTokenLifetime'] ?? null) : null;
+        $refreshTokenMaxLifetime = is_array($config) ? ($config['refreshTokenMaxLifetime'] ?? null) : null;
         $codeLt = is_array($config) ? ($config['codeLifetime'] ?? null) : null;
         $this->accessTokenLifetime = is_numeric($accessTokenLifetime) ? (int) $accessTokenLifetime : self::DEFAULT_ACCESS_TOKEN_LIFETIME;
         $this->refreshTokenLifetime = is_numeric($refreshTokenLifetime)
             ? (int) $refreshTokenLifetime
             : self::DEFAULT_REFRESH_TOKEN_LIFETIME;
+        $this->refreshTokenMaxLifetime = is_numeric($refreshTokenMaxLifetime)
+            ? (int) $refreshTokenMaxLifetime
+            : self::DEFAULT_REFRESH_TOKEN_MAX_LIFETIME;
         $this->codeLifetime = is_numeric($codeLt) ? (int) $codeLt : self::DEFAULT_CODE_LIFETIME;
     }
 
@@ -123,8 +131,14 @@ readonly class AuthorizationService
             throw new \RuntimeException('Authorization code has already been used', 1712100016);
         }
 
-        // Start a new token family for this authorization; rotated refresh tokens inherit it.
-        return $this->issueTokenPair($clientId, (int) $row['be_user'], bin2hex(random_bytes(16)));
+        // Start a new token family for this authorization; rotated refresh tokens inherit it and
+        // its absolute expiry, so the grant cannot be kept alive indefinitely by rotation.
+        return $this->issueTokenPair(
+            $clientId,
+            (int) $row['be_user'],
+            bin2hex(random_bytes(16)),
+            time() + $this->refreshTokenMaxLifetime,
+        );
     }
 
     public function refreshToken(string $refreshToken, string $clientId): OAuthTokenPair
@@ -134,9 +148,9 @@ readonly class AuthorizationService
         $queryBuilder = $this->connectionPool->getQueryBuilderForTable(self::TABLE);
         $queryBuilder->getRestrictions()->removeAll();
 
-        /** @var array{uid: int|string, client_id: string, be_user: int|string, token_family: string, refresh_token_expires: int|string, revoked: int|string}|false $row */
+        /** @var array{uid: int|string, client_id: string, be_user: int|string, token_family: string, refresh_token_expires: int|string, family_expires: int|string, revoked: int|string}|false $row */
         $row = $queryBuilder
-            ->select('uid', 'client_id', 'be_user', 'token_family', 'refresh_token_expires', 'revoked')
+            ->select('uid', 'client_id', 'be_user', 'token_family', 'refresh_token_expires', 'family_expires', 'revoked')
             ->from(self::TABLE)
             ->where(
                 $queryBuilder->expr()->eq('refresh_token_hash', $queryBuilder->createNamedParameter($refreshTokenHash)),
@@ -174,6 +188,15 @@ readonly class AuthorizationService
             throw new \RuntimeException('Client no longer exists', 1712100024);
         }
 
+        $familyExpires = (int) $row['family_expires'];
+        if ($familyExpires > 0 && $familyExpires < time()) {
+            // The grant has reached its absolute maximum lifetime. Rotation cannot extend it further;
+            // the user must re-authorize. Revoke the family so no descendant token stays usable.
+            $this->revokeFamily($row['token_family']);
+
+            throw new \RuntimeException('Refresh grant has reached its maximum lifetime', 1712100025);
+        }
+
         // Atomically rotate: flip the presented token to revoked only if it is still active.
         // The conditional `revoked = 0` guard closes the TOCTOU window between the SELECT above
         // and this UPDATE — two concurrent refreshes with the same token cannot both succeed.
@@ -190,7 +213,14 @@ readonly class AuthorizationService
             throw new \RuntimeException('Refresh token has been revoked', 1712100021);
         }
 
-        return $this->issueTokenPair($clientId, (int) $row['be_user'], $row['token_family']);
+        return $this->issueTokenPair($clientId, (int) $row['be_user'], $row['token_family'], $familyExpires);
+    }
+
+    /** Revoke every authorization belonging to a backend user (e.g. after a password change). */
+    public function revokeByBackendUser(int $beUserUid): void
+    {
+        $connection = $this->connectionPool->getConnectionForTable(self::TABLE);
+        $connection->update(self::TABLE, ['revoked' => 1], ['be_user' => $beUserUid]);
     }
 
     /** Revoke every active token in a family. No-op for legacy rows with an empty family. */
@@ -272,7 +302,7 @@ readonly class AuthorizationService
         ], ['uid' => (int) $row['uid']]);
     }
 
-    private function issueTokenPair(string $clientId, int $beUserUid, string $tokenFamily): OAuthTokenPair
+    private function issueTokenPair(string $clientId, int $beUserUid, string $tokenFamily, int $familyExpires): OAuthTokenPair
     {
         $accessToken = bin2hex(random_bytes(32));
         $refreshToken = bin2hex(random_bytes(32));
@@ -286,6 +316,7 @@ readonly class AuthorizationService
             'token_family' => $tokenFamily,
             'access_token_expires' => time() + $this->accessTokenLifetime,
             'refresh_token_expires' => time() + $this->refreshTokenLifetime,
+            'family_expires' => $familyExpires,
         ]);
 
         return new OAuthTokenPair(accessToken: $accessToken, refreshToken: $refreshToken, expiresIn: $this->accessTokenLifetime);

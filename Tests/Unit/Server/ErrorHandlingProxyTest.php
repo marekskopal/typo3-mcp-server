@@ -6,6 +6,7 @@ namespace MarekSkopal\MsMcpServer\Tests\Unit\Server;
 
 use MarekSkopal\MsMcpServer\Logging\AuditLogger;
 use MarekSkopal\MsMcpServer\Server\ErrorHandlingProxy;
+use Mcp\Exception\PromptGetException;
 use Mcp\Exception\ToolCallException;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
@@ -88,6 +89,50 @@ final class ErrorHandlingProxyTest extends TestCase
         $proxy = new ErrorHandlingProxy($inner, new NullLogger(), $auditLogger, 'tool');
 
         $this->expectException(ToolCallException::class);
+        $proxy->execute();
+    }
+
+    public function testPromptTypeConvertsUnexpectedExceptionToPromptGetException(): void
+    {
+        $inner = new class () {
+            public function execute(): never
+            {
+                throw new \RuntimeException('SQLSTATE near "SELECT * FROM be_users"');
+            }
+        };
+
+        $auditLogger = $this->createMock(AuditLogger::class);
+        $auditLogger->expects(self::once())->method('logFailure');
+
+        $proxy = new ErrorHandlingProxy($inner, new NullLogger(), $auditLogger, 'prompt');
+
+        try {
+            $proxy->execute();
+            self::fail('Expected PromptGetException');
+        } catch (PromptGetException $e) {
+            self::assertStringNotContainsString('be_users', $e->getMessage());
+            self::assertStringContainsString('internal error', $e->getMessage());
+        }
+    }
+
+    public function testPromptTypePreservesDeliberatePromptGetExceptionAndAuditsIt(): void
+    {
+        $inner = new class () {
+            public function execute(): never
+            {
+                throw new PromptGetException('Prompt argument missing');
+            }
+        };
+
+        $auditLogger = $this->createMock(AuditLogger::class);
+        $auditLogger->expects(self::once())
+            ->method('logFailure')
+            ->with(self::matchesRegularExpression('/^.+$/'), 'prompt', [], self::greaterThanOrEqual(0), 'Prompt argument missing');
+
+        $proxy = new ErrorHandlingProxy($inner, new NullLogger(), $auditLogger, 'prompt');
+
+        $this->expectException(PromptGetException::class);
+        $this->expectExceptionMessage('Prompt argument missing');
         $proxy->execute();
     }
 

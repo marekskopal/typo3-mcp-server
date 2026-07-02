@@ -306,10 +306,28 @@ readonly class OAuthMiddleware implements MiddlewareInterface
             );
         }
 
-        /** @var array<string, mixed> $body */
-        $body = json_decode((string) $request->getBody(), true, 16, JSON_THROW_ON_ERROR);
+        try {
+            $body = json_decode((string) $request->getBody(), true, 16, JSON_THROW_ON_ERROR);
+        } catch (\JsonException) {
+            return $this->createJsonResponse(
+                400,
+                ['error' => 'invalid_request', 'error_description' => 'Request body must be valid JSON'],
+            );
+        }
+
+        if (!is_array($body)) {
+            return $this->createJsonResponse(
+                400,
+                ['error' => 'invalid_request', 'error_description' => 'Request body must be a JSON object'],
+            );
+        }
 
         $clientName = is_string($body['client_name'] ?? null) ? $body['client_name'] : 'MCP Client';
+        // The client_name column is varchar(255); cap the attacker-controlled value so a long name
+        // cannot trigger a database error (500) instead of a clean registration.
+        if (mb_strlen($clientName) > 255) {
+            $clientName = mb_substr($clientName, 0, 255);
+        }
 
         $redirectUris = [];
         if (is_array($body['redirect_uris'] ?? null)) {

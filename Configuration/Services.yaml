@@ -40,6 +40,9 @@ services:
       $resources: !tagged_iterator mcp.resource
       $prompts: !tagged_iterator mcp.prompt
 
+  MarekSkopal\MsMcpServer\DataHandling\BackendUserPasswordChangeHook:
+    public: true
+
   MarekSkopal\MsMcpServer\Command\CleanupExpiredTokensCommand:
     tags:
       - name: 'console.command'

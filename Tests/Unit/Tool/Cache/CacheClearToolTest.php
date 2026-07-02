@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace MarekSkopal\MsMcpServer\Tests\Unit\Tool\Cache;
 
 use MarekSkopal\MsMcpServer\Service\CacheService;
+use MarekSkopal\MsMcpServer\Service\PermissionService;
 use MarekSkopal\MsMcpServer\Tool\Cache\CacheClearTool;
 use MarekSkopal\MsMcpServer\Tool\Result\CacheClearedResult;
 use MarekSkopal\MsMcpServer\Tool\Result\ErrorResult;
@@ -19,7 +20,7 @@ final class CacheClearToolTest extends TestCase
         $cacheService = $this->createMock(CacheService::class);
         $cacheService->expects(self::once())->method('flushPageCaches');
 
-        $tool = new CacheClearTool($cacheService);
+        $tool = new CacheClearTool($cacheService, $this->createAdminPermissionService());
         $result = $tool->execute('pages');
 
         self::assertInstanceOf(CacheClearedResult::class, $result);
@@ -32,7 +33,7 @@ final class CacheClearToolTest extends TestCase
         $cacheService = $this->createMock(CacheService::class);
         $cacheService->expects(self::once())->method('flushPageCaches');
 
-        $tool = new CacheClearTool($cacheService);
+        $tool = new CacheClearTool($cacheService, $this->createAdminPermissionService());
         $result = $tool->execute();
 
         self::assertInstanceOf(CacheClearedResult::class, $result);
@@ -44,11 +45,26 @@ final class CacheClearToolTest extends TestCase
         $cacheService = $this->createMock(CacheService::class);
         $cacheService->expects(self::once())->method('flushAllCaches');
 
-        $tool = new CacheClearTool($cacheService);
+        $tool = new CacheClearTool($cacheService, $this->createAdminPermissionService());
         $result = $tool->execute('all');
 
         self::assertInstanceOf(CacheClearedResult::class, $result);
         self::assertSame('all', $result->scope);
+    }
+
+    public function testExecuteAllScopeRejectedForNonAdmin(): void
+    {
+        $cacheService = $this->createMock(CacheService::class);
+        $cacheService->expects(self::never())->method('flushAllCaches');
+
+        $permissionService = $this->createStub(PermissionService::class);
+        $permissionService->method('isAdmin')->willReturn(false);
+
+        $tool = new CacheClearTool($cacheService, $permissionService);
+        $result = $tool->execute('all');
+
+        self::assertInstanceOf(ErrorResult::class, $result);
+        self::assertStringContainsString('administrator privileges', $result->error);
     }
 
     public function testExecutePageScopeClearsSpecificPage(): void
@@ -56,7 +72,7 @@ final class CacheClearToolTest extends TestCase
         $cacheService = $this->createMock(CacheService::class);
         $cacheService->expects(self::once())->method('flushPageCache')->with(42);
 
-        $tool = new CacheClearTool($cacheService);
+        $tool = new CacheClearTool($cacheService, $this->createAdminPermissionService());
         $result = $tool->execute('page', 42);
 
         self::assertInstanceOf(CacheClearedResult::class, $result);
@@ -67,7 +83,7 @@ final class CacheClearToolTest extends TestCase
     {
         $cacheService = $this->createStub(CacheService::class);
 
-        $tool = new CacheClearTool($cacheService);
+        $tool = new CacheClearTool($cacheService, $this->createAdminPermissionService());
         $result = $tool->execute('page');
 
         self::assertInstanceOf(ErrorResult::class, $result);
@@ -78,7 +94,7 @@ final class CacheClearToolTest extends TestCase
     {
         $cacheService = $this->createStub(CacheService::class);
 
-        $tool = new CacheClearTool($cacheService);
+        $tool = new CacheClearTool($cacheService, $this->createAdminPermissionService());
         $result = $tool->execute('invalid');
 
         self::assertInstanceOf(ErrorResult::class, $result);
@@ -92,11 +108,19 @@ final class CacheClearToolTest extends TestCase
             ->method('flushPageCaches')
             ->willThrowException(new \RuntimeException('Cache flush failed'));
 
-        $tool = new CacheClearTool($cacheService);
+        $tool = new CacheClearTool($cacheService, $this->createAdminPermissionService());
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('Cache flush failed');
 
         $tool->execute('pages');
+    }
+
+    private function createAdminPermissionService(): PermissionService
+    {
+        $permissionService = $this->createStub(PermissionService::class);
+        $permissionService->method('isAdmin')->willReturn(true);
+
+        return $permissionService;
     }
 }
