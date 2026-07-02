@@ -816,6 +816,55 @@ final class RecordServiceTest extends TestCase
         $service->findByUid('be_users', 1, ['uid']);
     }
 
+    public function testFindExistingUidsThrowsWhenTableNotSelectable(): void
+    {
+        $service = new RecordService($this->createStub(ConnectionPool::class), new WorkspaceContextService(), $this->createDenyingPermissionService());
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionCode(1718100000);
+
+        $service->findExistingUids('be_users', [1, 2]);
+    }
+
+    public function testFindFileReferencesThrowsWhenTableNotSelectable(): void
+    {
+        $service = new RecordService($this->createStub(ConnectionPool::class), new WorkspaceContextService(), $this->createDenyingPermissionService());
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionCode(1718100000);
+
+        $service->findFileReferences('be_users', 1, 'avatar');
+    }
+
+    public function testFindTranslationsThrowsWhenTableNotSelectable(): void
+    {
+        $service = new RecordService($this->createStub(ConnectionPool::class), new WorkspaceContextService(), $this->createDenyingPermissionService());
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionCode(1718100000);
+
+        $service->findTranslations('be_users', 1, 'sys_language_uid', 'l10n_parent');
+    }
+
+    public function testSearchThrowsOnUnknownOperator(): void
+    {
+        $queryBuilder = $this->createQueryBuilderStub();
+        $queryBuilder->method('select')->willReturnSelf();
+        $queryBuilder->method('count')->willReturnSelf();
+        $queryBuilder->method('from')->willReturnSelf();
+        $queryBuilder->method('andWhere')->willReturnSelf();
+
+        $connectionPool = $this->createStub(ConnectionPool::class);
+        $connectionPool->method('getQueryBuilderForTable')->willReturn($queryBuilder);
+
+        $service = new RecordService($connectionPool, new WorkspaceContextService(), $this->createAllowingPermissionService());
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionCode(1718100001);
+
+        $service->search('pages', ['title' => ['operator' => 'regexp', 'value' => 'x']], 20, 0, ['uid', 'title']);
+    }
+
     private function createAllowingPermissionService(): PermissionService
     {
         $permissionService = $this->createStub(PermissionService::class);
@@ -823,6 +872,14 @@ final class RecordServiceTest extends TestCase
         // Admin path: no page-permission constraint is added, so the query expectations in these
         // tests reflect the unrestricted query. Non-admin behaviour is covered separately below.
         $permissionService->method('isAdmin')->willReturn(true);
+
+        return $permissionService;
+    }
+
+    private function createDenyingPermissionService(): PermissionService
+    {
+        $permissionService = $this->createStub(PermissionService::class);
+        $permissionService->method('canSelectTable')->willReturn(false);
 
         return $permissionService;
     }

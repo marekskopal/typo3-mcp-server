@@ -59,6 +59,8 @@ readonly class RecordService
      */
     public function findExistingUids(string $table, array $uids): array
     {
+        $this->assertReadAccess($table);
+
         if ($uids === []) {
             return [];
         }
@@ -299,10 +301,13 @@ readonly class RecordService
             ),
             'null' => $expr->isNull($field),
             'notNull' => $expr->isNotNull($field),
-            default => $expr->like(
+            'like' => $expr->like(
                 $field,
                 $queryBuilder->createNamedParameter('%' . $queryBuilder->escapeLikeWildcards($value) . '%'),
             ),
+            // Reject unknown operators rather than silently falling back to a broad LIKE, which
+            // could return far more rows than intended (and feed downstream batch operations).
+            default => throw new \RuntimeException(sprintf('Unsupported search operator "%s".', $operator), 1718100001),
         });
     }
 
@@ -344,6 +349,10 @@ readonly class RecordService
      */
     public function findFileReferences(string $table, int $uid, string $fieldName): array
     {
+        // Gate on read access to the parent table, otherwise reference metadata (title, link, …)
+        // of records the user may not read would leak through this path.
+        $this->assertReadAccess($table);
+
         $queryBuilder = $this->connectionPool->getQueryBuilderForTable('sys_file_reference');
         $queryBuilder->getRestrictions()->removeAll();
         $this->workspaceContext->applyRestriction($queryBuilder, 'sys_file_reference');
@@ -368,6 +377,8 @@ readonly class RecordService
      */
     public function findTranslations(string $table, int $uid, string $languageField, string $transOrigPointerField): array
     {
+        $this->assertReadAccess($table);
+
         $queryBuilder = $this->connectionPool->getQueryBuilderForTable($table);
         $queryBuilder->getRestrictions()->removeAll();
         $this->workspaceContext->applyRestriction($queryBuilder, $table);
