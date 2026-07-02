@@ -322,7 +322,6 @@ readonly class OAuthMiddleware implements MiddlewareInterface
             );
         }
 
-        /** @var array<string, mixed> $body */
         $clientName = is_string($body['client_name'] ?? null) ? $body['client_name'] : 'MCP Client';
         // The client_name column is varchar(255); cap the attacker-controlled value so a long name
         // cannot trigger a database error (500) instead of a clean registration.

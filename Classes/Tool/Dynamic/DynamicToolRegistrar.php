@@ -37,7 +37,17 @@ readonly class DynamicToolRegistrar
 
     /** Prefixes owned by the built-in static tools; a discovered table may not shadow them. */
     private const array RESERVED_PREFIXES = [
-        'pages', 'content', 'record', 'file', 'table', 'permission', 'redirect', 'scheduler', 'cache', 'be_user', 'be_group',
+        'pages',
+        'content',
+        'record',
+        'file',
+        'table',
+        'permission',
+        'redirect',
+        'scheduler',
+        'cache',
+        'be_user',
+        'be_group',
     ];
 
     public function __construct(
