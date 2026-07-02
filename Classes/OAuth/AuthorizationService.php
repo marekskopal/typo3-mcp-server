@@ -110,17 +110,21 @@ readonly class AuthorizationService
             throw new \RuntimeException('PKCE verification failed', 1712100015);
         }
 
-        // Start a new token family for this authorization; rotated refresh tokens inherit it.
-        $tokenPair = $this->issueTokenPair($clientId, (int) $row['be_user'], bin2hex(random_bytes(16)));
-
-        // Clear authorization code after successful exchange
+        // Atomically consume the code *before* issuing tokens. The conditional `revoked = 0`
+        // guard means only one of two concurrent exchanges can flip the row, so a replay or a
+        // race yields zero affected rows and no second token pair is minted (TOCTOU-safe).
         $connection = $this->connectionPool->getConnectionForTable(self::TABLE);
-        $connection->update(self::TABLE, [
+        $affected = (int) $connection->update(self::TABLE, [
             'authorization_code_hash' => '',
             'revoked' => 1,
-        ], ['uid' => (int) $row['uid']]);
+        ], ['uid' => (int) $row['uid'], 'revoked' => 0]);
 
-        return $tokenPair;
+        if ($affected === 0) {
+            throw new \RuntimeException('Authorization code has already been used', 1712100016);
+        }
+
+        // Start a new token family for this authorization; rotated refresh tokens inherit it.
+        return $this->issueTokenPair($clientId, (int) $row['be_user'], bin2hex(random_bytes(16)));
     }
 
     public function refreshToken(string $refreshToken, string $clientId): OAuthTokenPair
@@ -161,11 +165,30 @@ readonly class AuthorizationService
             throw new \RuntimeException('Client ID mismatch', 1712100023);
         }
 
-        // Revoke old token
+        if ($this->clientRepository->findByClientId($clientId) === null) {
+            // The client was deleted or disabled after this grant was issued. Deleting a client
+            // already revokes its tokens, but this also covers hidden/disabled clients and any row
+            // that slipped through — stop honouring the refresh token and tear down the family.
+            $this->revokeFamily($row['token_family']);
+
+            throw new \RuntimeException('Client no longer exists', 1712100024);
+        }
+
+        // Atomically rotate: flip the presented token to revoked only if it is still active.
+        // The conditional `revoked = 0` guard closes the TOCTOU window between the SELECT above
+        // and this UPDATE — two concurrent refreshes with the same token cannot both succeed.
         $connection = $this->connectionPool->getConnectionForTable(self::TABLE);
-        $connection->update(self::TABLE, [
+        $affected = (int) $connection->update(self::TABLE, [
             'revoked' => 1,
-        ], ['uid' => (int) $row['uid']]);
+        ], ['uid' => (int) $row['uid'], 'revoked' => 0]);
+
+        if ($affected === 0) {
+            // Lost the race: another request already rotated this exact token. Per OAuth 2.1 §6.1
+            // treat concurrent reuse the same as replay of a rotated token and revoke the family.
+            $this->revokeFamily($row['token_family']);
+
+            throw new \RuntimeException('Refresh token has been revoked', 1712100021);
+        }
 
         return $this->issueTokenPair($clientId, (int) $row['be_user'], $row['token_family']);
     }

@@ -236,20 +236,41 @@ final class OAuthClientControllerTest extends TestCase
         self::assertSame(303, $this->getResponseStatusCode($response));
     }
 
-    public function testDeleteActionSoftDeletesClient(): void
+    public function testDeleteActionRevokesClientTokensThenSoftDeletesClient(): void
     {
         $request = $this->createStub(ServerRequestInterface::class);
         $request->method('getParsedBody')->willReturn(['uid' => 5]);
 
-        $connection = $this->createMock(Connection::class);
-        $connection->expects(self::once())
-            ->method('update')
-            ->with('tx_msmcpserver_oauth_client', ['deleted' => 1], ['uid' => 5]);
+        $result = $this->createStub(\Doctrine\DBAL\Result::class);
+        $result->method('fetchOne')->willReturn('client-abc');
 
-        $controller = $this->createController(connection: $connection);
+        $queryBuilder = $this->createQueryBuilderStub();
+        $queryBuilder->method('select')->willReturnSelf();
+        $queryBuilder->method('from')->willReturnSelf();
+        $queryBuilder->method('where')->willReturnSelf();
+        $queryBuilder->method('executeQuery')->willReturn($result);
+
+        /** @var list<array{0: string, 1: array<string, mixed>, 2: array<string, mixed>}> $updates */
+        $updates = [];
+        $connection = $this->createMock(Connection::class);
+        $connection->expects(self::exactly(2))
+            ->method('update')
+            ->willReturnCallback(function (string $table, array $data, array $criteria) use (&$updates): int {
+                $updates[] = [$table, $data, $criteria];
+
+                return 1;
+            });
+
+        $connectionPool = $this->createStub(ConnectionPool::class);
+        $connectionPool->method('getQueryBuilderForTable')->willReturn($queryBuilder);
+        $connectionPool->method('getConnectionForTable')->willReturn($connection);
+
+        $controller = $this->createController(connectionPool: $connectionPool);
         $response = $controller->deleteAction($request);
 
         self::assertSame(303, $this->getResponseStatusCode($response));
+        self::assertContains(['tx_msmcpserver_oauth_authorization', ['revoked' => 1], ['client_id' => 'client-abc']], $updates);
+        self::assertContains(['tx_msmcpserver_oauth_client', ['deleted' => 1], ['uid' => 5]], $updates);
     }
 
     public function testDeleteActionRejectsZeroUid(): void

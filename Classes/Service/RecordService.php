@@ -8,6 +8,10 @@ use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\DBAL\ParameterType;
 use TYPO3\CMS\Core\Database\ConnectionPool;
 use TYPO3\CMS\Core\Database\Query\QueryBuilder;
+use TYPO3\CMS\Core\Database\Query\Restriction\DeletedRestriction;
+use TYPO3\CMS\Core\Database\Query\Restriction\PagePermissionRestriction;
+use TYPO3\CMS\Core\Type\Bitmask\Permission;
+use TYPO3\CMS\Core\Utility\GeneralUtility;
 
 readonly class RecordService
 {
@@ -30,10 +34,13 @@ readonly class RecordService
         $queryBuilder->getRestrictions()->removeAll();
         $this->workspaceContext->applyRestriction($queryBuilder, $table);
 
-        $row = $queryBuilder
+        $queryBuilder
             ->select(...$fields)
             ->from($table)
-            ->where($queryBuilder->expr()->eq('uid', $queryBuilder->createNamedParameter($uid, ParameterType::INTEGER)))
+            ->where($queryBuilder->expr()->eq('uid', $queryBuilder->createNamedParameter($uid, ParameterType::INTEGER)));
+        $this->applyPageReadConstraint($queryBuilder, $table);
+
+        $row = $queryBuilder
             ->executeQuery()
             ->fetchAssociative();
 
@@ -109,6 +116,9 @@ readonly class RecordService
             ->from($table)
             ->where($queryBuilder->expr()->eq('pid', $queryBuilder->createNamedParameter($pid, ParameterType::INTEGER)));
 
+        $this->applyPageReadConstraint($queryBuilder, $table);
+        $this->applyPageReadConstraint($countQueryBuilder, $table);
+
         if ($sysLanguageUid !== null && $languageField !== null) {
             $countQueryBuilder->andWhere(
                 $countQueryBuilder->expr()->eq(
@@ -174,6 +184,9 @@ readonly class RecordService
         $queryBuilder->select(...$fields)->from($table);
         $countQueryBuilder->count('uid')->from($table);
 
+        $this->applyPageReadConstraint($queryBuilder, $table);
+        $this->applyPageReadConstraint($countQueryBuilder, $table);
+
         if ($pid !== null) {
             $queryBuilder->andWhere(
                 $queryBuilder->expr()->eq('pid', $queryBuilder->createNamedParameter($pid, ParameterType::INTEGER)),
@@ -219,6 +232,48 @@ readonly class RecordService
                 1718100000,
             );
         }
+    }
+
+    /**
+     * Restrict a read query to records the user is allowed to see by page permission.
+     *
+     * `tables_select` (checked in assertReadAccess) is table-wide and does not honour the per-page
+     * perms_* ACLs the TYPO3 backend enforces, so without this an editor could read pages and
+     * content across the whole installation. Admins keep unrestricted access (matching core).
+     * For `pages` the perms clause is applied directly; other tables are constrained to rows whose
+     * page (pid) the user may show.
+     */
+    private function applyPageReadConstraint(QueryBuilder $queryBuilder, string $table): void
+    {
+        if ($this->permissionService->isAdmin()) {
+            return;
+        }
+
+        $restriction = GeneralUtility::makeInstance(
+            PagePermissionRestriction::class,
+            $this->permissionService->getUserAspect(),
+            Permission::PAGE_SHOW,
+        );
+
+        if ($table === 'pages') {
+            // PagePermissionRestriction only constrains the `pages` table, so it applies directly.
+            $queryBuilder->getRestrictions()->add($restriction);
+
+            return;
+        }
+
+        // Other tables are bound to a page via pid: restrict to rows whose page the user may show.
+        $pagesQueryBuilder = $this->connectionPool->getQueryBuilderForTable('pages');
+        $pagesQueryBuilder->getRestrictions()->removeAll();
+        $pagesQueryBuilder->getRestrictions()->add(GeneralUtility::makeInstance(DeletedRestriction::class));
+        $pagesQueryBuilder->getRestrictions()->add($restriction);
+        $pagesQueryBuilder
+            ->select('uid')
+            ->from('pages');
+
+        $queryBuilder->andWhere(
+            $queryBuilder->expr()->in('pid', $pagesQueryBuilder->getSQL()),
+        );
     }
 
     /** @param array{operator: string, value: string} $condition */
