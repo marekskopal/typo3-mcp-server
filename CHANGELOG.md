@@ -6,6 +6,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+## [0.12.4] - 2026-07-02
+
+Security-hardening release addressing the findings of a full audit (OAuth layer, request/session path, data access, file operations, permissions). **Run `vendor/bin/typo3 database:updateschema` after upgrading** — this release adds a `family_expires` column to `tx_msmcpserver_oauth_authorization`. Existing rows default to `0` (uncapped) and keep working.
+
+### Security
+- **Record reads now enforce page-level permissions for non-admins.** Read paths (`findByUid`/`findByPid`/`search`/`count`) only checked the table-wide `tables_select` grant, so an editor could read pages and content across the entire installation regardless of the per-page `perms_*` ACLs the backend enforces. A `PagePermissionRestriction` (PAGE_SHOW) is now applied for non-admins — directly on `pages`, and via a page (`pid`) subquery for other page-bound tables. Admins keep unrestricted access.
+- **Deleting an OAuth client now revokes its tokens.** Deletion only soft-deleted the client row, so its access tokens kept working until expiry and its refresh grant could be rotated indefinitely. Deletion now revokes every authorization for the client, and `refreshToken()` additionally verifies the client still exists (covering hidden/disabled clients).
+- **`file_search` now enforces storage access.** It queried `sys_file` directly with all restrictions removed, filtered only by storage uid, letting any user enumerate file metadata of any storage. It now resolves the storage through the backend user's accessible storages first.
+- **Atomic single-use consumption of authorization codes and refresh tokens.** Both did a non-atomic check-then-update, so two concurrent token requests could both succeed. Consumption is now a conditional `UPDATE … WHERE revoked = 0` with an affected-row check; a refresh token that loses the race is treated as reuse and revokes the family (OAuth 2.1 §6.1).
+- **Refresh grants now have an absolute lifetime.** Rotation reset the refresh-token expiry each time, so a grant could be kept alive forever. A `family_expires` cap is recorded at grant creation, carried through rotations, and enforced. Configurable via the `refreshTokenMaxLifetime` setting (default 90 days).
+- **Backend-user password changes revoke MCP tokens.** Token validation does not re-check the password, so tokens issued before a credential reset kept working. A DataHandler hook now revokes a user's authorizations when their `be_users.password` changes.
+- **`cache_clear` "all" scope is admin-only.** Flushing every cache (including system caches) is now restricted to administrators, matching core; page-scoped flushes remain available to editors.
+- **Read helpers gated and unknown search operators rejected.** `findExistingUids`/`findFileReferences`/`findTranslations` now apply the same read-access check as other reads (closing a UID/metadata oracle via the batch tools), and unknown search operators are rejected instead of silently degrading to a broad substring `LIKE`.
+- **MCP session writes enforce ownership.** `DatabaseSessionStore::write()` now refuses to overwrite a session owned by a different backend user, mirroring `read`/`destroy`.
+- **Dynamic-tool registration validates discovered-table rows.** Prefix/label/table-name values from the DB are validated (format, reserved/collision, exclusion list, control-character stripping) before being turned into tool names and descriptions.
+- **Prompt handlers now go through centralized error handling and audit logging**, so prompt invocations are audited and their exceptions sanitized rather than relayed verbatim.
+- **OAuth client registration input hardened.** A malformed JSON body now returns `400` instead of an uncaught 500, and `client_name` is capped to the column length.
+
+### Changed
+- **`mcp:cleanup` purges unused OAuth clients.** Dynamically registered clients older than 30 days with no authorizations are now deleted, bounding growth of the unauthenticated-writable client table.
+- **Audit log is more complete.** A size-capped, scalar-only subset of tool arguments (uid/pid/table — never field payloads) is now recorded, and swallowed log-write failures are reported to the PSR logger instead of vanishing silently.
+
 ## [0.12.3] - 2026-06-17
 
 ### Fixed
