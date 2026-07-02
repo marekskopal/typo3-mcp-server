@@ -25,6 +25,7 @@ CREATE TABLE tx_msmcpserver_oauth_authorization (
     token_family varchar(32) DEFAULT '' NOT NULL,
     access_token_expires int(11) unsigned DEFAULT '0' NOT NULL,
     refresh_token_expires int(11) unsigned DEFAULT '0' NOT NULL,
+    family_expires int(11) unsigned DEFAULT '0' NOT NULL,
     code_expires int(11) unsigned DEFAULT '0' NOT NULL,
     revoked tinyint(1) unsigned DEFAULT '0' NOT NULL,
 

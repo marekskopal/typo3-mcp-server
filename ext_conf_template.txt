@@ -7,6 +7,9 @@ accessTokenLifetime = 3600
 # cat=token/enable; type=int+; label=Refresh token lifetime (seconds)
 refreshTokenLifetime = 2592000
 
+# cat=token/enable; type=int+; label=Refresh grant maximum lifetime (seconds): absolute cap on how long a refresh-token chain stays valid regardless of rotation. Defaults to 90 days.
+refreshTokenMaxLifetime = 7776000
+
 # cat=token/enable; type=int+; label=Authorization code lifetime (seconds)
 codeLifetime = 60
 
