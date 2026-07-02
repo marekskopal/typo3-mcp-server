@@ -7,6 +7,8 @@ namespace MarekSkopal\MsMcpServer\Tests\Unit\Logging;
 use MarekSkopal\MsMcpServer\Logging\AuditLogger;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\LoggerInterface;
+use Psr\Log\NullLogger;
 use TYPO3\CMS\Core\Authentication\BackendUserAuthentication;
 use TYPO3\CMS\Core\Database\Connection;
 use TYPO3\CMS\Core\Database\ConnectionPool;
@@ -55,7 +57,7 @@ final class AuditLoggerTest extends TestCase
         $connectionPool = $this->createStub(ConnectionPool::class);
         $connectionPool->method('getConnectionForTable')->willReturn($connection);
 
-        $auditLogger = new AuditLogger($connectionPool);
+        $auditLogger = new AuditLogger($connectionPool, new NullLogger());
         $auditLogger->logSuccess('PagesListTool', 'tool', [0, 20, 0], 42);
     }
 
@@ -83,8 +85,48 @@ final class AuditLoggerTest extends TestCase
         $connectionPool = $this->createStub(ConnectionPool::class);
         $connectionPool->method('getConnectionForTable')->willReturn($connection);
 
-        $auditLogger = new AuditLogger($connectionPool);
+        $auditLogger = new AuditLogger($connectionPool, new NullLogger());
         $auditLogger->logFailure('PagesDeleteTool', 'tool', [42], 12, 'Record not found');
+    }
+
+    public function testLogSuccessRecordsScalarArgumentsButOmitsArrays(): void
+    {
+        $connection = $this->createMock(Connection::class);
+        $connection->expects(self::once())
+            ->method('insert')
+            ->with(
+                'sys_log',
+                self::callback(static function (array $data): bool {
+                    $logData = json_decode($data['log_data'], true, 512, JSON_THROW_ON_ERROR);
+                    // Scalars (uid, table name) are kept; the field-payload array is dropped.
+                    self::assertSame([42, 'tt_content'], $logData['args']);
+
+                    return true;
+                }),
+            );
+
+        $connectionPool = $this->createStub(ConnectionPool::class);
+        $connectionPool->method('getConnectionForTable')->willReturn($connection);
+
+        $auditLogger = new AuditLogger($connectionPool, new NullLogger());
+        $auditLogger->logSuccess('RecordUpdateTool', 'tool', [42, 'tt_content', ['title' => 'secret payload']], 5);
+    }
+
+    public function testLogFailureIsReportedToPsrLoggerWhenDatabaseFails(): void
+    {
+        $connection = $this->createStub(Connection::class);
+        $connection->method('insert')->willThrowException(new \RuntimeException('Database connection lost'));
+
+        $connectionPool = $this->createStub(ConnectionPool::class);
+        $connectionPool->method('getConnectionForTable')->willReturn($connection);
+
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->expects(self::once())
+            ->method('warning')
+            ->with(self::stringContains('audit log write failed'), self::anything());
+
+        $auditLogger = new AuditLogger($connectionPool, $logger);
+        $auditLogger->logSuccess('PagesListTool', 'tool', [], 10);
     }
 
     public function testLogSuccessDoesNotThrowWhenDatabaseFails(): void
@@ -95,7 +137,7 @@ final class AuditLoggerTest extends TestCase
         $connectionPool = $this->createStub(ConnectionPool::class);
         $connectionPool->method('getConnectionForTable')->willReturn($connection);
 
-        $auditLogger = new AuditLogger($connectionPool);
+        $auditLogger = new AuditLogger($connectionPool, new NullLogger());
         $auditLogger->logSuccess('PagesListTool', 'tool', [], 10);
 
         self::assertTrue(true);
@@ -111,7 +153,7 @@ final class AuditLoggerTest extends TestCase
         $connectionPool = $this->createStub(ConnectionPool::class);
         $connectionPool->method('getConnectionForTable')->willReturn($connection);
 
-        $auditLogger = new AuditLogger($connectionPool);
+        $auditLogger = new AuditLogger($connectionPool, new NullLogger());
         $auditLogger->logSuccess('PagesListTool', 'tool', [], 10);
     }
 }
