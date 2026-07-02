@@ -216,6 +216,13 @@ readonly class AuthorizationService
         return $this->issueTokenPair($clientId, (int) $row['be_user'], $row['token_family'], $familyExpires);
     }
 
+    /** Revoke every authorization belonging to a backend user (e.g. after a password change). */
+    public function revokeByBackendUser(int $beUserUid): void
+    {
+        $connection = $this->connectionPool->getConnectionForTable(self::TABLE);
+        $connection->update(self::TABLE, ['revoked' => 1], ['be_user' => $beUserUid]);
+    }
+
     /** Revoke every active token in a family. No-op for legacy rows with an empty family. */
     private function revokeFamily(string $tokenFamily): void
     {
