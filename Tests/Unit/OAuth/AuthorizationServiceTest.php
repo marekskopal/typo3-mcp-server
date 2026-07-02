@@ -252,7 +252,7 @@ final class AuthorizationServiceTest extends TestCase
         $service = new AuthorizationService(
             $connectionPool,
             new PkceVerifier(),
-            new ClientRepository($this->createStub(ConnectionPool::class)),
+            $this->clientRepositoryFindingClient(),
             $this->createStub(ExtensionConfiguration::class),
         );
 
@@ -297,12 +297,48 @@ final class AuthorizationServiceTest extends TestCase
         $service = new AuthorizationService(
             $connectionPool,
             new PkceVerifier(),
-            new ClientRepository($this->createStub(ConnectionPool::class)),
+            $this->clientRepositoryFindingClient(),
             $this->createStub(ExtensionConfiguration::class),
         );
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionCode(1712100021);
+
+        $service->refreshToken('some-refresh-token', 'client-123');
+    }
+
+    public function testRefreshTokenRevokesFamilyWhenClientNoLongerExists(): void
+    {
+        // The token itself is still valid, but its client has been deleted/disabled since the
+        // grant was issued. The refresh must fail and the whole family must be revoked.
+        $row = [
+            'uid' => 1,
+            'client_id' => 'client-123',
+            'be_user' => 42,
+            'token_family' => 'fam-1',
+            'refresh_token_expires' => time() + 3600,
+            'revoked' => 0,
+        ];
+
+        $connection = $this->createMock(Connection::class);
+        $connection->expects(self::once())
+            ->method('update')
+            ->with('tx_msmcpserver_oauth_authorization', ['revoked' => 1], ['token_family' => 'fam-1']);
+
+        $connectionPool = $this->createConnectionPoolWithQueryAndConnection($row, $connection);
+
+        $clientRepository = $this->createStub(ClientRepository::class);
+        $clientRepository->method('findByClientId')->willReturn(null);
+
+        $service = new AuthorizationService(
+            $connectionPool,
+            new PkceVerifier(),
+            $clientRepository,
+            $this->createStub(ExtensionConfiguration::class),
+        );
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionCode(1712100024);
 
         $service->refreshToken('some-refresh-token', 'client-123');
     }
@@ -425,6 +461,20 @@ final class AuthorizationServiceTest extends TestCase
 
         // No exception thrown = success (RFC 7009: always return OK for unknown tokens)
         self::assertTrue(true);
+    }
+
+    private function clientRepositoryFindingClient(): ClientRepository
+    {
+        $clientRepository = $this->createStub(ClientRepository::class);
+        $clientRepository->method('findByClientId')->willReturn([
+            'uid' => 1,
+            'client_id' => 'client-123',
+            'client_name' => 'Test Client',
+            'redirect_uris' => '["https://app/cb"]',
+            'be_user' => 42,
+        ]);
+
+        return $clientRepository;
     }
 
     /**

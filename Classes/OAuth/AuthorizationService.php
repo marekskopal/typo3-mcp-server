@@ -165,6 +165,15 @@ readonly class AuthorizationService
             throw new \RuntimeException('Client ID mismatch', 1712100023);
         }
 
+        if ($this->clientRepository->findByClientId($clientId) === null) {
+            // The client was deleted or disabled after this grant was issued. Deleting a client
+            // already revokes its tokens, but this also covers hidden/disabled clients and any row
+            // that slipped through — stop honouring the refresh token and tear down the family.
+            $this->revokeFamily($row['token_family']);
+
+            throw new \RuntimeException('Client no longer exists', 1712100024);
+        }
+
         // Atomically rotate: flip the presented token to revoked only if it is still active.
         // The conditional `revoked = 0` guard closes the TOCTOU window between the SELECT above
         // and this UPDATE — two concurrent refreshes with the same token cannot both succeed.

@@ -231,12 +231,36 @@ readonly class OAuthClientController
             return $this->redirect();
         }
 
+        // Revoke every token issued to this client before removing it. Otherwise its access tokens
+        // keep working until they expire and its refresh tokens can be rotated indefinitely, so the
+        // deletion would not actually cut off the client's access.
+        $clientId = $this->findClientId($uid);
+        if ($clientId !== null) {
+            $authConnection = $this->connectionPool->getConnectionForTable(self::AUTHORIZATION_TABLE);
+            $authConnection->update(self::AUTHORIZATION_TABLE, ['revoked' => 1], ['client_id' => $clientId]);
+        }
+
         $connection = $this->connectionPool->getConnectionForTable(self::TABLE);
         $connection->update(self::TABLE, ['deleted' => 1], ['uid' => $uid]);
 
         $this->addFlashMessage('OAuth client deleted.', ContextualFeedbackSeverity::OK);
 
         return $this->redirect();
+    }
+
+    private function findClientId(int $uid): ?string
+    {
+        $queryBuilder = $this->connectionPool->getQueryBuilderForTable(self::TABLE);
+        $queryBuilder->getRestrictions()->removeAll();
+
+        $clientId = $queryBuilder
+            ->select('client_id')
+            ->from(self::TABLE)
+            ->where($queryBuilder->expr()->eq('uid', $queryBuilder->createNamedParameter($uid, ParameterType::INTEGER)))
+            ->executeQuery()
+            ->fetchOne();
+
+        return is_string($clientId) ? $clientId : null;
     }
 
     public function revokeTokenAction(ServerRequestInterface $request): ResponseInterface
