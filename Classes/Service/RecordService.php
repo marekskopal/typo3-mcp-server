@@ -265,6 +265,7 @@ readonly class RecordService
         if ($table === 'pages') {
             // PagePermissionRestriction only constrains the `pages` table, so it applies directly.
             $queryBuilder->getRestrictions()->add($restriction);
+            $queryBuilder->andWhere($this->buildWebmountCondition($queryBuilder, 'uid'));
 
             return;
         }
@@ -284,8 +285,32 @@ readonly class RecordService
         $queryBuilder->andWhere(
             $queryBuilder->expr()->or(
                 $queryBuilder->expr()->eq('pid', $queryBuilder->createNamedParameter(0, ParameterType::INTEGER)),
-                $queryBuilder->expr()->in('pid', $pagesQueryBuilder->getSQL()),
+                $queryBuilder->expr()->and(
+                    $queryBuilder->expr()->in('pid', $pagesQueryBuilder->getSQL()),
+                    $this->buildWebmountCondition($queryBuilder, 'pid'),
+                ),
             ),
+        );
+    }
+
+    /**
+     * Condition confining a page reference to the user's webmounts. The perms_* ACL alone is not
+     * enough: the backend additionally restricts every non-admin to the page trees mounted for
+     * them, so a page whose ACL would grant SHOW is still invisible outside those mounts.
+     * Only called for non-admins (admins skip the read constraint entirely).
+     */
+    private function buildWebmountCondition(QueryBuilder $queryBuilder, string $field): string
+    {
+        $webmountPageIds = $this->permissionService->getWebmountPageIds() ?? [];
+
+        if ($webmountPageIds === []) {
+            // A non-admin without webmounts can reach no page at all.
+            return '1 = 0';
+        }
+
+        return $queryBuilder->expr()->in(
+            $field,
+            $queryBuilder->createNamedParameter($webmountPageIds, ArrayParameterType::INTEGER),
         );
     }
 

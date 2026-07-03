@@ -4,12 +4,22 @@ declare(strict_types=1);
 
 namespace MarekSkopal\MsMcpServer\Service;
 
+use Doctrine\DBAL\ArrayParameterType;
 use TYPO3\CMS\Core\Authentication\BackendUserAuthentication;
+use TYPO3\CMS\Core\Cache\CacheManager;
+use TYPO3\CMS\Core\Cache\Exception\NoSuchCacheException;
+use TYPO3\CMS\Core\Cache\Frontend\FrontendInterface;
 use TYPO3\CMS\Core\Context\UserAspect;
+use TYPO3\CMS\Core\Database\ConnectionPool;
+use TYPO3\CMS\Core\Database\Query\Restriction\DeletedRestriction;
+use TYPO3\CMS\Core\Database\Query\Restriction\PagePermissionRestriction;
 use TYPO3\CMS\Core\Type\Bitmask\Permission;
+use TYPO3\CMS\Core\Utility\GeneralUtility;
 
 readonly class PermissionService
 {
+    private const int WEBMOUNT_DEPTH = 99;
+
     /** @return array{table: string, canSelect: bool, canModify: bool} */
     public function checkTableAccess(string $table): array
     {
@@ -94,6 +104,100 @@ readonly class PermissionService
     public function getUserAspect(): UserAspect
     {
         return new UserAspect($this->getBackendUser());
+    }
+
+    /**
+     * All page uids reachable through the user's webmounts — the mounts themselves plus every
+     * descendant page the user may show — or null for admins (unrestricted). This mirrors how
+     * core's live search confines non-admin results (DatabaseRecordProvider::getPageIdList()).
+     * The expansion walks the page tree, so the result is kept in the runtime cache per user.
+     *
+     * @return list<int>|null
+     */
+    public function getWebmountPageIds(): ?array
+    {
+        $backendUser = $this->getBackendUser();
+        if ($backendUser->isAdmin()) {
+            return null;
+        }
+
+        $cacheKey = 'msmcpserver-webmount-pages-' . ($backendUser->getUserId() ?? 0);
+
+        $cache = $this->getRuntimeCache();
+        $cached = $cache?->get($cacheKey);
+        if (is_array($cached)) {
+            /** @var list<int> $cached */
+            return $cached;
+        }
+
+        $pageIds = $this->expandWebmounts(array_map(intval(...), $backendUser->getWebmounts()));
+
+        $cache?->set($cacheKey, $pageIds);
+
+        return $pageIds;
+    }
+
+    /**
+     * Breadth-first expansion of the mount pages to all descendants the user may show. A page the
+     * user cannot show is pruned together with its whole subtree, mirroring the backend page tree.
+     * The mounts themselves are always included (as in core's live search page-id list).
+     *
+     * @param list<int> $mounts
+     * @return list<int>
+     */
+    private function expandWebmounts(array $mounts): array
+    {
+        if ($mounts === []) {
+            return [];
+        }
+
+        $pageIds = $mounts;
+        $seen = array_fill_keys($mounts, true);
+        $parents = $mounts;
+
+        for ($depth = 0; $depth < self::WEBMOUNT_DEPTH && $parents !== []; $depth++) {
+            $queryBuilder = GeneralUtility::makeInstance(ConnectionPool::class)->getQueryBuilderForTable('pages');
+            $queryBuilder->getRestrictions()->removeAll();
+            $queryBuilder->getRestrictions()->add(GeneralUtility::makeInstance(DeletedRestriction::class));
+            $queryBuilder->getRestrictions()->add(GeneralUtility::makeInstance(
+                PagePermissionRestriction::class,
+                $this->getUserAspect(),
+                Permission::PAGE_SHOW,
+            ));
+
+            /** @var list<array{uid: int|string}> $rows */
+            $rows = $queryBuilder
+                ->select('uid')
+                ->from('pages')
+                ->where($queryBuilder->expr()->in(
+                    'pid',
+                    $queryBuilder->createNamedParameter($parents, ArrayParameterType::INTEGER),
+                ))
+                ->executeQuery()
+                ->fetchAllAssociative();
+
+            $parents = [];
+            foreach ($rows as $row) {
+                $uid = (int) $row['uid'];
+                if (!isset($seen[$uid])) {
+                    $seen[$uid] = true;
+                    $pageIds[] = $uid;
+                    $parents[] = $uid;
+                }
+            }
+        }
+
+        return $pageIds;
+    }
+
+    private function getRuntimeCache(): ?FrontendInterface
+    {
+        try {
+            return GeneralUtility::makeInstance(CacheManager::class)->getCache('runtime');
+        } catch (NoSuchCacheException) {
+            // No cache registered (e.g. in unit tests) — recompute on every call instead.
+            return null;
+        }
     }
 
     private function getBackendUser(): BackendUserAuthentication

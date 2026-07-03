@@ -847,6 +847,8 @@ final class RecordServiceTest extends TestCase
             ->willReturnCallback(
                 static fn(string $field, string|array $value): string => $field . ' IN (' . (is_string($value) ? $value : '') . ')',
             );
+        $expressionBuilder->method('and')
+            ->willReturnCallback(static fn(...$parts): CompositeExpression => CompositeExpression::and(...$parts));
         $expressionBuilder->method('or')
             ->willReturnCallback(static function (...$parts) use (&$capturedOrParts): CompositeExpression {
                 $capturedOrParts = $parts;
@@ -857,7 +859,8 @@ final class RecordServiceTest extends TestCase
         $listQueryBuilder = $this->createStub(QueryBuilder::class);
         $listQueryBuilder->method('getRestrictions')->willReturn($this->createStub(QueryRestrictionContainerInterface::class));
         $listQueryBuilder->method('expr')->willReturn($expressionBuilder);
-        $listQueryBuilder->method('createNamedParameter')->willReturnCallback(static fn(mixed $value): string => (string) $value);
+        $listQueryBuilder->method('createNamedParameter')
+            ->willReturnCallback(static fn(mixed $value): string => is_array($value) ? implode(',', $value) : (string) $value);
         $listQueryBuilder->method('select')->willReturnSelf();
         $listQueryBuilder->method('from')->willReturnSelf();
         $listQueryBuilder->method('andWhere')->willReturnSelf();
@@ -899,10 +902,14 @@ final class RecordServiceTest extends TestCase
         $service->search('sys_redirect', [], 20, 0, ['uid', 'source_path']);
 
         // Root-level records (rootLevel tables like sys_redirect live at pid 0) must stay readable:
-        // the constraint has to be `pid = 0 OR pid IN (accessible pages)`, not the subquery alone.
+        // the constraint has to be `pid = 0 OR (pid in accessible pages within the webmounts)`,
+        // not the page subquery alone.
         self::assertIsArray($capturedOrParts);
         self::assertSame('pid = 0', $capturedOrParts[0]);
-        self::assertSame('pid IN (SELECT uid FROM pages WHERE PERMS_CLAUSE)', $capturedOrParts[1]);
+        self::assertSame(
+            '((pid IN (SELECT uid FROM pages WHERE PERMS_CLAUSE)) AND (pid IN (1,2)))',
+            (string) $capturedOrParts[1],
+        );
     }
 
     public function testFindExistingUidsConstrainsNonPageTableToAccessiblePagesForNonAdmin(): void
@@ -980,6 +987,77 @@ final class RecordServiceTest extends TestCase
         $call($service);
 
         return [$requestedTables, $andWhereCalled];
+    }
+
+    public function testFindByUidConfinesPagesReadsToWebmountsForNonAdmin(): void
+    {
+        $andWhereConditions = $this->capturePagesAndWhereConditions([7, 9]);
+
+        // ACL SHOW alone is not enough — the page must also sit inside the user's webmounts.
+        self::assertContains('uid IN (7,9)', $andWhereConditions);
+    }
+
+    public function testFindByUidDeniesPagesReadsWithoutWebmountsForNonAdmin(): void
+    {
+        $andWhereConditions = $this->capturePagesAndWhereConditions([]);
+
+        // A non-admin without any webmount can reach no page at all.
+        self::assertContains('1 = 0', $andWhereConditions);
+    }
+
+    /**
+     * Run a non-admin findByUid('pages', …) with the given webmount page ids and return every
+     * condition string passed to andWhere().
+     *
+     * @param list<int> $webmountPageIds
+     * @return list<string>
+     */
+    private function capturePagesAndWhereConditions(array $webmountPageIds): array
+    {
+        $andWhereConditions = [];
+
+        $result = $this->createStub(Result::class);
+        $result->method('fetchAssociative')->willReturn(false);
+
+        $expressionBuilder = $this->createStub(ExpressionBuilder::class);
+        $expressionBuilder->method('in')
+            ->willReturnCallback(
+                static fn(string $field, string|array $value): string => $field . ' IN (' . (is_string($value) ? $value : '') . ')',
+            );
+        $expressionBuilder->method('eq')
+            ->willReturnCallback(static fn(string $field, mixed $value): string => $field . ' = ' . $value);
+
+        $queryBuilder = $this->createStub(QueryBuilder::class);
+        $queryBuilder->method('getRestrictions')->willReturn($this->createStub(QueryRestrictionContainerInterface::class));
+        $queryBuilder->method('expr')->willReturn($expressionBuilder);
+        $queryBuilder->method('createNamedParameter')
+            ->willReturnCallback(static fn(mixed $value): string => is_array($value) ? implode(',', $value) : (string) $value);
+        $queryBuilder->method('select')->willReturnSelf();
+        $queryBuilder->method('from')->willReturnSelf();
+        $queryBuilder->method('where')->willReturnSelf();
+        $queryBuilder->method('executeQuery')->willReturn($result);
+        $queryBuilder->method('andWhere')
+            ->willReturnCallback(function (string|CompositeExpression ...$conditions) use (&$andWhereConditions, $queryBuilder): QueryBuilder {
+                foreach ($conditions as $condition) {
+                    $andWhereConditions[] = (string) $condition;
+                }
+
+                return $queryBuilder;
+            });
+
+        $connectionPool = $this->createStub(ConnectionPool::class);
+        $connectionPool->method('getQueryBuilderForTable')->willReturn($queryBuilder);
+
+        $permissionService = $this->createStub(PermissionService::class);
+        $permissionService->method('canSelectTable')->willReturn(true);
+        $permissionService->method('isAdmin')->willReturn(false);
+        $permissionService->method('getUserAspect')->willReturn(new UserAspect());
+        $permissionService->method('getWebmountPageIds')->willReturn($webmountPageIds);
+
+        $service = new RecordService($connectionPool, new WorkspaceContextService(), $permissionService);
+        $service->findByUid('pages', 7, ['uid', 'title']);
+
+        return $andWhereConditions;
     }
 
     public function testCountAppliesPagePermissionRestrictionForNonAdminOnPagesTable(): void
@@ -1169,6 +1247,7 @@ final class RecordServiceTest extends TestCase
         $permissionService->method('canSelectTable')->willReturn(true);
         $permissionService->method('isAdmin')->willReturn(false);
         $permissionService->method('getUserAspect')->willReturn(new UserAspect());
+        $permissionService->method('getWebmountPageIds')->willReturn([1, 2]);
 
         return $permissionService;
     }

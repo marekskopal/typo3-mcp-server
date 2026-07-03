@@ -4,11 +4,18 @@ declare(strict_types=1);
 
 namespace MarekSkopal\MsMcpServer\Tests\Unit\Service;
 
+use Doctrine\DBAL\Result;
 use MarekSkopal\MsMcpServer\Service\PermissionService;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 use TYPO3\CMS\Core\Authentication\BackendUserAuthentication;
+use TYPO3\CMS\Core\Database\ConnectionPool;
+use TYPO3\CMS\Core\Database\Query\Expression\ExpressionBuilder;
+use TYPO3\CMS\Core\Database\Query\QueryBuilder;
+use TYPO3\CMS\Core\Database\Query\Restriction\DeletedRestriction;
+use TYPO3\CMS\Core\Database\Query\Restriction\QueryRestrictionContainerInterface;
 use TYPO3\CMS\Core\Type\Bitmask\Permission;
+use TYPO3\CMS\Core\Utility\GeneralUtility;
 
 #[CoversClass(PermissionService::class)]
 final class PermissionServiceTest extends TestCase
@@ -264,5 +271,80 @@ final class PermissionServiceTest extends TestCase
         $GLOBALS['BE_USER'] = $backendUser;
 
         self::assertFalse((new PermissionService())->isAdmin());
+    }
+
+    public function testGetWebmountPageIdsReturnsNullForAdmin(): void
+    {
+        $backendUser = $this->createStub(BackendUserAuthentication::class);
+        $backendUser->method('isAdmin')->willReturn(true);
+
+        $GLOBALS['BE_USER'] = $backendUser;
+
+        self::assertNull((new PermissionService())->getWebmountPageIds());
+    }
+
+    public function testGetWebmountPageIdsReturnsEmptyListWithoutWebmounts(): void
+    {
+        $backendUser = $this->createStub(BackendUserAuthentication::class);
+        $backendUser->method('isAdmin')->willReturn(false);
+        $backendUser->method('getWebmounts')->willReturn([]);
+
+        $GLOBALS['BE_USER'] = $backendUser;
+
+        self::assertSame([], (new PermissionService())->getWebmountPageIds());
+    }
+
+    public function testGetWebmountPageIdsReturnsMountsAndDescendants(): void
+    {
+        $backendUser = $this->createStub(BackendUserAuthentication::class);
+        $backendUser->method('isAdmin')->willReturn(false);
+        $backendUser->method('getWebmounts')->willReturn([10]);
+        $backendUser->method('getUserId')->willReturn(5);
+
+        $GLOBALS['BE_USER'] = $backendUser;
+
+        // First level below the mount yields two children, the next level none — BFS stops there.
+        $callCount = 0;
+        $connectionPool = $this->createStub(ConnectionPool::class);
+        $connectionPool->method('getQueryBuilderForTable')->willReturnCallback(
+            function () use (&$callCount): QueryBuilder {
+                $callCount++;
+
+                return $this->createPagesQueryBuilderStub($callCount === 1 ? [['uid' => 11], ['uid' => 12]] : []);
+            },
+        );
+
+        GeneralUtility::addInstance(ConnectionPool::class, $connectionPool);
+        GeneralUtility::addInstance(ConnectionPool::class, $connectionPool);
+        // DeletedRestriction resolves TcaSchemaFactory through DI when constructed for real.
+        GeneralUtility::addInstance(DeletedRestriction::class, $this->createStub(DeletedRestriction::class));
+        GeneralUtility::addInstance(DeletedRestriction::class, $this->createStub(DeletedRestriction::class));
+
+        try {
+            self::assertSame([10, 11, 12], (new PermissionService())->getWebmountPageIds());
+        } finally {
+            GeneralUtility::purgeInstances();
+        }
+    }
+
+    /** @param list<array{uid: int}> $rows */
+    private function createPagesQueryBuilderStub(array $rows): QueryBuilder
+    {
+        $result = $this->createStub(Result::class);
+        $result->method('fetchAllAssociative')->willReturn($rows);
+
+        $restrictions = $this->createStub(QueryRestrictionContainerInterface::class);
+        $restrictions->method('removeAll')->willReturn($restrictions);
+
+        $queryBuilder = $this->createStub(QueryBuilder::class);
+        $queryBuilder->method('getRestrictions')->willReturn($restrictions);
+        $queryBuilder->method('expr')->willReturn($this->createStub(ExpressionBuilder::class));
+        $queryBuilder->method('createNamedParameter')->willReturn(':ids');
+        $queryBuilder->method('select')->willReturnSelf();
+        $queryBuilder->method('from')->willReturnSelf();
+        $queryBuilder->method('where')->willReturnSelf();
+        $queryBuilder->method('executeQuery')->willReturn($result);
+
+        return $queryBuilder;
     }
 }
