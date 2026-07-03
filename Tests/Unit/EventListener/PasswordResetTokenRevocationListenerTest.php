@@ -13,6 +13,15 @@ use TYPO3\CMS\Backend\Authentication\Event\PasswordHasBeenResetEvent;
 #[CoversClass(PasswordResetTokenRevocationListener::class)]
 final class PasswordResetTokenRevocationListenerTest extends TestCase
 {
+    protected function setUp(): void
+    {
+        if (class_exists(PasswordHasBeenResetEvent::class)) {
+            return;
+        }
+
+        self::markTestSkipped('PasswordHasBeenResetEvent does not exist in this TYPO3 version (introduced in v14).');
+    }
+
     public function testRevokesAuthorizationsForResetUser(): void
     {
         $authorizationService = $this->createMock(AuthorizationService::class);

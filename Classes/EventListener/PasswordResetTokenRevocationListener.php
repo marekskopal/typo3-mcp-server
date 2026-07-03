@@ -14,6 +14,11 @@ use TYPO3\CMS\Core\Attribute\AsEventListener;
  * CLI command). That flow updates be_users directly with a query builder and never goes
  * through DataHandler, so BackendUserPasswordChangeHook does not fire for it — yet it is
  * the canonical response to a credential compromise, exactly when issued tokens must die.
+ *
+ * PasswordHasBeenResetEvent exists only in TYPO3 v14+. On v13 the class is never dispatched
+ * (registration by class-name string is harmless), so this flow is uncovered there: after an
+ * email password reset on v13, additionally disable the user or revoke their tokens in the
+ * backend module. DataHandler-mediated password changes are covered on both versions.
  */
 #[AsEventListener(identifier: 'ms-mcp-server/password-reset-token-revocation')]
 readonly class PasswordResetTokenRevocationListener

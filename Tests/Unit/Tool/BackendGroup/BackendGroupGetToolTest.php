@@ -108,4 +108,53 @@ final class BackendGroupGetToolTest extends TestCase
 
         $tool->execute(1);
     }
+
+    public function testExecuteOmitsTsconfigIncludesWhenColumnNotInTca(): void
+    {
+        // TYPO3 v13 has no be_groups.tsconfig_includes column — selecting it would be an SQL error.
+        $capturedFields = $this->executeCapturingSelectedFields();
+
+        self::assertIsArray($capturedFields);
+        self::assertNotContains('tsconfig_includes', $capturedFields);
+    }
+
+    public function testExecuteSelectsTsconfigIncludesWhenColumnInTca(): void
+    {
+        $GLOBALS['TCA']['be_groups']['columns']['tsconfig_includes'] = ['config' => ['type' => 'input']];
+
+        try {
+            $capturedFields = $this->executeCapturingSelectedFields();
+
+            self::assertIsArray($capturedFields);
+            self::assertContains('tsconfig_includes', $capturedFields);
+        } finally {
+            unset($GLOBALS['TCA']);
+        }
+    }
+
+    /** @return list<string>|null the field list the tool passed to RecordService::findByUid() */
+    private function executeCapturingSelectedFields(): ?array
+    {
+        $capturedFields = null;
+
+        $permissionService = $this->createStub(PermissionService::class);
+        $permissionService->method('isAdmin')->willReturn(true);
+
+        $recordService = $this->createStub(RecordService::class);
+        $recordService->method('findByUid')
+            ->willReturnCallback(static function (string $table, int $uid, array $fields) use (&$capturedFields): array {
+                $capturedFields = $fields;
+
+                return ['uid' => $uid, 'title' => 'Group', 'deleted' => 0];
+            });
+
+        $tool = new BackendGroupGetTool($recordService, $permissionService);
+        $result = $tool->execute(3);
+
+        self::assertInstanceOf(BackendGroupDetailResult::class, $result);
+        // The field is absent from the row on v13; the DTO must fall back to '' either way.
+        self::assertSame('', $result->tsconfigIncludes);
+
+        return $capturedFields;
+    }
 }
