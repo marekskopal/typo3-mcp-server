@@ -332,6 +332,8 @@ readonly class RecordService
 
         $queryBuilder->count('uid')->from($table);
 
+        $this->applyPageReadConstraint($queryBuilder, $table);
+
         if ($pid !== null) {
             $queryBuilder->andWhere(
                 $queryBuilder->expr()->eq('pid', $queryBuilder->createNamedParameter($pid, ParameterType::INTEGER)),

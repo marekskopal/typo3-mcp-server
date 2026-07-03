@@ -877,6 +877,92 @@ final class RecordServiceTest extends TestCase
         self::assertSame('pid IN (SELECT uid FROM pages WHERE PERMS_CLAUSE)', $capturedOrParts[1]);
     }
 
+    public function testCountAppliesPagePermissionRestrictionForNonAdminOnPagesTable(): void
+    {
+        $addedRestrictions = [];
+
+        $restrictions = $this->createStub(QueryRestrictionContainerInterface::class);
+        $restrictions->method('add')
+            ->willReturnCallback(function (object $restriction) use (&$addedRestrictions, $restrictions) {
+                $addedRestrictions[] = $restriction;
+
+                return $restrictions;
+            });
+
+        $countResult = $this->createStub(Result::class);
+        $countResult->method('fetchOne')->willReturn(3);
+
+        $queryBuilder = $this->createStub(QueryBuilder::class);
+        $queryBuilder->method('getRestrictions')->willReturn($restrictions);
+        $queryBuilder->method('expr')->willReturn($this->createStub(ExpressionBuilder::class));
+        $queryBuilder->method('createNamedParameter')->willReturn("'0'");
+        $queryBuilder->method('count')->willReturnSelf();
+        $queryBuilder->method('from')->willReturnSelf();
+        $queryBuilder->method('andWhere')->willReturnSelf();
+        $queryBuilder->method('executeQuery')->willReturn($countResult);
+
+        $connectionPool = $this->createStub(ConnectionPool::class);
+        $connectionPool->method('getQueryBuilderForTable')->willReturn($queryBuilder);
+
+        $service = new RecordService($connectionPool, new WorkspaceContextService(), $this->createEditorPermissionService());
+        $count = $service->count('pages');
+
+        self::assertSame(3, $count);
+        $pagePermissionRestrictions = array_filter(
+            $addedRestrictions,
+            static fn(object $restriction): bool => $restriction instanceof PagePermissionRestriction,
+        );
+        self::assertNotEmpty($pagePermissionRestrictions);
+    }
+
+    public function testCountConstrainsNonPageTableToAccessiblePagesForNonAdmin(): void
+    {
+        $requestedTables = [];
+        $andWhereCalled = false;
+
+        $countResult = $this->createStub(Result::class);
+        $countResult->method('fetchOne')->willReturn(0);
+
+        $countQueryBuilder = $this->createQueryBuilderStub();
+        $countQueryBuilder->method('count')->willReturnSelf();
+        $countQueryBuilder->method('from')->willReturnSelf();
+        $countQueryBuilder->method('executeQuery')->willReturn($countResult);
+        $countQueryBuilder->method('andWhere')
+            ->willReturnCallback(function () use (&$andWhereCalled, $countQueryBuilder): QueryBuilder {
+                $andWhereCalled = true;
+
+                return $countQueryBuilder;
+            });
+
+        $pagesQueryBuilder = $this->createQueryBuilderStub();
+        $pagesQueryBuilder->method('select')->willReturnSelf();
+        $pagesQueryBuilder->method('from')->willReturnSelf();
+        $pagesQueryBuilder->method('getSQL')->willReturn('SELECT uid FROM pages WHERE PERMS_CLAUSE');
+
+        $callCount = 0;
+        $connectionPool = $this->createStub(ConnectionPool::class);
+        $connectionPool->method('getQueryBuilderForTable')
+            ->willReturnCallback(function (string $table) use (
+                &$callCount,
+                &$requestedTables,
+                $countQueryBuilder,
+                $pagesQueryBuilder,
+            ): QueryBuilder {
+                $requestedTables[] = $table;
+                $callCount++;
+
+                return $callCount === 1 ? $countQueryBuilder : $pagesQueryBuilder;
+            });
+
+        $service = new RecordService($connectionPool, new WorkspaceContextService(), $this->createEditorPermissionService());
+        $service->count('tt_content', 5);
+
+        // count() must honour the same page-permission constraint as search()/findByPid():
+        // a `pages` subquery is built and the count query is constrained by it.
+        self::assertContains('pages', $requestedTables);
+        self::assertTrue($andWhereCalled);
+    }
+
     public function testFindByUidThrowsWhenTableNotSelectable(): void
     {
         $connectionPool = $this->createStub(ConnectionPool::class);
