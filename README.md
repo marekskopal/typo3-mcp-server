@@ -1,7 +1,5 @@
 # TYPO3 MCP Server
 
-> **Beta** — This extension is under active development. APIs and behavior may change between releases.
-
 TYPO3 CMS extension that implements an [MCP (Model Context Protocol)](https://modelcontextprotocol.io/) server for TYPO3 administration. It exposes 60+ tools for managing pages, content elements, files, backend users, and custom extension records via the MCP protocol, allowing AI assistants to interact with your TYPO3 instance.
 
 **This extension is designed primarily for direct, fully autonomous AI operation — changes take effect immediately, with no approval queue between the AI and the live site.** The goal is to let AI agents build, update, and maintain TYPO3 sites end-to-end without human intervention.
@@ -312,8 +310,15 @@ Configurable via **Settings > Extension Configuration > ms_mcp_server**:
 | Setting | Default | Description |
 |---------|---------|-------------|
 | `accessTokenLifetime` | 3600 (1 hour) | Access token lifetime in seconds |
-| `refreshTokenLifetime` | 2592000 (30 days) | Refresh token lifetime in seconds |
+| `refreshTokenLifetime` | 2592000 (30 days) | Refresh token lifetime in seconds (sliding: each rotation issues a fresh token with this lifetime) |
+| `refreshTokenMaxLifetime` | 7776000 (90 days) | Absolute cap on how long a refresh-token chain stays valid regardless of rotation; after this the user must re-authenticate |
 | `codeLifetime` | 60 (1 minute) | Authorization code lifetime in seconds |
+
+### Sessions
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `sessionLifetime` | 86400 (1 day) | MCP session idle lifetime in seconds (sliding TTL — any activity extends it); idle sessions are removed by `mcp:cleanup` |
 
 ### Rate Limiting
 
@@ -581,7 +586,7 @@ $GLOBALS['TYPO3_CONF_VARS']['EXTCONF']['ms_mcp_server']['tables']['tx_blog_domai
 
 ## Maintenance
 
-The `mcp:cleanup` command purges expired OAuth authorization codes / access tokens / refresh tokens, idle MCP sessions past `sessionLifetime`, and stale rate-limit window rows:
+The `mcp:cleanup` command purges expired OAuth authorization codes / access tokens / refresh tokens, dynamically registered OAuth clients that never obtained (or no longer have) an authorization after 30 days, idle MCP sessions past `sessionLifetime`, and stale rate-limit window rows. Clients created manually in the backend module are never purged:
 
 ```bash
 vendor/bin/typo3 mcp:cleanup

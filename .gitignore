@@ -8,3 +8,4 @@ composer.lock
 /.claude/
 Tests/Integration/node_modules/
 Tests/Integration/package-lock.json
+/SECURITY_AUDIT.md
