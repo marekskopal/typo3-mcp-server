@@ -1,5 +1,13 @@
 # TYPO3 MCP Server
 
+[![CI](https://github.com/marekskopal/typo3-mcp-server/actions/workflows/ci.yml/badge.svg)](https://github.com/marekskopal/typo3-mcp-server/actions/workflows/ci.yml)
+[![Integration Tests](https://github.com/marekskopal/typo3-mcp-server/actions/workflows/integration.yml/badge.svg)](https://github.com/marekskopal/typo3-mcp-server/actions/workflows/integration.yml)
+[![Latest Version](https://img.shields.io/packagist/v/marekskopal/typo3-mcp-server?label=packagist)](https://packagist.org/packages/marekskopal/typo3-mcp-server)
+[![Downloads](https://img.shields.io/packagist/dt/marekskopal/typo3-mcp-server)](https://packagist.org/packages/marekskopal/typo3-mcp-server)
+[![PHP Version](https://img.shields.io/packagist/dependency-v/marekskopal/typo3-mcp-server/php?label=php)](https://packagist.org/packages/marekskopal/typo3-mcp-server)
+[![TYPO3](https://img.shields.io/badge/TYPO3-13.4%20%7C%2014-ff8700?logo=typo3)](https://get.typo3.org/)
+[![License](https://img.shields.io/github/license/marekskopal/typo3-mcp-server)](LICENSE)
+
 TYPO3 CMS extension that implements an [MCP (Model Context Protocol)](https://modelcontextprotocol.io/) server for TYPO3 administration. It exposes 60+ tools for managing pages, content elements, files, backend users, and custom extension records via the MCP protocol, allowing AI assistants to interact with your TYPO3 instance.
 
 **This extension is designed primarily for direct, fully autonomous AI operation — changes take effect immediately, with no approval queue between the AI and the live site.** The goal is to let AI agents build, update, and maintain TYPO3 sites end-to-end without human intervention.
@@ -23,7 +31,7 @@ These are the kinds of tasks an AI agent can accomplish autonomously through thi
 ## Requirements
 
 - PHP 8.3+
-- TYPO3 v13.4 or v14.x
+- TYPO3 v13.4.24+ or v14.3+
 
 ## Installation
 
@@ -66,7 +74,7 @@ vendor/bin/typo3 mcp:server --user editor
 
 ### HTTP Transport
 
-For remote AI clients, the MCP server is available at `/mcp` on your TYPO3 instance. It uses the [Streamable HTTP transport](https://modelcontextprotocol.io/specification/2025-03-26/basic/transports#streamable-http) (MCP protocol version 2025-03-26).
+For remote AI clients, the MCP server is available at `/mcp` on your TYPO3 instance. It uses the [Streamable HTTP transport](https://modelcontextprotocol.io/specification/2025-03-26/basic/transports#streamable-http) (MCP protocol version 2025-03-26 or later, negotiated with the client).
 
 HTTP transport requires OAuth 2.1 authentication. See the [Authentication](#authentication) section below.
 
@@ -333,6 +341,8 @@ OAuth endpoints are protected by IP-based rate limiting with configurable per-en
 | `rateLimitRegister` | `10` / 3600s | Client registration |
 | `rateLimitRevoke` | `20` / 300s | Token revocation |
 
+Each endpoint's window length is configurable too, via the matching `rateLimit*Window` setting (`rateLimitAuthorizeWindow`, `rateLimitAuthorizeGetWindow`, `rateLimitTokenWindow`, `rateLimitRegisterWindow`, `rateLimitRevokeWindow`; values in seconds).
+
 Returns `429 Too Many Requests` with `Retry-After` header when exceeded.
 
 ### Backend Module
@@ -376,7 +386,7 @@ The **System > MCP Server** backend module provides:
 | `content_copy` | Copy a content element to a new position. |
 | `content_search` | Search content by header (plain text) or advanced conditions (JSON). Supports language filtering and sorting. |
 
-**Target positioning** (for `content_move`, `content_copy`): Positive target = place at top of that page. Negative target = place after element with that UID.
+**Target positioning** (for `content_move`, `content_copy`): Provide exactly one of `targetPid` (place at the top of that page) or `afterUid` (place after that content element, on the same page and column as the sibling).
 
 ### File Management
 
@@ -480,7 +490,7 @@ Registered only when `typo3/cms-redirects` is installed. Operates on the `sys_re
 |------|-------------|
 | `redirect_list` | List redirects with pagination; filter by `sourceHost`, `sourcePath`, `target` (LIKE) and `disabled`. |
 | `redirect_get` | Get a single redirect record by uid. |
-| `redirect_create` | Create a redirect. Required: `sourceHost`, `sourcePath`, `target`; optional `targetStatuscode` and extra `fields` JSON. |
+| `redirect_create` | Create a redirect. Required: `sourceHost`, `sourcePath`, `target`; optional `pid` (default 0), `targetStatuscode` and extra `fields` JSON. |
 | `redirect_update` | Update an existing redirect. Pass fields as a JSON object. |
 | `redirect_delete` | Delete a redirect by uid. |
 
