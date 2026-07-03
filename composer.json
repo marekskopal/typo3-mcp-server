@@ -4,17 +4,27 @@
     "description": "MCP server for TYPO3 CMS administration",
     "keywords": [
         "TYPO3",
+        "typo3-extension",
         "mcp",
+        "mcp-server",
+        "model-context-protocol",
+        "ai",
+        "oauth",
         "server"
     ],
-    "homepage": "https://marekskopal.com",
+    "homepage": "https://github.com/marekskopal/typo3-mcp-server",
     "authors": [
         {
             "name": "Marek Skopal",
+            "email": "skopal.marek@gmail.com",
             "role": "Developer",
             "homepage": "https://marekskopal.com"
         }
     ],
+    "support": {
+        "issues": "https://github.com/marekskopal/typo3-mcp-server/issues",
+        "source": "https://github.com/marekskopal/typo3-mcp-server"
+    },
     "license": ["GPL-2.0-or-later"],
     "require": {
         "php": ">=8.3",
