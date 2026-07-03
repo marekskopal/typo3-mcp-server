@@ -116,8 +116,15 @@ final class ClientRepositoryTest extends TestCase
 
     public function testRegisterClientInsertsAndReturnsData(): void
     {
+        $insertedRow = null;
+
         $connection = $this->createMock(Connection::class);
-        $connection->expects(self::once())->method('insert');
+        $connection->expects(self::once())->method('insert')
+            ->willReturnCallback(static function (string $table, array $row) use (&$insertedRow): int {
+                $insertedRow = $row;
+
+                return 1;
+            });
 
         $connectionPool = $this->createStub(ConnectionPool::class);
         $connectionPool->method('getConnectionForTable')->willReturn($connection);
@@ -129,6 +136,9 @@ final class ClientRepositoryTest extends TestCase
         self::assertSame(['https://example.com/callback'], $result['redirect_uris']);
         self::assertIsString($result['client_id']);
         self::assertNotEmpty($result['client_id']);
+        // Dynamic registrations must carry the marker that makes them eligible for mcp:cleanup purging.
+        self::assertIsArray($insertedRow);
+        self::assertSame(1, $insertedRow['dynamically_registered']);
     }
 
     public function testValidateRedirectUrisForRegistrationAcceptsHttpsAndLoopbackAndPrivateScheme(): void

@@ -384,7 +384,7 @@ readonly class FileService
         // resolves through getStorage() (backed by the user's accessible storages), but this method
         // reads the table straight, so without this gate any user could enumerate file metadata of
         // any storage uid, including storages they have no access to.
-        $this->getStorage($storageUid);
+        $storage = $this->getStorage($storageUid);
 
         $limit = min(max($limit, 1), 500);
 
@@ -402,6 +402,27 @@ readonly class FileService
         $countQueryBuilder->andWhere(
             $countQueryBuilder->expr()->eq('storage', $countQueryBuilder->createNamedParameter($storageUid, ParameterType::INTEGER)),
         );
+
+        // Storage access alone still spans the whole storage; the backend confines a non-admin
+        // user to their filemount folders, so mirror that here. With permission evaluation on and
+        // no filemounts, nothing in the storage is reachable — return empty rather than everything.
+        if ($storage->getEvaluatePermissions()) {
+            $mountIdentifiers = array_map(strval(...), array_keys($storage->getFileMounts()));
+            if ($mountIdentifiers === []) {
+                return ['files' => [], 'total' => 0];
+            }
+
+            foreach ([$queryBuilder, $countQueryBuilder] as $builder) {
+                $mountConditions = array_map(
+                    static fn(string $mountIdentifier): string => $builder->expr()->like(
+                        'identifier',
+                        $builder->createNamedParameter($builder->escapeLikeWildcards($mountIdentifier) . '%'),
+                    ),
+                    $mountIdentifiers,
+                );
+                $builder->andWhere($builder->expr()->or(...$mountConditions));
+            }
+        }
 
         if ($namePattern !== '') {
             $queryBuilder->andWhere(

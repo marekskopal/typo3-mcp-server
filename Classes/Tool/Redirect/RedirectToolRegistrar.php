@@ -147,7 +147,7 @@ readonly class RedirectToolRegistrar
                     );
 
                     return json_encode($result, JSON_THROW_ON_ERROR);
-                });
+                }, arguments: [$pid, $limit, $offset, $sourceHost, $sourcePath, $target, $disabled], tableName: self::TABLE);
             },
             name: 'redirect_list',
             description: 'List redirect records with pagination and optional filtering.'
@@ -177,6 +177,9 @@ readonly class RedirectToolRegistrar
 
                         return json_encode($record, JSON_THROW_ON_ERROR);
                     },
+                    arguments: [$uid],
+                    tableName: self::TABLE,
+                    recordUid: $uid,
                 );
             },
             name: 'redirect_get',
@@ -237,7 +240,7 @@ readonly class RedirectToolRegistrar
                     $uid = $dataHandlerService->createRecord(self::TABLE, $pid, $filteredData);
 
                     return new RecordCreatedResult($uid, $ignoredFields);
-                });
+                }, arguments: [$sourceHost, $sourcePath, $target, $pid, $targetStatuscode, $fields], tableName: self::TABLE);
             },
             name: 'redirect_create',
             description: 'Create a new redirect record. Required: sourceHost (domain or "*"), sourcePath, target (URL or t3:// link).'
@@ -274,6 +277,9 @@ readonly class RedirectToolRegistrar
 
                         return new RecordUpdatedResult($uid, array_keys($filteredData), $ignoredFields);
                     },
+                    arguments: [$uid, $fields],
+                    tableName: self::TABLE,
+                    recordUid: $uid,
                 );
             },
             name: 'redirect_update',
@@ -299,6 +305,9 @@ readonly class RedirectToolRegistrar
 
                         return new RecordDeletedResult($uid);
                     },
+                    arguments: [$uid],
+                    tableName: self::TABLE,
+                    recordUid: $uid,
                 );
             },
             name: 'redirect_delete',

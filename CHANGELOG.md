@@ -6,6 +6,33 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-07-03
+
+First stable release. **Run `vendor/bin/typo3 database:updateschema` after upgrading** — this release adds a `dynamically_registered` column to `tx_msmcpserver_oauth_client`.
+
+### Fixed
+- **Root-level records were invisible to non-admins.** The page-permission read constraint introduced in 0.12.4 restricted non-`pages` tables to `pid IN (accessible pages)` — a set that can never contain `0` — so every record stored at pid 0 disappeared for non-admin users. `sys_redirect` is a rootLevel table, so `redirect_list` returned nothing and `redirect_get` reported "not found" for editors. Root-level records are now readable again under the table-level `tables_select` grant.
+- **`record_count` now honours page-level read permissions.** `count()` was the one read path left out of the 0.12.4 page-permission fix, so counts still leaked for pages outside a non-admin's ACLs and disagreed with `record_search` totals.
+- **`mcp:cleanup` no longer deletes admin-created OAuth clients.** The unused-client purge applied to *all* clients without authorizations after 30 days — including clients created manually in the backend module, whose random `client_id` is unrecoverable once deleted. Clients now carry a `dynamically_registered` flag set only by the unauthenticated registration endpoint, and the purge is scoped to it.
+- **Invalid dynamic-tool prefixes are rejected when saved.** The extension-table module accepted any non-empty prefix (e.g. `News` or the reserved `record`), which tool registration then silently dropped. Validation is now shared between the module and the registrar, and the save fails with a message naming the problem.
+- **Unknown search operators produce a client-visible error.** A typo'd operator (or a non-string `op`) surfaced as a generic "internal error"; the MCP client now receives a message naming the offending operator and listing the supported ones.
+
+### Security
+- **Non-admin reads are confined to the user's webmounts.** Page ACLs alone did not fully mirror the backend: a page whose `perms_*` grant SHOW was still returned even when it lay outside the user's mounted page trees. Reads now additionally require the page to be inside the webmounts (expanded to descendants with SHOW, cached per request).
+- **Password resets via TYPO3's PasswordReset service revoke MCP tokens (TYPO3 v14+).** The 0.12.4 DataHandler hook did not fire for the "forgot password" email flow or `backend:resetpassword`, which write to `be_users` directly; a listener for `PasswordHasBeenResetEvent` now covers them. TYPO3 v13 dispatches no event for this flow — there, additionally disable the user or revoke their tokens in the backend module after an email reset.
+- **`file_search` is confined to the user's filemounts.** The storage-access gate from 0.12.4 still allowed enumerating an entire accessible storage; non-admin results are now restricted to identifiers under the user's filemount folders (none → empty result).
+- **UID probing, translations and file references honour page permissions.** `findExistingUids`/`findTranslations` now apply the page-level read constraint (closing a per-page existence oracle through batch-tool "skipped" responses), and `file_reference_list` verifies the parent record is visible before returning reference metadata.
+- **Audit log records the target of registrar tool calls.** Dynamic/redirect/scheduler/workspace tools logged an empty argument list and never populated `sys_log.tablename`/`recuid`; all 26 call sites now record redacted arguments plus the affected table and record uid.
+- **`workspace` is a reserved dynamic-tool prefix**, so a discovered table can no longer shadow the built-in workspace tools.
+
+### Changed
+- Extension state is now **stable**; the README beta notice is gone.
+- `ext_emconf.php` now requires TYPO3 13.4.24+ / 14.3+, matching composer.json.
+- Added `SECURITY.md` (private vulnerability reporting via GitHub Security Advisories or email).
+- composer.json gained support links, author email and discoverability keywords; `LICENCE` was renamed to `LICENSE` for automatic license detection.
+- README documents the `refreshTokenMaxLifetime` and `sessionLifetime` settings and the unused-client purge.
+- The integration suite gained a non-admin editor scenario covering root-level record reads, webmount containment, count/search consistency and table-grant enforcement.
+
 ## [0.12.4] - 2026-07-02
 
 Security-hardening release addressing the findings of a full audit (OAuth layer, request/session path, data access, file operations, permissions). **Run `vendor/bin/typo3 database:updateschema` after upgrading** — this release adds a `family_expires` column to `tx_msmcpserver_oauth_authorization`. Existing rows default to `0` (uncapped) and keep working.

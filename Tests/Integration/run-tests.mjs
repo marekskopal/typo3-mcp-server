@@ -37,7 +37,8 @@ function section(title) { log(`\n${c.bold}--- ${title} ---${c.reset}`); }
 // --- Test runner ---
 
 class IntegrationTestRunner {
-    constructor() {
+    constructor(user = 'admin') {
+        this.user = user;
         this.client = null;
         this.transport = null;
         this.passed = [];
@@ -50,7 +51,7 @@ class IntegrationTestRunner {
 
     async connect() {
         log('Connecting to MCP server via stdio...');
-        log(`  command: php vendor/bin/typo3 mcp:server --user admin`);
+        log(`  command: php vendor/bin/typo3 mcp:server --user ${this.user}`);
         log(`  cwd:     ${TYPO3_PATH}`);
 
         this.transport = new StdioClientTransport({
@@ -59,7 +60,7 @@ class IntegrationTestRunner {
                 '-d', 'display_errors=stderr',
                 '-d', 'log_errors=1',
                 '-d', 'memory_limit=512M',
-                'vendor/bin/typo3', 'mcp:server', '--user', 'admin',
+                'vendor/bin/typo3', 'mcp:server', '--user', this.user,
             ],
             cwd: TYPO3_PATH,
         });
@@ -758,6 +759,87 @@ class IntegrationTestRunner {
         if (pageUid) await this.testTool('pages_delete', { uid: pageUid });
     }
 
+    /** Record a named assertion outside the plain tool-call flow. */
+    check(name, ok, errorMessage) {
+        if (ok) {
+            this.passed.push({ tool: name });
+            pass(name);
+        } else {
+            this.failed.push({ tool: name, error: errorMessage });
+            fail(name, errorMessage);
+        }
+    }
+
+    /**
+     * Permission scenario for a non-admin editor (fixtures in test-data.sql: user "editor",
+     * group 10 mounted on page 1, fixture pages 80/90/91, root-level redirect 900).
+     * Everything here runs against a connection bootstrapped with --user editor.
+     */
+    async runEditorScenario() {
+        await this.discoverCapabilities();
+
+        section('Editor: root-level records stay readable');
+        if (this.availableTools.has('redirect_list')) {
+            // Regression guard: sys_redirect is a rootLevel table (all rows at pid 0); the page
+            // read constraint must not hide it from non-admins.
+            const redirects = await this.testTool('redirect_list', {});
+            const rows = Array.isArray(redirects?.records) ? redirects.records : [];
+            this.check(
+                'redirect_list returns the root-level fixture redirect',
+                rows.some(r => r.source_path === '/integration-fixture-redirect'),
+                `fixture redirect not in list (got ${rows.length} rows)`,
+            );
+        } else {
+            skip('redirect_list', 'typo3/cms-redirects not installed');
+            this.skipped.push({ tool: 'redirect_list', reason: 'extension not installed' });
+        }
+
+        section('Editor: page ACL + webmount containment');
+
+        // Inside the webmount with group SHOW permission — must be readable.
+        const visible = await this.testTool('pages_get', { uid: 80 });
+        this.check(
+            'pages_get inside webmount',
+            visible?.title === 'Editor Visible Page',
+            `expected fixture title, got '${visible?.title ?? visible?.error}'`,
+        );
+
+        // Outside the webmount, although perms_everybody grants SHOW — must be refused.
+        const outside = await this.callToolSafe('pages_get', { uid: 91 });
+        this.check(
+            'pages_get outside webmount refused',
+            outside === null || !!outside.error,
+            `page outside webmount was returned: '${outside?.title}'`,
+        );
+
+        section('Editor: count/search consistency');
+        const count = await this.testTool('record_count', { tableName: 'pages' });
+        const search = await this.testTool('record_search', { tableName: 'pages', search: '{}', limit: 500 });
+        const searchRecords = Array.isArray(search?.records) ? search.records : [];
+
+        this.check(
+            'record_count matches record_search total',
+            typeof count?.count === 'number' && count.count === search?.total,
+            `count=${count?.count} vs search total=${search?.total}`,
+        );
+        this.check(
+            'search excludes pages outside webmount',
+            !searchRecords.some(r => r.uid === 90 || r.uid === 91),
+            'out-of-mount page leaked into search results',
+        );
+
+        section('Editor: table grants still enforced');
+        // No tables_select for be_users — must be refused (error result or tool error).
+        let beUsersDenied = false;
+        try {
+            const result = await this.callTool('record_search', { tableName: 'be_users', search: '{}' });
+            beUsersDenied = !!result?.error;
+        } catch {
+            beUsersDenied = true;
+        }
+        this.check('record_search on be_users refused', beUsersDenied, 'editor could search be_users');
+    }
+
     // ---- Main execution ----
 
     async run() {
@@ -803,7 +885,7 @@ class IntegrationTestRunner {
     printReport() {
         const total = this.passed.length + this.failed.length + this.skipped.length;
 
-        log(`\n${c.bold}=== Results ===${c.reset}`);
+        log(`\n${c.bold}=== Results (${this.user}) ===${c.reset}`);
         log(`  Total:   ${total}`);
         log(`  ${c.green}Passed:  ${this.passed.length}${c.reset}`);
         log(`  ${c.red}Failed:  ${this.failed.length}${c.reset}`);
@@ -846,8 +928,26 @@ async function main() {
     }
 
     await runner.disconnect();
+
+    // ---- Non-admin scenario on a separate connection ----
+    log(`\n${c.bold}=== Non-Admin (editor) Scenario ===${c.reset}`);
+    const editorRunner = new IntegrationTestRunner('editor');
+
+    try {
+        await editorRunner.connect();
+        await editorRunner.runEditorScenario();
+    } catch (e) {
+        log(`\n${c.red}Fatal error in editor scenario: ${e.message}${c.reset}`);
+        if (e.stack) log(e.stack);
+        await editorRunner.disconnect();
+        process.exit(2);
+    }
+
+    await editorRunner.disconnect();
+
     const success = runner.printReport();
-    process.exit(success ? 0 : 1);
+    const editorSuccess = editorRunner.printReport();
+    process.exit(success && editorSuccess ? 0 : 1);
 }
 
 main();

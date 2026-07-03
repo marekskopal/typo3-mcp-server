@@ -235,6 +235,41 @@ final class ExtensionTableControllerTest extends TestCase
         $controller->updateAction($request);
     }
 
+    public function testUpdateActionRejectsMalformedPrefix(): void
+    {
+        // "News" passes the old non-empty check but would be silently dropped at tool registration.
+        $request = $this->createStub(ServerRequestInterface::class);
+        $request->method('getParsedBody')->willReturn(['uid' => 5, 'label' => 'Test', 'prefix' => 'News']);
+
+        $repository = $this->createMock(DiscoveredTableRepository::class);
+        $repository->expects(self::never())->method('update');
+
+        $flashMessageQueue = $this->createMock(FlashMessageQueue::class);
+        $flashMessageQueue->expects(self::once())
+            ->method('enqueue')
+            ->with(self::callback(fn (FlashMessage $msg): bool => str_contains($msg->getMessage(), 'Invalid prefix "News"')));
+
+        $controller = $this->createController(repository: $repository, flashMessageQueue: $flashMessageQueue);
+        $controller->updateAction($request);
+    }
+
+    public function testUpdateActionRejectsReservedPrefix(): void
+    {
+        $request = $this->createStub(ServerRequestInterface::class);
+        $request->method('getParsedBody')->willReturn(['uid' => 5, 'label' => 'Test', 'prefix' => 'record']);
+
+        $repository = $this->createMock(DiscoveredTableRepository::class);
+        $repository->expects(self::never())->method('update');
+
+        $flashMessageQueue = $this->createMock(FlashMessageQueue::class);
+        $flashMessageQueue->expects(self::once())
+            ->method('enqueue')
+            ->with(self::callback(fn (FlashMessage $msg): bool => str_contains($msg->getMessage(), 'reserved')));
+
+        $controller = $this->createController(repository: $repository, flashMessageQueue: $flashMessageQueue);
+        $controller->updateAction($request);
+    }
+
     private function createController(
         ?ExtensionTableDiscoveryService $discoveryService = null,
         ?DiscoveredTableRepository $repository = null,

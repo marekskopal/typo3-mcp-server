@@ -154,7 +154,7 @@ readonly class SchedulerToolRegistrar
                     );
 
                     return json_encode($result, JSON_THROW_ON_ERROR);
-                });
+                }, arguments: [$limit, $offset, $tasktype, $taskGroup, $disable], tableName: self::TABLE);
             },
             name: 'scheduler_list',
             description: 'List scheduler tasks with pagination and optional filtering.'
@@ -185,6 +185,9 @@ readonly class SchedulerToolRegistrar
 
                         return json_encode($record, JSON_THROW_ON_ERROR);
                     },
+                    arguments: [$uid],
+                    tableName: self::TABLE,
+                    recordUid: $uid,
                 );
             },
             name: 'scheduler_get',
@@ -228,7 +231,7 @@ readonly class SchedulerToolRegistrar
                     $dataHandlerService->updateRecord(self::TABLE, $uid, $filteredData);
 
                     return new RecordUpdatedResult($uid, array_keys($filteredData), $ignoredFields);
-                });
+                }, arguments: [$uid, $fields], tableName: self::TABLE, recordUid: $uid);
             },
             name: 'scheduler_update',
             description: 'Update a scheduler task. Pass fields as a JSON object string.'
@@ -253,6 +256,9 @@ readonly class SchedulerToolRegistrar
 
                         return new RecordDeletedResult($uid);
                     },
+                    arguments: [$uid],
+                    tableName: self::TABLE,
+                    recordUid: $uid,
                 );
             },
             name: 'scheduler_delete',

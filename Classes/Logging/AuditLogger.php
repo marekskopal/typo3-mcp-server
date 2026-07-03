@@ -25,8 +25,14 @@ readonly class AuditLogger
     }
 
     /** @param list<mixed> $arguments */
-    public function logSuccess(string $handlerName, string $type, array $arguments, int $executionTimeMs): void
-    {
+    public function logSuccess(
+        string $handlerName,
+        string $type,
+        array $arguments,
+        int $executionTimeMs,
+        string $tableName = '',
+        int $recordUid = 0,
+    ): void {
         $this->writeLog(
             handlerName: $handlerName,
             type: $type,
@@ -34,12 +40,21 @@ readonly class AuditLogger
             error: 0,
             details: sprintf('MCP %s %s: OK (%dms)', $type, $handlerName, $executionTimeMs),
             arguments: $arguments,
+            tableName: $tableName,
+            recordUid: $recordUid,
         );
     }
 
     /** @param list<mixed> $arguments */
-    public function logFailure(string $handlerName, string $type, array $arguments, int $executionTimeMs, string $errorMessage,): void
-    {
+    public function logFailure(
+        string $handlerName,
+        string $type,
+        array $arguments,
+        int $executionTimeMs,
+        string $errorMessage,
+        string $tableName = '',
+        int $recordUid = 0,
+    ): void {
         $this->writeLog(
             handlerName: $handlerName,
             type: $type,
@@ -50,6 +65,8 @@ readonly class AuditLogger
             details: sprintf('MCP %s %s failed (%dms)', $type, $handlerName, $executionTimeMs),
             errorMessage: $errorMessage,
             arguments: $arguments,
+            tableName: $tableName,
+            recordUid: $recordUid,
         );
     }
 
@@ -62,6 +79,8 @@ readonly class AuditLogger
         string $details,
         string $errorMessage = '',
         array $arguments = [],
+        string $tableName = '',
+        int $recordUid = 0,
     ): void {
         try {
             $backendUser = $GLOBALS['BE_USER'] ?? null;
@@ -96,8 +115,11 @@ readonly class AuditLogger
                 'error' => $error,
                 'details' => $details,
                 'log_data' => json_encode($data, JSON_THROW_ON_ERROR),
-                'tablename' => '',
-                'recuid' => 0,
+                // Target of the action, so the trail can answer "which record was touched" —
+                // strip control chars like the error message, since table names for dynamic
+                // tools originate from a DB row.
+                'tablename' => mb_substr((string) preg_replace('/[\x00-\x1F\x7F]/', '', $tableName), 0, 255),
+                'recuid' => max($recordUid, 0),
                 'IP' => $this->resolveRemoteAddress(),
                 'tstamp' => $GLOBALS['EXEC_TIME'] ?? time(),
                 'event_pid' => -1,

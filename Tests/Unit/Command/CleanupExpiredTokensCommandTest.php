@@ -92,4 +92,54 @@ final class CleanupExpiredTokensCommandTest extends TestCase
         self::assertStringContainsString('7 stale MCP sessions', $outputText);
         self::assertStringContainsString('3 expired rate limit entries', $outputText);
     }
+
+    public function testClientPurgeOnlyTargetsDynamicallyRegisteredClients(): void
+    {
+        $eqFields = [];
+
+        $expressionBuilder = $this->createStub(ExpressionBuilder::class);
+        $expressionBuilder->method('eq')
+            ->willReturnCallback(static function (string $field, mixed $value) use (&$eqFields): string {
+                $eqFields[] = $field;
+
+                return $field . ' = ' . $value;
+            });
+
+        $queryBuilder = $this->createStub(QueryBuilder::class);
+        $restrictions = $this->createStub(QueryRestrictionContainerInterface::class);
+        $restrictions->method('removeAll')->willReturn($restrictions);
+        $queryBuilder->method('getRestrictions')->willReturn($restrictions);
+        $queryBuilder->method('delete')->willReturn($queryBuilder);
+        $queryBuilder->method('where')->willReturn($queryBuilder);
+        $queryBuilder->method('select')->willReturn($queryBuilder);
+        $queryBuilder->method('from')->willReturn($queryBuilder);
+        $queryBuilder->method('getSQL')->willReturn('SELECT client_id FROM tx_msmcpserver_oauth_authorization');
+        $queryBuilder->method('executeStatement')->willReturn(0);
+        $queryBuilder->method('expr')->willReturn($expressionBuilder);
+        $queryBuilder->method('createNamedParameter')->willReturn(':param');
+
+        $connection = $this->createStub(Connection::class);
+        $connection->method('createQueryBuilder')->willReturn($queryBuilder);
+
+        $connectionPool = $this->createStub(ConnectionPool::class);
+        $connectionPool->method('getConnectionForTable')->willReturn($connection);
+
+        $rateLimitService = $this->createStub(RateLimitService::class);
+        $sessionRepository = $this->createStub(McpSessionRepository::class);
+        $extensionConfiguration = $this->createStub(ExtensionConfiguration::class);
+        $extensionConfiguration->method('get')->willReturn([]);
+
+        $command = new CleanupExpiredTokensCommand(
+            $connectionPool,
+            $rateLimitService,
+            $sessionRepository,
+            $extensionConfiguration,
+        );
+
+        $command->run(new ArrayInput([]), new BufferedOutput());
+
+        // Admin-created clients must never be purged: the delete has to be scoped to rows
+        // flagged as dynamically registered (unauthenticated RFC 7591 registrations).
+        self::assertContains('dynamically_registered', $eqFields);
+    }
 }

@@ -53,7 +53,14 @@ readonly class BackendGroupGetTool
             throw new ToolCallException('Admin access required');
         }
 
-        $row = $this->recordService->findByUid('be_groups', $uid, self::DETAIL_FIELDS);
+        // tsconfig_includes only exists in the TYPO3 v14+ be_groups schema; selecting it on v13
+        // is an SQL error. RowField falls back to '' for the missing key in the result DTO.
+        $fields = self::DETAIL_FIELDS;
+        if (!$this->tcaHasTsconfigIncludes()) {
+            $fields = array_values(array_diff($fields, ['tsconfig_includes']));
+        }
+
+        $row = $this->recordService->findByUid('be_groups', $uid, $fields);
 
         if ($row === null || RowField::asInt($row, 'deleted') === 1) {
             return new ErrorResult('Backend group not found', ['uid' => $uid]);
@@ -81,5 +88,22 @@ readonly class BackendGroupGetTool
             tsConfig: RowField::asString($row, 'TSconfig'),
             tsconfigIncludes: RowField::asString($row, 'tsconfig_includes'),
         );
+    }
+
+    private function tcaHasTsconfigIncludes(): bool
+    {
+        $tca = $GLOBALS['TCA'] ?? [];
+        if (!is_array($tca)) {
+            return false;
+        }
+
+        $tableConfig = $tca['be_groups'] ?? null;
+        if (!is_array($tableConfig)) {
+            return false;
+        }
+
+        $columns = $tableConfig['columns'] ?? null;
+
+        return is_array($columns) && isset($columns['tsconfig_includes']);
     }
 }

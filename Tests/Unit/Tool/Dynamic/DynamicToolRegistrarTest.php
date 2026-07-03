@@ -871,6 +871,75 @@ final class DynamicToolRegistrarTest extends TestCase
         $closure('10,20', targetPid: 5);
     }
 
+    public function testUpdateToolAuditLogsArgumentsTableAndRecordUid(): void
+    {
+        $auditLogger = $this->createMock(AuditLogger::class);
+        $auditLogger->expects(self::once())
+            ->method('logSuccess')
+            ->with('item_update', 'tool', [5, '{"title":"New"}'], self::anything(), self::TABLE, 5);
+
+        $registrar = new DynamicToolRegistrar(
+            $this->createStub(RecordService::class),
+            $this->createStub(DataHandlerService::class),
+            new TcaSchemaService(),
+            $this->createEmptyDiscoveredTableRepository(),
+            new NullLogger(),
+            $auditLogger,
+        );
+
+        $builder = Server::builder();
+        $registrar->register($builder);
+
+        $closure = null;
+        foreach ($this->getRegisteredTools($builder) as $tool) {
+            if (($tool['name'] ?? null) === 'item_update') {
+                $closure = $tool['handler'];
+
+                break;
+            }
+        }
+        self::assertNotNull($closure);
+
+        $result = $closure(5, '{"title":"New"}');
+        self::assertInstanceOf(RecordUpdatedResult::class, $result);
+    }
+
+    public function testListToolAuditLogsFailureWithArgumentsAndTable(): void
+    {
+        $recordService = $this->createStub(RecordService::class);
+        $recordService->method('findByPid')->willThrowException(new \RuntimeException('DB error'));
+
+        $auditLogger = $this->createMock(AuditLogger::class);
+        $auditLogger->expects(self::once())
+            ->method('logFailure')
+            ->with('item_list', 'tool', [10, 20, 0, ''], self::anything(), 'DB error', self::TABLE, 0);
+
+        $registrar = new DynamicToolRegistrar(
+            $recordService,
+            $this->createStub(DataHandlerService::class),
+            new TcaSchemaService(),
+            $this->createEmptyDiscoveredTableRepository(),
+            new NullLogger(),
+            $auditLogger,
+        );
+
+        $builder = Server::builder();
+        $registrar->register($builder);
+
+        $closure = null;
+        foreach ($this->getRegisteredTools($builder) as $tool) {
+            if (($tool['name'] ?? null) === 'item_list') {
+                $closure = $tool['handler'];
+
+                break;
+            }
+        }
+        self::assertNotNull($closure);
+
+        $this->expectException(ToolCallException::class);
+        $closure(10);
+    }
+
     private function createRegistrar(
         ?RecordService $recordService = null,
         ?DataHandlerService $dataHandlerService = null,

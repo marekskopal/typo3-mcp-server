@@ -6,6 +6,7 @@ namespace MarekSkopal\MsMcpServer\Service;
 
 use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\DBAL\ParameterType;
+use Mcp\Exception\ToolCallException;
 use TYPO3\CMS\Core\Database\ConnectionPool;
 use TYPO3\CMS\Core\Database\Query\QueryBuilder;
 use TYPO3\CMS\Core\Database\Query\Restriction\DeletedRestriction;
@@ -15,6 +16,9 @@ use TYPO3\CMS\Core\Utility\GeneralUtility;
 
 readonly class RecordService
 {
+    /** Operators accepted in search conditions; anything else is rejected with a client-visible error. */
+    public const array SUPPORTED_OPERATORS = ['eq', 'neq', 'gt', 'gte', 'lt', 'lte', 'in', 'null', 'notNull', 'like'];
+
     public function __construct(
         private ConnectionPool $connectionPool,
         private WorkspaceContextService $workspaceContext,
@@ -69,14 +73,19 @@ readonly class RecordService
         $queryBuilder->getRestrictions()->removeAll();
         $this->workspaceContext->applyRestriction($queryBuilder, $table);
 
-        /** @var list<array{uid: int|string}> $rows */
-        $rows = $queryBuilder
+        $queryBuilder
             ->select('uid')
             ->from($table)
             ->where($queryBuilder->expr()->in(
                 'uid',
                 $queryBuilder->createNamedParameter($uids, ArrayParameterType::INTEGER),
-            ))
+            ));
+        // Records on pages the user may not show must not be probeable here either, otherwise
+        // batch-tool "skipped" responses become a UID existence oracle for restricted pages.
+        $this->applyPageReadConstraint($queryBuilder, $table);
+
+        /** @var list<array{uid: int|string}> $rows */
+        $rows = $queryBuilder
             ->executeQuery()
             ->fetchAllAssociative();
 
@@ -260,6 +269,7 @@ readonly class RecordService
         if ($table === 'pages') {
             // PagePermissionRestriction only constrains the `pages` table, so it applies directly.
             $queryBuilder->getRestrictions()->add($restriction);
+            $queryBuilder->andWhere($this->buildWebmountCondition($queryBuilder, 'uid'));
 
             return;
         }
@@ -273,8 +283,38 @@ readonly class RecordService
             ->select('uid')
             ->from('pages');
 
+        // Root-level records (pid 0, e.g. rootLevel tables like sys_redirect) sit outside the page
+        // tree, so no perms_* ACL applies to them; they remain readable under the table-level grant
+        // checked in assertReadAccess. Without this, the pid IN (pages…) subquery would hide them.
         $queryBuilder->andWhere(
-            $queryBuilder->expr()->in('pid', $pagesQueryBuilder->getSQL()),
+            $queryBuilder->expr()->or(
+                $queryBuilder->expr()->eq('pid', $queryBuilder->createNamedParameter(0, ParameterType::INTEGER)),
+                $queryBuilder->expr()->and(
+                    $queryBuilder->expr()->in('pid', $pagesQueryBuilder->getSQL()),
+                    $this->buildWebmountCondition($queryBuilder, 'pid'),
+                ),
+            ),
+        );
+    }
+
+    /**
+     * Condition confining a page reference to the user's webmounts. The perms_* ACL alone is not
+     * enough: the backend additionally restricts every non-admin to the page trees mounted for
+     * them, so a page whose ACL would grant SHOW is still invisible outside those mounts.
+     * Only called for non-admins (admins skip the read constraint entirely).
+     */
+    private function buildWebmountCondition(QueryBuilder $queryBuilder, string $field): string
+    {
+        $webmountPageIds = $this->permissionService->getWebmountPageIds() ?? [];
+
+        if ($webmountPageIds === []) {
+            // A non-admin without webmounts can reach no page at all.
+            return '1 = 0';
+        }
+
+        return $queryBuilder->expr()->in(
+            $field,
+            $queryBuilder->createNamedParameter($webmountPageIds, ArrayParameterType::INTEGER),
         );
     }
 
@@ -307,7 +347,16 @@ readonly class RecordService
             ),
             // Reject unknown operators rather than silently falling back to a broad LIKE, which
             // could return far more rows than intended (and feed downstream batch operations).
-            default => throw new \RuntimeException(sprintf('Unsupported search operator "%s".', $operator), 1718100001),
+            // ToolCallException is relayed verbatim to the MCP client (ErrorHandlingProxy passes it
+            // through), so the caller learns which operator was wrong instead of "internal error".
+            default => throw new ToolCallException(
+                sprintf(
+                    'Unsupported search operator "%s". Supported operators: %s.',
+                    $operator,
+                    implode(', ', self::SUPPORTED_OPERATORS),
+                ),
+                1718100001,
+            ),
         });
     }
 
@@ -325,6 +374,8 @@ readonly class RecordService
         $this->workspaceContext->applyRestriction($queryBuilder, $table);
 
         $queryBuilder->count('uid')->from($table);
+
+        $this->applyPageReadConstraint($queryBuilder, $table);
 
         if ($pid !== null) {
             $queryBuilder->andWhere(
@@ -352,6 +403,12 @@ readonly class RecordService
         // Gate on read access to the parent table, otherwise reference metadata (title, link, …)
         // of records the user may not read would leak through this path.
         $this->assertReadAccess($table);
+
+        // The reference rows carry no page context of their own; gate on the visibility of the
+        // parent record instead, which applies the page-permission read constraint via findByUid.
+        if ($this->findByUid($table, $uid, ['uid']) === null) {
+            return [];
+        }
 
         $queryBuilder = $this->connectionPool->getQueryBuilderForTable('sys_file_reference');
         $queryBuilder->getRestrictions()->removeAll();
@@ -383,12 +440,15 @@ readonly class RecordService
         $queryBuilder->getRestrictions()->removeAll();
         $this->workspaceContext->applyRestriction($queryBuilder, $table);
 
-        /** @var list<array{uid: int|string, sys_language_uid: int|string}> $rows */
-        $rows = $queryBuilder
+        $queryBuilder
             ->select('uid', $languageField . ' AS sys_language_uid')
             ->from($table)
             ->where($queryBuilder->expr()->eq($transOrigPointerField, $queryBuilder->createNamedParameter($uid, ParameterType::INTEGER)))
-            ->orderBy($languageField, 'ASC')
+            ->orderBy($languageField, 'ASC');
+        $this->applyPageReadConstraint($queryBuilder, $table);
+
+        /** @var list<array{uid: int|string, sys_language_uid: int|string}> $rows */
+        $rows = $queryBuilder
             ->executeQuery()
             ->fetchAllAssociative();
 

@@ -6,6 +6,7 @@ namespace MarekSkopal\MsMcpServer\Controller;
 
 use MarekSkopal\MsMcpServer\Repository\DiscoveredTableRepository;
 use MarekSkopal\MsMcpServer\Service\ExtensionTableDiscoveryService;
+use MarekSkopal\MsMcpServer\Tool\Dynamic\ToolPrefixValidator;
 use Psr\Http\Message\ResponseFactoryInterface;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
@@ -172,6 +173,16 @@ readonly class ExtensionTableController
 
         if ($label === '' || $prefix === '') {
             $this->addFlashMessage('Label and prefix are required.', ContextualFeedbackSeverity::ERROR);
+
+            return $this->redirectToIndex();
+        }
+
+        // Validate with the same rules DynamicToolRegistrar applies at registration time —
+        // otherwise a prefix like "News" or "record" saves fine here but the table's tools
+        // silently vanish (registration drops the row with only a PSR warning).
+        $prefixError = ToolPrefixValidator::validate($prefix);
+        if ($prefixError !== null) {
+            $this->addFlashMessage($prefixError, ContextualFeedbackSeverity::ERROR);
 
             return $this->redirectToIndex();
         }

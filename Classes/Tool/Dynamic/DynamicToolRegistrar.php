@@ -27,28 +27,10 @@ use const JSON_THROW_ON_ERROR;
 
 readonly class DynamicToolRegistrar
 {
-    /** A tool prefix must be a lowercase identifier; it becomes part of generated tool names. */
-    private const string PREFIX_PATTERN = '/^[a-z][a-z0-9_]{0,63}$/';
-
     /** Table-name prefixes that discovery never exposes; re-checked here in case a row was tampered with. */
     private const array EXCLUDED_TABLE_PREFIXES = ['sys_', 'be_', 'fe_', 'cache_', 'cf_', 'index_', 'tx_msmcpserver_'];
 
     private const array EXCLUDED_TABLES = ['pages', 'tt_content'];
-
-    /** Prefixes owned by the built-in static tools; a discovered table may not shadow them. */
-    private const array RESERVED_PREFIXES = [
-        'pages',
-        'content',
-        'record',
-        'file',
-        'table',
-        'permission',
-        'redirect',
-        'scheduler',
-        'cache',
-        'be_user',
-        'be_group',
-    ];
 
     public function __construct(
         private RecordService $recordService,
@@ -211,7 +193,7 @@ readonly class DynamicToolRegistrar
 
     private function isValidPrefix(string $prefix): bool
     {
-        return preg_match(self::PREFIX_PATTERN, $prefix) === 1 && !in_array($prefix, self::RESERVED_PREFIXES, true);
+        return ToolPrefixValidator::isValid($prefix);
     }
 
     private function sanitizeLabel(string $label): string
@@ -302,7 +284,7 @@ readonly class DynamicToolRegistrar
                         );
 
                         return json_encode($result, JSON_THROW_ON_ERROR);
-                    });
+                    }, arguments: [$pid, $limit, $offset, $sysLanguageUid, $selectFields], tableName: $tableName);
                 },
                 name: $toolName,
                 description: 'List ' . $config['label'] . ' records by parent page ID with pagination.'
@@ -343,7 +325,7 @@ readonly class DynamicToolRegistrar
                         $result = $recordService->findByPid($tableName, $pid, $limit, $offset, $fields);
 
                         return json_encode($result, JSON_THROW_ON_ERROR);
-                    });
+                    }, arguments: [$pid, $limit, $offset, $selectFields], tableName: $tableName);
                 },
                 name: $toolName,
                 description: 'List ' . $config['label'] . ' records by parent page ID with pagination.'
@@ -402,7 +384,7 @@ readonly class DynamicToolRegistrar
                     }
 
                     return json_encode($record, JSON_THROW_ON_ERROR);
-                });
+                }, arguments: [$uid], tableName: $tableName, recordUid: $uid);
             },
             name: $toolName,
             description: 'Get a single ' . $config['label'] . ' record by its uid.',
@@ -458,7 +440,7 @@ readonly class DynamicToolRegistrar
                 $uid = $dataHandlerService->createRecord($tableName, $pid, $filteredData);
 
                 return new RecordCreatedResult($uid, $ignoredFields);
-            });
+            }, arguments: [$data, $pid, $sysLanguageUid], tableName: $tableName);
         };
 
         $description = 'Create a new ' . $config['label'] . ' record. Pass fields as a JSON object string.'
@@ -538,7 +520,7 @@ readonly class DynamicToolRegistrar
                     $dataHandlerService->updateRecord($tableName, $uid, $filteredData);
 
                     return new RecordUpdatedResult($uid, array_keys($filteredData), $ignoredFields);
-                });
+                }, arguments: [$uid, $fields], tableName: $tableName, recordUid: $uid);
             },
             name: $toolName,
             description: 'Update an existing ' . $config['label'] . ' record. Pass fields as a JSON object string'
@@ -566,6 +548,9 @@ readonly class DynamicToolRegistrar
 
                         return new RecordDeletedResult($uid);
                     },
+                    arguments: [$uid],
+                    tableName: $tableName,
+                    recordUid: $uid,
                 );
             },
             name: $toolName,
@@ -608,7 +593,7 @@ readonly class DynamicToolRegistrar
                     $dataHandlerService->moveRecord($tableName, $uid, $target);
 
                     return new RecordMovedResult($uid, $target);
-                });
+                }, arguments: [$uid, $targetPid, $afterUid], tableName: $tableName, recordUid: $uid);
             },
             name: $toolName,
             description: 'Move a ' . $config['label'] . ' record to a new position. Provide exactly one of:'
@@ -645,6 +630,8 @@ readonly class DynamicToolRegistrar
 
                         return new BatchRecordsDeletedResult($existingUids, count($existingUids), $skippedUids);
                     },
+                    arguments: [$uids],
+                    tableName: $tableName,
                 );
             },
             name: $toolName,
@@ -720,7 +707,7 @@ readonly class DynamicToolRegistrar
                         $ignoredFields,
                         $skippedUids,
                     );
-                });
+                }, arguments: [$uids, $fields], tableName: $tableName);
             },
             name: $toolName,
             description: 'Update the same fields on multiple ' . $config['label'] . ' records.'
@@ -777,7 +764,7 @@ readonly class DynamicToolRegistrar
                     $dataHandlerService->moveRecords($tableName, $existingUids, $target);
 
                     return new BatchRecordsMovedResult($existingUids, count($existingUids), $target, $skippedUids);
-                });
+                }, arguments: [$uids, $targetPid, $afterUid], tableName: $tableName);
             },
             name: $toolName,
             description: 'Move multiple ' . $config['label'] . ' records to a new position in a single operation.'
