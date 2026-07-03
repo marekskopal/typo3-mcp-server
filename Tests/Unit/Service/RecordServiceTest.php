@@ -8,6 +8,7 @@ use Doctrine\DBAL\Result;
 use MarekSkopal\MsMcpServer\Service\PermissionService;
 use MarekSkopal\MsMcpServer\Service\RecordService;
 use MarekSkopal\MsMcpServer\Service\WorkspaceContextService;
+use Mcp\Exception\ToolCallException;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
@@ -906,10 +907,7 @@ final class RecordServiceTest extends TestCase
         // not the page subquery alone.
         self::assertIsArray($capturedOrParts);
         self::assertSame('pid = 0', $capturedOrParts[0]);
-        self::assertSame(
-            '((pid IN (SELECT uid FROM pages WHERE PERMS_CLAUSE)) AND (pid IN (1,2)))',
-            (string) $capturedOrParts[1],
-        );
+        self::assertSame('((pid IN (SELECT uid FROM pages WHERE PERMS_CLAUSE)) AND (pid IN (1,2)))', (string) $capturedOrParts[1]);
     }
 
     public function testFindExistingUidsConstrainsNonPageTableToAccessiblePagesForNonAdmin(): void
@@ -1037,13 +1035,15 @@ final class RecordServiceTest extends TestCase
         $queryBuilder->method('where')->willReturnSelf();
         $queryBuilder->method('executeQuery')->willReturn($result);
         $queryBuilder->method('andWhere')
-            ->willReturnCallback(function (string|CompositeExpression ...$conditions) use (&$andWhereConditions, $queryBuilder): QueryBuilder {
-                foreach ($conditions as $condition) {
-                    $andWhereConditions[] = (string) $condition;
-                }
+            ->willReturnCallback(
+                function (string|CompositeExpression ...$conditions) use (&$andWhereConditions, $queryBuilder): QueryBuilder {
+                    foreach ($conditions as $condition) {
+                        $andWhereConditions[] = (string) $condition;
+                    }
 
-                return $queryBuilder;
-            });
+                    return $queryBuilder;
+                },
+            );
 
         $connectionPool = $this->createStub(ConnectionPool::class);
         $connectionPool->method('getQueryBuilderForTable')->willReturn($queryBuilder);
@@ -1216,8 +1216,10 @@ final class RecordServiceTest extends TestCase
 
         $service = new RecordService($connectionPool, new WorkspaceContextService(), $this->createAllowingPermissionService());
 
-        $this->expectException(\RuntimeException::class);
+        // ToolCallException reaches the MCP client verbatim, so the message must name the operator.
+        $this->expectException(ToolCallException::class);
         $this->expectExceptionCode(1718100001);
+        $this->expectExceptionMessageMatches('/Unsupported search operator "regexp"\. Supported operators: eq, /');
 
         $service->search('pages', ['title' => ['operator' => 'regexp', 'value' => 'x']], 20, 0, ['uid', 'title']);
     }

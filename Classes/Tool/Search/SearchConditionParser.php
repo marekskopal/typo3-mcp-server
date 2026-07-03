@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace MarekSkopal\MsMcpServer\Tool\Search;
 
+use MarekSkopal\MsMcpServer\Service\RecordService;
+use Mcp\Exception\ToolCallException;
+
 /** @internal */
 class SearchConditionParser
 {
@@ -33,10 +36,23 @@ class SearchConditionParser
     {
         if (is_array($value) && isset($value['op'])) {
             $op = $value['op'];
+            // Fail fast with a client-visible message: ToolCallException is relayed verbatim to the
+            // MCP client, so a typo'd operator is reported instead of surfacing as "internal error".
+            if (!is_string($op) || !in_array($op, RecordService::SUPPORTED_OPERATORS, true)) {
+                throw new ToolCallException(
+                    sprintf(
+                        'Unsupported search operator "%s". Supported operators: %s.',
+                        is_scalar($op) ? (string) $op : gettype($op),
+                        implode(', ', RecordService::SUPPORTED_OPERATORS),
+                    ),
+                    1718100002,
+                );
+            }
+
             $val = $value['value'] ?? '';
 
             return [
-                'operator' => is_string($op) ? $op : '',
+                'operator' => $op,
                 'value' => is_string($val) || is_int($val) || is_float($val) ? (string) $val : '',
             ];
         }

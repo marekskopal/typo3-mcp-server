@@ -6,6 +6,7 @@ namespace MarekSkopal\MsMcpServer\Service;
 
 use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\DBAL\ParameterType;
+use Mcp\Exception\ToolCallException;
 use TYPO3\CMS\Core\Database\ConnectionPool;
 use TYPO3\CMS\Core\Database\Query\QueryBuilder;
 use TYPO3\CMS\Core\Database\Query\Restriction\DeletedRestriction;
@@ -15,6 +16,9 @@ use TYPO3\CMS\Core\Utility\GeneralUtility;
 
 readonly class RecordService
 {
+    /** Operators accepted in search conditions; anything else is rejected with a client-visible error. */
+    public const array SUPPORTED_OPERATORS = ['eq', 'neq', 'gt', 'gte', 'lt', 'lte', 'in', 'null', 'notNull', 'like'];
+
     public function __construct(
         private ConnectionPool $connectionPool,
         private WorkspaceContextService $workspaceContext,
@@ -343,7 +347,16 @@ readonly class RecordService
             ),
             // Reject unknown operators rather than silently falling back to a broad LIKE, which
             // could return far more rows than intended (and feed downstream batch operations).
-            default => throw new \RuntimeException(sprintf('Unsupported search operator "%s".', $operator), 1718100001),
+            // ToolCallException is relayed verbatim to the MCP client (ErrorHandlingProxy passes it
+            // through), so the caller learns which operator was wrong instead of "internal error".
+            default => throw new ToolCallException(
+                sprintf(
+                    'Unsupported search operator "%s". Supported operators: %s.',
+                    $operator,
+                    implode(', ', self::SUPPORTED_OPERATORS),
+                ),
+                1718100001,
+            ),
         });
     }
 
