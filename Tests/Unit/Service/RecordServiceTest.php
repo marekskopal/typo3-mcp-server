@@ -611,6 +611,8 @@ final class RecordServiceTest extends TestCase
 
         $result = $this->createStub(Result::class);
         $result->method('fetchAllAssociative')->willReturn($expectedRows);
+        // The parent-record visibility gate loads the record first; the same stub serves both queries.
+        $result->method('fetchAssociative')->willReturn(['uid' => 100]);
 
         $queryBuilder = $this->createQueryBuilderStub();
         $queryBuilder->method('select')->willReturnSelf();
@@ -636,6 +638,7 @@ final class RecordServiceTest extends TestCase
     {
         $result = $this->createStub(Result::class);
         $result->method('fetchAllAssociative')->willReturn([]);
+        $result->method('fetchAssociative')->willReturn(['uid' => 999]);
 
         $queryBuilder = $this->createQueryBuilderStub();
         $queryBuilder->method('select')->willReturnSelf();
@@ -650,6 +653,31 @@ final class RecordServiceTest extends TestCase
 
         $service = new RecordService($connectionPool, new WorkspaceContextService(), $this->createAllowingPermissionService());
         $references = $service->findFileReferences('tt_content', 999, 'image');
+
+        self::assertSame([], $references);
+    }
+
+    public function testFindFileReferencesReturnsEmptyArrayWhenParentRecordIsNotVisible(): void
+    {
+        // Parent record lookup yields nothing (e.g. hidden by the page-permission constraint):
+        // reference metadata must not leak.
+        $result = $this->createStub(Result::class);
+        $result->method('fetchAssociative')->willReturn(false);
+        $result->method('fetchAllAssociative')->willReturn([['uid' => 201]]);
+
+        $queryBuilder = $this->createQueryBuilderStub();
+        $queryBuilder->method('select')->willReturnSelf();
+        $queryBuilder->method('from')->willReturnSelf();
+        $queryBuilder->method('where')->willReturnSelf();
+        $queryBuilder->method('andWhere')->willReturnSelf();
+        $queryBuilder->method('orderBy')->willReturnSelf();
+        $queryBuilder->method('executeQuery')->willReturn($result);
+
+        $connectionPool = $this->createStub(ConnectionPool::class);
+        $connectionPool->method('getQueryBuilderForTable')->willReturn($queryBuilder);
+
+        $service = new RecordService($connectionPool, new WorkspaceContextService(), $this->createAllowingPermissionService());
+        $references = $service->findFileReferences('tt_content', 100, 'image');
 
         self::assertSame([], $references);
     }
@@ -875,6 +903,83 @@ final class RecordServiceTest extends TestCase
         self::assertIsArray($capturedOrParts);
         self::assertSame('pid = 0', $capturedOrParts[0]);
         self::assertSame('pid IN (SELECT uid FROM pages WHERE PERMS_CLAUSE)', $capturedOrParts[1]);
+    }
+
+    public function testFindExistingUidsConstrainsNonPageTableToAccessiblePagesForNonAdmin(): void
+    {
+        [$requestedTables, $andWhereCalled] = $this->runNonAdminHelperQuery(
+            static fn(RecordService $service) => $service->findExistingUids('tt_content', [1, 2, 3]),
+        );
+
+        // UID probing must honour the page-permission constraint, otherwise batch-tool "skipped"
+        // responses become an existence oracle for records on restricted pages.
+        self::assertContains('pages', $requestedTables);
+        self::assertTrue($andWhereCalled);
+    }
+
+    public function testFindTranslationsConstrainsNonPageTableToAccessiblePagesForNonAdmin(): void
+    {
+        [$requestedTables, $andWhereCalled] = $this->runNonAdminHelperQuery(
+            static fn(RecordService $service) => $service->findTranslations('tt_content', 42, 'sys_language_uid', 'l18n_parent'),
+        );
+
+        self::assertContains('pages', $requestedTables);
+        self::assertTrue($andWhereCalled);
+    }
+
+    /**
+     * Run a RecordService helper as a non-admin against stubbed query builders and report which
+     * tables were queried and whether the main query was constrained via andWhere().
+     *
+     * @param callable(RecordService): mixed $call
+     * @return array{list<string>, bool}
+     */
+    private function runNonAdminHelperQuery(callable $call): array
+    {
+        $requestedTables = [];
+        $andWhereCalled = false;
+
+        $result = $this->createStub(Result::class);
+        $result->method('fetchAllAssociative')->willReturn([]);
+        $result->method('fetchOne')->willReturn(0);
+
+        $mainQueryBuilder = $this->createQueryBuilderStub();
+        $mainQueryBuilder->method('select')->willReturnSelf();
+        $mainQueryBuilder->method('from')->willReturnSelf();
+        $mainQueryBuilder->method('where')->willReturnSelf();
+        $mainQueryBuilder->method('orderBy')->willReturnSelf();
+        $mainQueryBuilder->method('executeQuery')->willReturn($result);
+        $mainQueryBuilder->method('andWhere')
+            ->willReturnCallback(function () use (&$andWhereCalled, $mainQueryBuilder): QueryBuilder {
+                $andWhereCalled = true;
+
+                return $mainQueryBuilder;
+            });
+
+        $pagesQueryBuilder = $this->createQueryBuilderStub();
+        $pagesQueryBuilder->method('select')->willReturnSelf();
+        $pagesQueryBuilder->method('from')->willReturnSelf();
+        $pagesQueryBuilder->method('getSQL')->willReturn('SELECT uid FROM pages WHERE PERMS_CLAUSE');
+
+        $callCount = 0;
+        $connectionPool = $this->createStub(ConnectionPool::class);
+        $connectionPool->method('getQueryBuilderForTable')
+            ->willReturnCallback(function (string $table) use (
+                &$callCount,
+                &$requestedTables,
+                $mainQueryBuilder,
+                $pagesQueryBuilder,
+            ): QueryBuilder {
+                $requestedTables[] = $table;
+                $callCount++;
+
+                return $callCount === 1 ? $mainQueryBuilder : $pagesQueryBuilder;
+            });
+
+        $service = new RecordService($connectionPool, new WorkspaceContextService(), $this->createEditorPermissionService());
+        $call($service);
+
+        return [$requestedTables, $andWhereCalled];
     }
 
     public function testCountAppliesPagePermissionRestrictionForNonAdminOnPagesTable(): void

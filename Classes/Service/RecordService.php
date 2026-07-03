@@ -69,14 +69,19 @@ readonly class RecordService
         $queryBuilder->getRestrictions()->removeAll();
         $this->workspaceContext->applyRestriction($queryBuilder, $table);
 
-        /** @var list<array{uid: int|string}> $rows */
-        $rows = $queryBuilder
+        $queryBuilder
             ->select('uid')
             ->from($table)
             ->where($queryBuilder->expr()->in(
                 'uid',
                 $queryBuilder->createNamedParameter($uids, ArrayParameterType::INTEGER),
-            ))
+            ));
+        // Records on pages the user may not show must not be probeable here either, otherwise
+        // batch-tool "skipped" responses become a UID existence oracle for restricted pages.
+        $this->applyPageReadConstraint($queryBuilder, $table);
+
+        /** @var list<array{uid: int|string}> $rows */
+        $rows = $queryBuilder
             ->executeQuery()
             ->fetchAllAssociative();
 
@@ -361,6 +366,12 @@ readonly class RecordService
         // of records the user may not read would leak through this path.
         $this->assertReadAccess($table);
 
+        // The reference rows carry no page context of their own; gate on the visibility of the
+        // parent record instead, which applies the page-permission read constraint via findByUid.
+        if ($this->findByUid($table, $uid, ['uid']) === null) {
+            return [];
+        }
+
         $queryBuilder = $this->connectionPool->getQueryBuilderForTable('sys_file_reference');
         $queryBuilder->getRestrictions()->removeAll();
         $this->workspaceContext->applyRestriction($queryBuilder, 'sys_file_reference');
@@ -391,12 +402,15 @@ readonly class RecordService
         $queryBuilder->getRestrictions()->removeAll();
         $this->workspaceContext->applyRestriction($queryBuilder, $table);
 
-        /** @var list<array{uid: int|string, sys_language_uid: int|string}> $rows */
-        $rows = $queryBuilder
+        $queryBuilder
             ->select('uid', $languageField . ' AS sys_language_uid')
             ->from($table)
             ->where($queryBuilder->expr()->eq($transOrigPointerField, $queryBuilder->createNamedParameter($uid, ParameterType::INTEGER)))
-            ->orderBy($languageField, 'ASC')
+            ->orderBy($languageField, 'ASC');
+        $this->applyPageReadConstraint($queryBuilder, $table);
+
+        /** @var list<array{uid: int|string, sys_language_uid: int|string}> $rows */
+        $rows = $queryBuilder
             ->executeQuery()
             ->fetchAllAssociative();
 
