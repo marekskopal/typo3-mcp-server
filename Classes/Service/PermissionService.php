@@ -126,8 +126,10 @@ readonly class PermissionService
         $cache = $this->getRuntimeCache();
         $cached = $cache?->get($cacheKey);
         if (is_array($cached)) {
-            /** @var list<int> $cached */
-            return $cached;
+            /** @var list<int> $cachedPageIds */
+            $cachedPageIds = $cached;
+
+            return $cachedPageIds;
         }
 
         $pageIds = $this->expandWebmounts(array_map(intval(...), $backendUser->getWebmounts()));
@@ -179,11 +181,13 @@ readonly class PermissionService
             $parents = [];
             foreach ($rows as $row) {
                 $uid = (int) $row['uid'];
-                if (!isset($seen[$uid])) {
-                    $seen[$uid] = true;
-                    $pageIds[] = $uid;
-                    $parents[] = $uid;
+                if (isset($seen[$uid])) {
+                    continue;
                 }
+
+                $seen[$uid] = true;
+                $pageIds[] = $uid;
+                $parents[] = $uid;
             }
         }
 
