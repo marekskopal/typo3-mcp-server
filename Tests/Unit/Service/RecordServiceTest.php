@@ -9,9 +9,11 @@ use MarekSkopal\MsMcpServer\Service\PermissionService;
 use MarekSkopal\MsMcpServer\Service\RecordService;
 use MarekSkopal\MsMcpServer\Service\WorkspaceContextService;
 use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
 use TYPO3\CMS\Core\Context\UserAspect;
 use TYPO3\CMS\Core\Database\ConnectionPool;
+use TYPO3\CMS\Core\Database\Query\Expression\CompositeExpression;
 use TYPO3\CMS\Core\Database\Query\Expression\ExpressionBuilder;
 use TYPO3\CMS\Core\Database\Query\QueryBuilder;
 use TYPO3\CMS\Core\Database\Query\Restriction\DeletedRestriction;
@@ -801,6 +803,80 @@ final class RecordServiceTest extends TestCase
         self::assertTrue($listAndWhereCalled);
     }
 
+    public function testSearchKeepsRootLevelRecordsVisibleForNonAdminOnNonPageTable(): void
+    {
+        $capturedOrParts = null;
+
+        $listResult = $this->createStub(Result::class);
+        $listResult->method('fetchAllAssociative')->willReturn([]);
+        $countResult = $this->createStub(Result::class);
+        $countResult->method('fetchOne')->willReturn(0);
+
+        $expressionBuilder = $this->createStub(ExpressionBuilder::class);
+        $expressionBuilder->method('eq')
+            ->willReturnCallback(static fn(string $field, mixed $value): string => $field . ' = ' . $value);
+        $expressionBuilder->method('in')
+            ->willReturnCallback(
+                static fn(string $field, string|array $value): string => $field . ' IN (' . (is_string($value) ? $value : '') . ')',
+            );
+        $expressionBuilder->method('or')
+            ->willReturnCallback(static function (...$parts) use (&$capturedOrParts): CompositeExpression {
+                $capturedOrParts = $parts;
+
+                return CompositeExpression::or(...$parts);
+            });
+
+        $listQueryBuilder = $this->createStub(QueryBuilder::class);
+        $listQueryBuilder->method('getRestrictions')->willReturn($this->createStub(QueryRestrictionContainerInterface::class));
+        $listQueryBuilder->method('expr')->willReturn($expressionBuilder);
+        $listQueryBuilder->method('createNamedParameter')->willReturnCallback(static fn(mixed $value): string => (string) $value);
+        $listQueryBuilder->method('select')->willReturnSelf();
+        $listQueryBuilder->method('from')->willReturnSelf();
+        $listQueryBuilder->method('andWhere')->willReturnSelf();
+        $listQueryBuilder->method('setMaxResults')->willReturnSelf();
+        $listQueryBuilder->method('setFirstResult')->willReturnSelf();
+        $listQueryBuilder->method('orderBy')->willReturnSelf();
+        $listQueryBuilder->method('executeQuery')->willReturn($listResult);
+
+        $countQueryBuilder = $this->createQueryBuilderStub();
+        $countQueryBuilder->method('count')->willReturnSelf();
+        $countQueryBuilder->method('from')->willReturnSelf();
+        $countQueryBuilder->method('andWhere')->willReturnSelf();
+        $countQueryBuilder->method('executeQuery')->willReturn($countResult);
+
+        $pagesQueryBuilder = $this->createQueryBuilderStub();
+        $pagesQueryBuilder->method('select')->willReturnSelf();
+        $pagesQueryBuilder->method('from')->willReturnSelf();
+        $pagesQueryBuilder->method('getSQL')->willReturn('SELECT uid FROM pages WHERE PERMS_CLAUSE');
+
+        $callCount = 0;
+        $connectionPool = $this->createStub(ConnectionPool::class);
+        $connectionPool->method('getQueryBuilderForTable')
+            ->willReturnCallback(function () use (
+                &$callCount,
+                $listQueryBuilder,
+                $countQueryBuilder,
+                $pagesQueryBuilder,
+            ): QueryBuilder {
+                $callCount++;
+
+                return match ($callCount) {
+                    1 => $listQueryBuilder,
+                    2 => $countQueryBuilder,
+                    default => $pagesQueryBuilder,
+                };
+            });
+
+        $service = new RecordService($connectionPool, new WorkspaceContextService(), $this->createEditorPermissionService());
+        $service->search('sys_redirect', [], 20, 0, ['uid', 'source_path']);
+
+        // Root-level records (rootLevel tables like sys_redirect live at pid 0) must stay readable:
+        // the constraint has to be `pid = 0 OR pid IN (accessible pages)`, not the subquery alone.
+        self::assertIsArray($capturedOrParts);
+        self::assertSame('pid = 0', $capturedOrParts[0]);
+        self::assertSame('pid IN (SELECT uid FROM pages WHERE PERMS_CLAUSE)', $capturedOrParts[1]);
+    }
+
     public function testFindByUidThrowsWhenTableNotSelectable(): void
     {
         $connectionPool = $this->createStub(ConnectionPool::class);
@@ -818,7 +894,11 @@ final class RecordServiceTest extends TestCase
 
     public function testFindExistingUidsThrowsWhenTableNotSelectable(): void
     {
-        $service = new RecordService($this->createStub(ConnectionPool::class), new WorkspaceContextService(), $this->createDenyingPermissionService());
+        $service = new RecordService(
+            $this->createStub(ConnectionPool::class),
+            new WorkspaceContextService(),
+            $this->createDenyingPermissionService(),
+        );
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionCode(1718100000);
@@ -828,7 +908,11 @@ final class RecordServiceTest extends TestCase
 
     public function testFindFileReferencesThrowsWhenTableNotSelectable(): void
     {
-        $service = new RecordService($this->createStub(ConnectionPool::class), new WorkspaceContextService(), $this->createDenyingPermissionService());
+        $service = new RecordService(
+            $this->createStub(ConnectionPool::class),
+            new WorkspaceContextService(),
+            $this->createDenyingPermissionService(),
+        );
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionCode(1718100000);
@@ -838,7 +922,11 @@ final class RecordServiceTest extends TestCase
 
     public function testFindTranslationsThrowsWhenTableNotSelectable(): void
     {
-        $service = new RecordService($this->createStub(ConnectionPool::class), new WorkspaceContextService(), $this->createDenyingPermissionService());
+        $service = new RecordService(
+            $this->createStub(ConnectionPool::class),
+            new WorkspaceContextService(),
+            $this->createDenyingPermissionService(),
+        );
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionCode(1718100000);
@@ -894,7 +982,7 @@ final class RecordServiceTest extends TestCase
         return $permissionService;
     }
 
-    /** @return QueryBuilder&\PHPUnit\Framework\MockObject\Stub */
+    /** @return QueryBuilder&Stub */
     private function createQueryBuilderStub(): QueryBuilder
     {
         $restrictions = $this->createStub(QueryRestrictionContainerInterface::class);

@@ -273,8 +273,14 @@ readonly class RecordService
             ->select('uid')
             ->from('pages');
 
+        // Root-level records (pid 0, e.g. rootLevel tables like sys_redirect) sit outside the page
+        // tree, so no perms_* ACL applies to them; they remain readable under the table-level grant
+        // checked in assertReadAccess. Without this, the pid IN (pages…) subquery would hide them.
         $queryBuilder->andWhere(
-            $queryBuilder->expr()->in('pid', $pagesQueryBuilder->getSQL()),
+            $queryBuilder->expr()->or(
+                $queryBuilder->expr()->eq('pid', $queryBuilder->createNamedParameter(0, ParameterType::INTEGER)),
+                $queryBuilder->expr()->in('pid', $pagesQueryBuilder->getSQL()),
+            ),
         );
     }
 
