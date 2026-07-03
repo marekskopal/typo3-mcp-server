@@ -21,24 +21,34 @@ final class RegistrarToolRunner
 {
     /**
      * @param callable(): T $fn
+     * @param list<mixed> $arguments the tool call's arguments, for the audit trail (redacted there)
+     * @param string $tableName table the tool operates on, recorded as the audit-log target
+     * @param int $recordUid primary record uid the tool operates on, recorded as the audit-log target
      * @return T
      * @template T
      */
-    public static function run(string $toolName, AuditLogger $auditLogger, LoggerInterface $logger, callable $fn): mixed
-    {
+    public static function run(
+        string $toolName,
+        AuditLogger $auditLogger,
+        LoggerInterface $logger,
+        callable $fn,
+        array $arguments = [],
+        string $tableName = '',
+        int $recordUid = 0,
+    ): mixed {
         $startTime = hrtime(true);
 
         try {
             $result = $fn();
-            $auditLogger->logSuccess($toolName, 'tool', [], self::elapsedMs($startTime));
+            $auditLogger->logSuccess($toolName, 'tool', $arguments, self::elapsedMs($startTime), $tableName, $recordUid);
 
             return $result;
         } catch (ToolCallException $e) {
-            $auditLogger->logFailure($toolName, 'tool', [], self::elapsedMs($startTime), $e->getMessage());
+            $auditLogger->logFailure($toolName, 'tool', $arguments, self::elapsedMs($startTime), $e->getMessage(), $tableName, $recordUid);
 
             throw $e;
         } catch (\Throwable $e) {
-            $auditLogger->logFailure($toolName, 'tool', [], self::elapsedMs($startTime), $e->getMessage());
+            $auditLogger->logFailure($toolName, 'tool', $arguments, self::elapsedMs($startTime), $e->getMessage(), $tableName, $recordUid);
             $logger->error($toolName . ' failed', ['exception' => $e]);
 
             throw new ToolCallException('An internal error occurred while executing this tool.', (int) $e->getCode(), $e);

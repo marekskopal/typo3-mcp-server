@@ -106,7 +106,7 @@ readonly class WorkspaceToolRegistrar
                     }
 
                     return json_encode($accessible, JSON_THROW_ON_ERROR);
-                });
+                }, tableName: self::WORKSPACE_TABLE);
             },
             name: 'workspace_list',
             description: 'List workspaces accessible to the current backend user, including the implicit live workspace (uid 0).'
@@ -154,6 +154,9 @@ readonly class WorkspaceToolRegistrar
 
                         return json_encode($record, JSON_THROW_ON_ERROR);
                     },
+                    arguments: [$workspaceId],
+                    tableName: self::WORKSPACE_TABLE,
+                    recordUid: $workspaceId,
                 );
             },
             name: 'workspace_get',
@@ -196,6 +199,9 @@ readonly class WorkspaceToolRegistrar
 
                         return new RecordUpdatedResult($userUid, ['workspace_id']);
                     },
+                    arguments: [$workspaceId],
+                    tableName: self::WORKSPACE_TABLE,
+                    recordUid: $workspaceId,
                 );
             },
             name: 'workspace_switch',
@@ -281,6 +287,7 @@ readonly class WorkspaceToolRegistrar
 
                         return json_encode(['workspaceId' => $workspaceId, 'tables' => $changes], JSON_THROW_ON_ERROR);
                     },
+                    arguments: [$table, $limit],
                 );
             },
             name: 'workspace_changes_list',
@@ -336,7 +343,7 @@ readonly class WorkspaceToolRegistrar
                     ]);
 
                     return new RecordUpdatedResult($cmdKey, ['published']);
-                });
+                }, arguments: [$table, $workspaceVersionUid], tableName: $table, recordUid: $workspaceVersionUid);
             },
             name: 'workspace_publish',
             description: 'Publish a workspace version to live (swap). Pass table and workspaceVersionUid.'
@@ -383,7 +390,7 @@ readonly class WorkspaceToolRegistrar
                     ]);
 
                     return new RecordDeletedResult($workspaceVersionUid);
-                });
+                }, arguments: [$table, $workspaceVersionUid], tableName: $table, recordUid: $workspaceVersionUid);
             },
             name: 'workspace_discard',
             description: 'Discard a workspace version, dropping unpublished changes. Pass table and workspaceVersionUid.'
@@ -430,7 +437,7 @@ readonly class WorkspaceToolRegistrar
                     $dataHandlerService->updateRecord($table, $workspaceVersionUid, ['t3ver_stage' => $stage]);
 
                     return new RecordUpdatedResult($workspaceVersionUid, ['t3ver_stage']);
-                });
+                }, arguments: [$table, $workspaceVersionUid, $stage], tableName: $table, recordUid: $workspaceVersionUid);
             },
             name: 'workspace_stage_set',
             description: 'Move a workspace version to a different stage. Pass table, workspaceVersionUid, and stage.'
