@@ -486,4 +486,97 @@ final class FileServiceTest extends TestCase
             unset($GLOBALS['BE_USER']);
         }
     }
+
+    public function testSearchFilesReturnsEmptyWhenPermissionsEvaluatedAndNoFileMounts(): void
+    {
+        // A non-admin user without any filemount in the storage may reach nothing in it,
+        // so the search must return empty instead of enumerating the whole storage.
+        $storage = $this->createStub(ResourceStorage::class);
+        $storage->method('getEvaluatePermissions')->willReturn(true);
+        $storage->method('getFileMounts')->willReturn([]);
+
+        $backendUser = $this->createStub(BackendUserAuthentication::class);
+        $backendUser->method('getFileStorages')->willReturn([7 => $storage]);
+        $GLOBALS['BE_USER'] = $backendUser;
+
+        try {
+            $queryBuilder = $this->createStub(QueryBuilder::class);
+            $queryBuilder->method('select')->willReturnSelf();
+            $queryBuilder->method('count')->willReturnSelf();
+            $queryBuilder->method('from')->willReturnSelf();
+            $queryBuilder->method('andWhere')->willReturnSelf();
+            $queryBuilder->method('expr')->willReturn($this->createStub(ExpressionBuilder::class));
+            $queryBuilder->method('createNamedParameter')->willReturn("'x'");
+            $queryBuilder->method('getRestrictions')->willReturn($this->createStub(QueryRestrictionContainerInterface::class));
+
+            $connectionPool = $this->createStub(ConnectionPool::class);
+            $connectionPool->method('getQueryBuilderForTable')->willReturn($queryBuilder);
+
+            $service = new FileService($this->createStub(StorageRepository::class), $connectionPool);
+            $result = $service->searchFiles(7, '', '', 20, 0);
+
+            self::assertSame([], $result['files']);
+            self::assertSame(0, $result['total']);
+        } finally {
+            unset($GLOBALS['BE_USER']);
+        }
+    }
+
+    public function testSearchFilesConstrainsResultsToFileMounts(): void
+    {
+        $storage = $this->createStub(ResourceStorage::class);
+        $storage->method('getEvaluatePermissions')->willReturn(true);
+        $storage->method('getFileMounts')->willReturn(['/user_upload/' => ['title' => 'User upload']]);
+
+        $backendUser = $this->createStub(BackendUserAuthentication::class);
+        $backendUser->method('getFileStorages')->willReturn([7 => $storage]);
+        $GLOBALS['BE_USER'] = $backendUser;
+
+        try {
+            $likeConditions = [];
+
+            $expressionBuilder = $this->createStub(ExpressionBuilder::class);
+            $expressionBuilder->method('like')
+                ->willReturnCallback(static function (string $field, string $value) use (&$likeConditions): string {
+                    $likeConditions[] = [$field, $value];
+
+                    return $field . ' LIKE ' . $value;
+                });
+
+            $dbResult = $this->createStub(Result::class);
+            $dbResult->method('fetchOne')->willReturn(0);
+            $dbResult->method('fetchAllAssociative')->willReturn([]);
+
+            $queryBuilder = $this->createStub(QueryBuilder::class);
+            $queryBuilder->method('select')->willReturnSelf();
+            $queryBuilder->method('count')->willReturnSelf();
+            $queryBuilder->method('from')->willReturnSelf();
+            $queryBuilder->method('andWhere')->willReturnSelf();
+            $queryBuilder->method('setMaxResults')->willReturnSelf();
+            $queryBuilder->method('setFirstResult')->willReturnSelf();
+            $queryBuilder->method('orderBy')->willReturnSelf();
+            $queryBuilder->method('expr')->willReturn($expressionBuilder);
+            $queryBuilder->method('createNamedParameter')
+                ->willReturnCallback(static fn(mixed $value): string => "'" . $value . "'");
+            $queryBuilder->method('escapeLikeWildcards')
+                ->willReturnCallback(static fn(string $value): string => $value);
+            $queryBuilder->method('getRestrictions')->willReturn($this->createStub(QueryRestrictionContainerInterface::class));
+            $queryBuilder->method('executeQuery')->willReturn($dbResult);
+
+            $connectionPool = $this->createStub(ConnectionPool::class);
+            $connectionPool->method('getQueryBuilderForTable')->willReturn($queryBuilder);
+
+            $service = new FileService($this->createStub(StorageRepository::class), $connectionPool);
+            $service->searchFiles(7, '', '', 20, 0);
+
+            // Both the list and the count query must be confined to the filemount path.
+            self::assertContains(['identifier', "'/user_upload/%'"], $likeConditions);
+            self::assertCount(2, array_filter(
+                $likeConditions,
+                static fn(array $condition): bool => $condition[0] === 'identifier',
+            ));
+        } finally {
+            unset($GLOBALS['BE_USER']);
+        }
+    }
 }
