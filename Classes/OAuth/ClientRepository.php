@@ -123,6 +123,9 @@ readonly class ClientRepository
             'client_name' => $clientName,
             'redirect_uris' => json_encode($redirectUris, JSON_THROW_ON_ERROR),
             'be_user' => 0,
+            // Marks unauthenticated RFC 7591 registrations so mcp:cleanup can purge them when they
+            // stay unused; clients created by an admin in the backend module are never purged.
+            'dynamically_registered' => 1,
             'crdate' => $now,
             'tstamp' => $now,
         ]);

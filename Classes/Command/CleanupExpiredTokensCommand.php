@@ -110,7 +110,9 @@ class CleanupExpiredTokensCommand extends Command
      * Purge dynamically-registered clients that are older than UNUSED_CLIENT_LIFETIME and have no
      * authorization rows. Registration is unauthenticated, so without this these rows accumulate
      * indefinitely. Runs after deleteExpiredAuthorizations(), so clients whose authorizations have
-     * all expired are treated as unused too.
+     * all expired are treated as unused too. Clients created by an admin in the backend module
+     * (dynamically_registered = 0) are never purged — their client_id is configured in external
+     * MCP clients and cannot be recovered once deleted.
      */
     private function deleteUnusedClients(): int
     {
@@ -126,6 +128,10 @@ class CleanupExpiredTokensCommand extends Command
         return (int) $queryBuilder
             ->delete(self::CLIENT_TABLE)
             ->where(
+                $queryBuilder->expr()->eq(
+                    'dynamically_registered',
+                    $queryBuilder->createNamedParameter(1, ParameterType::INTEGER),
+                ),
                 $queryBuilder->expr()->lt(
                     'crdate',
                     $queryBuilder->createNamedParameter(time() - self::UNUSED_CLIENT_LIFETIME, ParameterType::INTEGER),
