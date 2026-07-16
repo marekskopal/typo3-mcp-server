@@ -10,7 +10,6 @@ use TYPO3\CMS\Core\DataHandling\DataHandler;
 use TYPO3\CMS\Core\Exception\SiteNotFoundException;
 use TYPO3\CMS\Core\Site\SiteFinder;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
-use const JSON_THROW_ON_ERROR;
 
 readonly class DataHandlerService
 {
@@ -298,10 +297,7 @@ readonly class DataHandlerService
         $errorLog = $dataHandler->errorLog;
         if ($errorLog !== []) {
             throw new \RuntimeException(
-                'DataHandler errors: ' . implode('; ', array_map(
-                    static fn (mixed $e): string => is_string($e) ? $e : json_encode($e, JSON_THROW_ON_ERROR),
-                    $errorLog,
-                )),
+                'DataHandler errors: ' . implode('; ', $errorLog),
                 1712000021,
             );
         }
