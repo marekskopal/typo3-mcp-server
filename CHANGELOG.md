@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+### Changed
+- **mcp/sdk bumped to ^0.7.** No code changes were required: every SDK API the extension consumes (`Server::builder`, the `Builder` fluent methods, `SessionStoreInterface`, `StreamableHttpTransport`/`StdioTransport` constructors, `Server::run`, and the `ToolCallException`/`ResourceReadException`/`PromptGetException` exceptions) is unchanged in v0.7.0. The release adds an opt-in `Builder::setLazyLoading()`, hardens JSON-RPC input parsing, and now rejects malformed `Mcp-Session-Id` headers itself — the latter overlaps with, but does not conflict with, the existing 400 guard in `McpServerMiddleware`.
+
 ## [1.0.0] - 2026-07-03
 
 First stable release. **Run `vendor/bin/typo3 database:updateschema` after upgrading** — this release adds a `dynamically_registered` column to `tx_msmcpserver_oauth_client`.
