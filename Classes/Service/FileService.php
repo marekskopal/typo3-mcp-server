@@ -239,8 +239,11 @@ readonly class FileService
             for ($hop = 0; $hop <= $maxRedirects; $hop++) {
                 $hopHost = parse_url($currentUrl, PHP_URL_HOST);
                 $hopScheme = parse_url($currentUrl, PHP_URL_SCHEME);
+                // The empty check is redundant against a valid host but keeps $currentUrl narrowed
+                // to non-empty-string for CURLOPT_URL, which rejects the empty string.
                 if (
-                    !is_string($hopHost)
+                    $currentUrl === ''
+                    || !is_string($hopHost)
                     || $hopHost === ''
                     || !is_string($hopScheme)
                     || !in_array($hopScheme, ['http', 'https'], true)
