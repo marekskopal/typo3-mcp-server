@@ -17,7 +17,8 @@ readonly class DirectoryMoveTool
     #[McpTool(
         name: 'directory_move',
         description: 'Move a directory to a different parent directory within the same storage.'
-            . ' Provide the directory identifier and the target parent directory path.',
+            . ' Provide the directory identifier and the target parent directory path.'
+            . ' Directory paths must lie inside the user\'s file mounts; call file_storage_list first if the valid roots are not already known.',
     )]
     public function execute(string $directoryIdentifier, string $targetDirectory, int $storageUid = 1): DirectoryMovedResult
     {

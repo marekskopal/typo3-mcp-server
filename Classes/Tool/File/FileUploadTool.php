@@ -17,7 +17,8 @@ readonly class FileUploadTool
 
     #[McpTool(
         name: 'file_upload',
-        description: 'Upload a file to a storage directory. Provide either "content" for plain text or "base64Content" for base64-encoded binary data. Exactly one must be specified.',
+        description: 'Upload a file to a storage directory. Provide either "content" for plain text or "base64Content" for base64-encoded binary data. Exactly one must be specified.'
+            . ' Directory paths must lie inside the user\'s file mounts; call file_storage_list first if the valid roots are not already known.',
     )]
     public function execute(
         string $fileName,

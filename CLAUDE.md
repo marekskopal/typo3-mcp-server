@@ -51,13 +51,14 @@ vendor/bin/typo3 mcp:cleanup
 - `Server/ErrorHandlingProxy` — Proxy that catches `\Throwable` from tool/resource methods, logs it, and converts to `ToolCallException`/`ResourceReadException`
 - `Service/DataHandlerService` — Wraps TYPO3 DataHandler for create/update/delete operations (single and batch)
 - `Service/RecordService` — Read operations via QueryBuilder (findByUid, findByPid, search with pagination capped at 500)
-- `Service/FileService` — File operations via TYPO3 ResourceStorage (list, upload, copy, delete, move, rename, directory ops)
+- `Service/FileService` — File operations via TYPO3 ResourceStorage (storage/mount discovery, list, upload, copy, delete, move, rename, directory ops)
+- `Service/StoragePermissionService` — Applies a backend user's filemounts, `evaluatePermissions` and `file_permissions` to a `ResourceStorage`. Core's `StoragePermissionsAspect` only runs for backend requests; the MCP endpoint is a frontend/CLI context, so without this a non-admin would reach an entire storage rather than just their mounts.
 - `Service/TcaSchemaService` — TCA field metadata extraction for schema introspection and dynamic tools
 - `Service/PermissionService` — Wraps `$GLOBALS['BE_USER']` permission APIs for table/page access checks and permission summaries
 - `Service/BackendLayoutService` — Resolves the effective BackendLayout for a page via BackendLayoutView, returns structured DTOs with column positions and grid structure
 - `Tool/Pages/*` — CRUD tools for pages table (use `#[McpTool]` attributes)
 - `Tool/Content/*` — CRUD tools for tt_content table (use `#[McpTool]` attributes)
-- `Tool/File/*` — File management tools (list, search, get info, upload, upload from URL, copy, delete, move, rename, directory create/delete/move/rename, file reference add/list/remove)
+- `Tool/File/*` — File management tools (storage/mount list, list, search, get info, upload, upload from URL, copy, delete, move, rename, directory create/delete/move/rename, file reference add/list/remove). Non-admins are confined to their filemounts; `file_storage_list` reports the valid roots and `file_list` on `/` returns the mount folders.
 - `Tool/Schema/TableSchemaTool` — TCA field introspection for any table
 - `Tool/Search/RecordSearchTool` — Search records in any table by field values with operators (eq, neq, like, gt, gte, lt, lte, in, null, notNull) and sorting
 - `Tool/Search/RecordCountTool` — Count records without fetching them, with optional pid and search condition filtering
@@ -128,7 +129,7 @@ readonly class MyTool
 
 ## Testing
 
-637 unit tests covering:
+744 unit tests covering:
 - All static MCP tools + batch tools (Pages/Content/File/Schema/Search/Translation/Cache/Permission/BackendUser/BackendGroup/Batch CRUD)
 - Dynamic tool registration and execution (DynamicToolRegistrar), including merged EXTCONF + discovered tables
 - OAuth classes (AuthorizationService incl. revocation, ClientRepository, PkceVerifier, OAuthTokenPair, RateLimitService)
@@ -138,7 +139,7 @@ readonly class MyTool
 - ExtensionTableDiscoveryService (TCA scanning, label/prefix generation, system table filtering)
 - DiscoveredTableRepository (findAll, findEnabled, findByUid, insertIfNew, update, setEnabled)
 - BackendUserBootstrap, McpServerFactory, McpServerMiddleware
-- Services (RecordService, DataHandlerService, FileService, TcaSchemaService, BackendLayoutService, PermissionService)
+- Services (RecordService, DataHandlerService, FileService, StoragePermissionService, TcaSchemaService, BackendLayoutService, PermissionService)
 - Resources (SystemInfo, SiteConfiguration, TcaTables, BackendUser, TcaTableSchema, BackendLayout)
 - CleanupExpiredTokensCommand
 

@@ -143,7 +143,10 @@ cp "$EXTENSION_PATH/Tests/Integration/Fixtures/site-config.yaml" config/sites/ma
 
 # --- Create fileadmin directory ---
 echo "Setting up fileadmin..."
-mkdir -p public/fileadmin
+# user_upload/ is the editor's filemount (fixture sys_filemounts uid 10) and must exist before
+# the mount is applied — core drops filemounts pointing at missing folders. outside-mount/ is the
+# counterpart the editor must NOT be able to reach.
+mkdir -p public/fileadmin public/fileadmin/user_upload public/fileadmin/outside-mount
 
 # --- Verify setup ---
 echo ""

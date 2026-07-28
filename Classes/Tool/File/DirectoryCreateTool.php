@@ -14,7 +14,12 @@ readonly class DirectoryCreateTool
     {
     }
 
-    #[McpTool(name: 'directory_create', description: 'Create a new directory in a storage.')]
+    #[McpTool(
+        name: 'directory_create',
+        description: 'Create a new directory in a storage.'
+            . ' The parent path must lie inside the user\'s file mounts;'
+            . ' call file_storage_list first if the valid roots are not already known.',
+    )]
     public function execute(string $directoryName, string $parentPath = '/', int $storageUid = 1): string
     {
         $result = $this->fileService->createDirectory($storageUid, $parentPath, $directoryName);

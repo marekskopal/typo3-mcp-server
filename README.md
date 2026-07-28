@@ -392,6 +392,7 @@ The **System > MCP Server** backend module provides:
 
 | Tool | Description |
 |------|-------------|
+| `file_storage_list` | List accessible file storages and the file mounts that bound them. |
 | `file_list` | List files and directories with pagination. |
 | `file_search` | Search files by name pattern and/or extension across storage. |
 | `file_get_info` | Get file metadata: UID, name, size, MIME type, public URL. |
@@ -407,6 +408,13 @@ The **System > MCP Server** backend module provides:
 | `directory_rename` | Rename a directory. |
 
 All file tools accept an optional `storageUid` parameter (default: `1` for fileadmin).
+
+**File mounts.** A non-admin user is confined to their configured file mounts, exactly as in the
+backend: paths outside a mount are rejected, and read-only mounts reject writes. Since a mounted
+user's storage root is typically outside their mounts, `file_list` on `/` returns the mount folders
+themselves, and `file_storage_list` reports the valid roots up front — so an AI client can find out
+where it may work instead of guessing paths relative to the storage root. Administrators keep
+unrestricted access to every storage.
 
 ### File References
 

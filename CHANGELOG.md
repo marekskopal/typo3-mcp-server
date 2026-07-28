@@ -4,7 +4,16 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [1.1.0] - 2026-07-28
+
+### Security
+- **File operations now really honour a non-admin's file mounts** ([#8](https://github.com/marekskopal/typo3-mcp-server/issues/8)). Filemounts, `evaluatePermissions` and the user's `file_permissions` are attached to a `ResourceStorage` by core's `StoragePermissionsAspect`, which is gated on `ApplicationType::fromRequest(...)->isBackend()`. The MCP endpoint runs in the *frontend* middleware stack and `mcp:server` runs in CLI, so that listener never fired and storages were handed out with their constructor defaults. Because `isWithinFileMountBoundaries()` and `checkUserActionPermission()` short-circuit to `true` while `evaluatePermissions` is off, an editor mounted only on `/user_upload/` could read, write, move, rename and delete anywhere in a storage they held any mount in — an upload addressed to `/examples/` silently landed in `fileadmin/examples/` — and their `file_permissions` (addFile/deleteFile/…) were ignored entirely. A new `StoragePermissionService` applies the same restrictions core does, so mount confinement, read-only mounts and file-operation rights are enforced on every file tool. Administrators keep unrestricted access, as in core. Affects 0.12.1 through 1.0.0.
+- **`file_search` mount confinement is no longer dead code.** The identifier filter added in 1.0.0 branches on `$storage->getEvaluatePermissions()`, which was always `false` on the MCP paths for the reason above, so non-admin searches still enumerated whole storages. It now takes effect. Its unit tests stubbed the flag to `true` and therefore passed against behaviour production never exhibited; the integration suite now covers the real path with a mounted editor.
+
+### Added
+- **`file_storage_list` tool** reporting the storages the current user may access, each with its file mounts (`path`, `title`, `readOnly`) and a `fullAccess` flag for unrestricted (admin) storages. Enforcement alone left an AI client blind — no tool exposed the valid roots, so it would keep addressing paths relative to the storage root and collecting permission errors.
+- **`file_list` on `/` returns the user's mount folders** when the storage root lies outside them, mirroring the backend file list, instead of failing with a permission error and leaving the client with no way to discover where it may work. Storages whose root is itself a mount, and unrestricted storages, list normally; a restricted storage with no usable mount still surfaces core's permission error rather than a misleading empty listing.
+- File tool descriptions now point at `file_storage_list` for resolving valid directory paths.
 
 ### Changed
 - **mcp/sdk bumped to ^0.7.** No code changes were required: every SDK API the extension consumes (`Server::builder`, the `Builder` fluent methods, `SessionStoreInterface`, `StreamableHttpTransport`/`StdioTransport` constructors, `Server::run`, and the `ToolCallException`/`ResourceReadException`/`PromptGetException` exceptions) is unchanged in v0.7.0. The release adds an opt-in `Builder::setLazyLoading()`, hardens JSON-RPC input parsing, and now rejects malformed `Mcp-Session-Id` headers itself — the latter overlaps with, but does not conflict with, the existing 400 guard in `McpServerMiddleware`.

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace MarekSkopal\MsMcpServer\Tests\Unit\Service;
 
 use MarekSkopal\MsMcpServer\Service\FileService;
+use MarekSkopal\MsMcpServer\Service\StoragePermissionService;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 use Doctrine\DBAL\Result;
@@ -41,7 +42,7 @@ final class FileServiceTest extends TestCase
             $storageRepository = $this->createMock(StorageRepository::class);
             $storageRepository->expects(self::never())->method('findByUid');
 
-            $service = new FileService($storageRepository, $this->createStub(ConnectionPool::class));
+            $service = $this->createService($storageRepository);
             $result = $service->listDirectory(7, '/', 20, 0);
 
             self::assertSame(0, $result['totalFiles']);
@@ -57,7 +58,7 @@ final class FileServiceTest extends TestCase
         $GLOBALS['BE_USER'] = $backendUser;
 
         try {
-            $service = new FileService($this->createStub(StorageRepository::class), $this->createStub(ConnectionPool::class));
+            $service = $this->createService();
 
             $this->expectException(\RuntimeException::class);
             $this->expectExceptionMessage('Storage not found or not accessible: 7');
@@ -94,7 +95,7 @@ final class FileServiceTest extends TestCase
         $storageRepository = $this->createStub(StorageRepository::class);
         $storageRepository->method('findByUid')->willReturn($storage);
 
-        $service = new FileService($storageRepository, $this->createStub(ConnectionPool::class));
+        $service = $this->createService($storageRepository);
         $result = $service->listDirectory(1, '/', 20, 0);
 
         self::assertCount(1, $result['files']);
@@ -124,7 +125,7 @@ final class FileServiceTest extends TestCase
         $storageRepository = $this->createStub(StorageRepository::class);
         $storageRepository->method('findByUid')->willReturn($storage);
 
-        $service = new FileService($storageRepository, $this->createStub(ConnectionPool::class));
+        $service = $this->createService($storageRepository);
         $result = $service->getFileInfo(1, '/images/image.png');
 
         self::assertSame('image.png', $result['name']);
@@ -141,7 +142,7 @@ final class FileServiceTest extends TestCase
         $storageRepository = $this->createStub(StorageRepository::class);
         $storageRepository->method('findByUid')->willReturn($storage);
 
-        $service = new FileService($storageRepository, $this->createStub(ConnectionPool::class));
+        $service = $this->createService($storageRepository);
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionCode(1712002001);
@@ -166,7 +167,7 @@ final class FileServiceTest extends TestCase
         $storageRepository = $this->createStub(StorageRepository::class);
         $storageRepository->method('findByUid')->willReturn($storage);
 
-        $service = new FileService($storageRepository, $this->createStub(ConnectionPool::class));
+        $service = $this->createService($storageRepository);
         $result = $service->uploadFile(1, '/', 'upload.txt', 'Hello, World!');
 
         self::assertSame(42, $result['uid']);
@@ -188,7 +189,7 @@ final class FileServiceTest extends TestCase
         $storageRepository = $this->createStub(StorageRepository::class);
         $storageRepository->method('findByUid')->willReturn($storage);
 
-        $service = new FileService($storageRepository, $this->createStub(ConnectionPool::class));
+        $service = $this->createService($storageRepository);
         $result = $service->createDirectory(1, '/', 'newdir');
 
         self::assertSame('newdir', $result['name']);
@@ -208,7 +209,7 @@ final class FileServiceTest extends TestCase
         $storageRepository = $this->createStub(StorageRepository::class);
         $storageRepository->method('findByUid')->willReturn($storage);
 
-        $service = new FileService($storageRepository, $this->createStub(ConnectionPool::class));
+        $service = $this->createService($storageRepository);
         $service->copyFile(1, '/test.txt', '/target/');
     }
 
@@ -220,7 +221,7 @@ final class FileServiceTest extends TestCase
         $storageRepository = $this->createStub(StorageRepository::class);
         $storageRepository->method('findByUid')->willReturn($storage);
 
-        $service = new FileService($storageRepository, $this->createStub(ConnectionPool::class));
+        $service = $this->createService($storageRepository);
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionCode(1712002007);
@@ -241,7 +242,7 @@ final class FileServiceTest extends TestCase
         $storageRepository = $this->createStub(StorageRepository::class);
         $storageRepository->method('findByUid')->willReturn($storage);
 
-        $service = new FileService($storageRepository, $this->createStub(ConnectionPool::class));
+        $service = $this->createService($storageRepository);
         $service->moveFile(1, '/test.txt', '/target/');
     }
 
@@ -253,7 +254,7 @@ final class FileServiceTest extends TestCase
         $storageRepository = $this->createStub(StorageRepository::class);
         $storageRepository->method('findByUid')->willReturn($storage);
 
-        $service = new FileService($storageRepository, $this->createStub(ConnectionPool::class));
+        $service = $this->createService($storageRepository);
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionCode(1712002005);
@@ -272,7 +273,7 @@ final class FileServiceTest extends TestCase
         $storageRepository = $this->createStub(StorageRepository::class);
         $storageRepository->method('findByUid')->willReturn($storage);
 
-        $service = new FileService($storageRepository, $this->createStub(ConnectionPool::class));
+        $service = $this->createService($storageRepository);
         $service->renameFile(1, '/test.txt', 'new-name.txt');
     }
 
@@ -284,7 +285,7 @@ final class FileServiceTest extends TestCase
         $storageRepository = $this->createStub(StorageRepository::class);
         $storageRepository->method('findByUid')->willReturn($storage);
 
-        $service = new FileService($storageRepository, $this->createStub(ConnectionPool::class));
+        $service = $this->createService($storageRepository);
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionCode(1712002006);
@@ -303,7 +304,7 @@ final class FileServiceTest extends TestCase
         $storageRepository = $this->createStub(StorageRepository::class);
         $storageRepository->method('findByUid')->willReturn($storage);
 
-        $service = new FileService($storageRepository, $this->createStub(ConnectionPool::class));
+        $service = $this->createService($storageRepository);
         $service->deleteFile(1, '/test.txt');
     }
 
@@ -315,7 +316,7 @@ final class FileServiceTest extends TestCase
         $storageRepository = $this->createStub(StorageRepository::class);
         $storageRepository->method('findByUid')->willReturn($storage);
 
-        $service = new FileService($storageRepository, $this->createStub(ConnectionPool::class));
+        $service = $this->createService($storageRepository);
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionCode(1712002004);
@@ -337,7 +338,7 @@ final class FileServiceTest extends TestCase
         $storageRepository = $this->createStub(StorageRepository::class);
         $storageRepository->method('findByUid')->willReturn($storage);
 
-        $service = new FileService($storageRepository, $this->createStub(ConnectionPool::class));
+        $service = $this->createService($storageRepository);
         $service->moveDirectory(1, '/source/', '/target/');
     }
 
@@ -352,7 +353,7 @@ final class FileServiceTest extends TestCase
         $storageRepository = $this->createStub(StorageRepository::class);
         $storageRepository->method('findByUid')->willReturn($storage);
 
-        $service = new FileService($storageRepository, $this->createStub(ConnectionPool::class));
+        $service = $this->createService($storageRepository);
         $service->renameDirectory(1, '/old-name/', 'new-name');
     }
 
@@ -367,14 +368,14 @@ final class FileServiceTest extends TestCase
         $storageRepository = $this->createStub(StorageRepository::class);
         $storageRepository->method('findByUid')->willReturn($storage);
 
-        $service = new FileService($storageRepository, $this->createStub(ConnectionPool::class));
+        $service = $this->createService($storageRepository);
         $service->deleteDirectory(1, '/old/', true);
     }
 
     public function testUploadFileFromUrlRejectsNonHttpScheme(): void
     {
         $storageRepository = $this->createStub(StorageRepository::class);
-        $service = new FileService($storageRepository, $this->createStub(ConnectionPool::class));
+        $service = $this->createService($storageRepository);
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionCode(1712002010);
@@ -385,7 +386,7 @@ final class FileServiceTest extends TestCase
     public function testUploadFileFromUrlRejectsInvalidUrl(): void
     {
         $storageRepository = $this->createStub(StorageRepository::class);
-        $service = new FileService($storageRepository, $this->createStub(ConnectionPool::class));
+        $service = $this->createService($storageRepository);
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionCode(1712002010);
@@ -396,7 +397,7 @@ final class FileServiceTest extends TestCase
     public function testUploadFileFromUrlRejectsHostResolvingToPrivateIp(): void
     {
         $storageRepository = $this->createStub(StorageRepository::class);
-        $service = new FileService($storageRepository, $this->createStub(ConnectionPool::class));
+        $service = $this->createService($storageRepository);
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionCode(1712002015);
@@ -409,7 +410,7 @@ final class FileServiceTest extends TestCase
     public function testUploadFileFromUrlRejectsLinkLocalMetadataIp(): void
     {
         $storageRepository = $this->createStub(StorageRepository::class);
-        $service = new FileService($storageRepository, $this->createStub(ConnectionPool::class));
+        $service = $this->createService($storageRepository);
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionCode(1712002015);
@@ -423,7 +424,7 @@ final class FileServiceTest extends TestCase
         $storageRepository = $this->createStub(StorageRepository::class);
         $storageRepository->method('findByUid')->willReturn(null);
 
-        $service = new FileService($storageRepository, $this->createStub(ConnectionPool::class));
+        $service = $this->createService($storageRepository);
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionCode(1712002000);
@@ -438,7 +439,7 @@ final class FileServiceTest extends TestCase
         $GLOBALS['BE_USER'] = $backendUser;
 
         try {
-            $service = new FileService($this->createStub(StorageRepository::class), $this->createStub(ConnectionPool::class));
+            $service = $this->createService();
 
             $this->expectException(\RuntimeException::class);
             $this->expectExceptionMessage('Storage not found or not accessible: 7');
@@ -477,7 +478,7 @@ final class FileServiceTest extends TestCase
             $connectionPool = $this->createStub(ConnectionPool::class);
             $connectionPool->method('getQueryBuilderForTable')->willReturn($queryBuilder);
 
-            $service = new FileService($this->createStub(StorageRepository::class), $connectionPool);
+            $service = $this->createService(null, $connectionPool);
             $result = $service->searchFiles(7, 'foo', '', 20, 0);
 
             self::assertSame([], $result['files']);
@@ -512,7 +513,7 @@ final class FileServiceTest extends TestCase
             $connectionPool = $this->createStub(ConnectionPool::class);
             $connectionPool->method('getQueryBuilderForTable')->willReturn($queryBuilder);
 
-            $service = new FileService($this->createStub(StorageRepository::class), $connectionPool);
+            $service = $this->createService(null, $connectionPool);
             $result = $service->searchFiles(7, '', '', 20, 0);
 
             self::assertSame([], $result['files']);
@@ -566,7 +567,7 @@ final class FileServiceTest extends TestCase
             $connectionPool = $this->createStub(ConnectionPool::class);
             $connectionPool->method('getQueryBuilderForTable')->willReturn($queryBuilder);
 
-            $service = new FileService($this->createStub(StorageRepository::class), $connectionPool);
+            $service = $this->createService(null, $connectionPool);
             $service->searchFiles(7, '', '', 20, 0);
 
             // Both the list and the count query must be confined to the filemount path.
@@ -578,5 +579,222 @@ final class FileServiceTest extends TestCase
         } finally {
             unset($GLOBALS['BE_USER']);
         }
+    }
+
+    public function testListStoragesReportsAccessibleMounts(): void
+    {
+        $mountFolder = $this->createStub(Folder::class);
+        $mountFolder->method('getIdentifier')->willReturn('/user_upload/');
+
+        $storage = $this->createStub(ResourceStorage::class);
+        $storage->method('getName')->willReturn('fileadmin');
+        $storage->method('getEvaluatePermissions')->willReturn(true);
+        $storage->method('getFileMounts')->willReturn([
+            '/user_upload/' => ['folder' => $mountFolder, 'title' => 'User upload', 'read_only' => 1],
+        ]);
+
+        $backendUser = $this->createStub(BackendUserAuthentication::class);
+        $backendUser->method('getFileStorages')->willReturn([7 => $storage]);
+        $GLOBALS['BE_USER'] = $backendUser;
+
+        try {
+            $result = $this->createService()->listStorages();
+
+            self::assertSame([
+                'storages' => [
+                    [
+                        'uid' => 7,
+                        'name' => 'fileadmin',
+                        'fullAccess' => false,
+                        'mounts' => [['path' => '/user_upload/', 'title' => 'User upload', 'readOnly' => true]],
+                    ],
+                ],
+            ], $result);
+        } finally {
+            unset($GLOBALS['BE_USER']);
+        }
+    }
+
+    public function testListStoragesMarksUnrestrictedStorageAsFullAccess(): void
+    {
+        $storage = $this->createStub(ResourceStorage::class);
+        $storage->method('getName')->willReturn('fileadmin');
+        $storage->method('getEvaluatePermissions')->willReturn(false);
+        $storage->method('getFileMounts')->willReturn([]);
+
+        $backendUser = $this->createStub(BackendUserAuthentication::class);
+        $backendUser->method('getFileStorages')->willReturn([1 => $storage]);
+        $GLOBALS['BE_USER'] = $backendUser;
+
+        try {
+            $result = $this->createService()->listStorages();
+
+            self::assertTrue($result['storages'][0]['fullAccess']);
+            self::assertSame([], $result['storages'][0]['mounts']);
+        } finally {
+            unset($GLOBALS['BE_USER']);
+        }
+    }
+
+    public function testListStoragesReturnsEmptyWithoutBackendUser(): void
+    {
+        self::assertSame(['storages' => []], $this->createService()->listStorages());
+    }
+
+    public function testListDirectoryReturnsMountFoldersForRestrictedStorageRoot(): void
+    {
+        // The storage root lies outside the user's mounts, so getFolder('/') would only throw.
+        // Listing the mounts instead is what lets the client discover where it may work.
+        $mountFolder = $this->createStub(Folder::class);
+        $mountFolder->method('getName')->willReturn('user_upload');
+        $mountFolder->method('getIdentifier')->willReturn('/user_upload/');
+        $mountFolder->method('getModificationTime')->willReturn(1700000000);
+
+        $storage = $this->createMock(ResourceStorage::class);
+        $storage->method('getEvaluatePermissions')->willReturn(true);
+        $storage->method('getFileMounts')->willReturn(['/user_upload/' => ['folder' => $mountFolder]]);
+        $storage->expects(self::never())->method('getFolder');
+
+        $backendUser = $this->createStub(BackendUserAuthentication::class);
+        $backendUser->method('getFileStorages')->willReturn([7 => $storage]);
+        $GLOBALS['BE_USER'] = $backendUser;
+
+        try {
+            $result = $this->createService()->listDirectory(7, '/', 20, 0);
+
+            self::assertSame([], $result['files']);
+            self::assertSame(0, $result['totalFiles']);
+            self::assertSame(1, $result['totalDirectories']);
+            self::assertSame('/user_upload/', $result['directories'][0]['identifier']);
+        } finally {
+            unset($GLOBALS['BE_USER']);
+        }
+    }
+
+    public function testListDirectoryReadsNormallyBelowAMountRoot(): void
+    {
+        // Only the root gets the mount listing; a real path underneath goes through the storage,
+        // where core rejects anything outside the mounts.
+        $mountFolder = $this->createStub(Folder::class);
+        $mountFolder->method('getIdentifier')->willReturn('/user_upload/');
+
+        $folder = $this->createStub(Folder::class);
+
+        $storage = $this->createMock(ResourceStorage::class);
+        $storage->method('getEvaluatePermissions')->willReturn(true);
+        $storage->method('getFileMounts')->willReturn(['/user_upload/' => ['folder' => $mountFolder]]);
+        $storage->method('getFilesInFolder')->willReturn([]);
+        $storage->method('getFoldersInFolder')->willReturn([]);
+        $storage->method('countFilesInFolder')->willReturn(0);
+        $storage->method('countFoldersInFolder')->willReturn(0);
+        $storage->expects(self::once())->method('getFolder')->with('/user_upload/')->willReturn($folder);
+
+        $backendUser = $this->createStub(BackendUserAuthentication::class);
+        $backendUser->method('getFileStorages')->willReturn([7 => $storage]);
+        $GLOBALS['BE_USER'] = $backendUser;
+
+        try {
+            $this->createService()->listDirectory(7, '/user_upload/', 20, 0);
+        } finally {
+            unset($GLOBALS['BE_USER']);
+        }
+    }
+
+    public function testListDirectoryReadsRootNormallyWhenRootItselfIsMounted(): void
+    {
+        $mountFolder = $this->createStub(Folder::class);
+        $mountFolder->method('getIdentifier')->willReturn('/');
+
+        $folder = $this->createStub(Folder::class);
+
+        $storage = $this->createMock(ResourceStorage::class);
+        $storage->method('getEvaluatePermissions')->willReturn(true);
+        $storage->method('getFileMounts')->willReturn(['/' => ['folder' => $mountFolder]]);
+        $storage->method('getFilesInFolder')->willReturn([]);
+        $storage->method('getFoldersInFolder')->willReturn([]);
+        $storage->method('countFilesInFolder')->willReturn(0);
+        $storage->method('countFoldersInFolder')->willReturn(0);
+        $storage->expects(self::once())->method('getFolder')->with('/')->willReturn($folder);
+
+        $backendUser = $this->createStub(BackendUserAuthentication::class);
+        $backendUser->method('getFileStorages')->willReturn([7 => $storage]);
+        $GLOBALS['BE_USER'] = $backendUser;
+
+        try {
+            $this->createService()->listDirectory(7, '/', 20, 0);
+        } finally {
+            unset($GLOBALS['BE_USER']);
+        }
+    }
+
+    public function testListDirectorySurfacesPermissionErrorWhenRestrictedStorageHasNoMounts(): void
+    {
+        // No mount at all: fall through to the storage so the caller gets core's permission
+        // error rather than a misleading empty listing.
+        $storage = $this->createMock(ResourceStorage::class);
+        $storage->method('getEvaluatePermissions')->willReturn(true);
+        $storage->method('getFileMounts')->willReturn([]);
+        $storage->expects(self::once())
+            ->method('getFolder')
+            ->willThrowException(new \RuntimeException('no access', 1323059807));
+
+        $backendUser = $this->createStub(BackendUserAuthentication::class);
+        $backendUser->method('getFileStorages')->willReturn([7 => $storage]);
+        $GLOBALS['BE_USER'] = $backendUser;
+
+        try {
+            $this->expectException(\RuntimeException::class);
+            $this->expectExceptionMessage('no access');
+
+            $this->createService()->listDirectory(7, '/', 20, 0);
+        } finally {
+            unset($GLOBALS['BE_USER']);
+        }
+    }
+
+    public function testGetStorageAppliesUserPermissionsToTheResolvedStorage(): void
+    {
+        $folder = $this->createStub(Folder::class);
+
+        $storage = $this->createStub(ResourceStorage::class);
+        $storage->method('getFolder')->willReturn($folder);
+        $storage->method('getFilesInFolder')->willReturn([]);
+        $storage->method('getFoldersInFolder')->willReturn([]);
+        $storage->method('countFilesInFolder')->willReturn(0);
+        $storage->method('countFoldersInFolder')->willReturn(0);
+
+        $backendUser = $this->createStub(BackendUserAuthentication::class);
+        $backendUser->method('getFileStorages')->willReturn([7 => $storage]);
+        $GLOBALS['BE_USER'] = $backendUser;
+
+        try {
+            $storagePermissionService = $this->createMock(StoragePermissionService::class);
+            $storagePermissionService->expects(self::once())
+                ->method('applyUserPermissions')
+                ->with($storage, $backendUser);
+
+            $service = new FileService(
+                $this->createStub(StorageRepository::class),
+                $this->createStub(ConnectionPool::class),
+                $storagePermissionService,
+            );
+            $service->listDirectory(7, '/', 20, 0);
+        } finally {
+            unset($GLOBALS['BE_USER']);
+        }
+    }
+
+    private function createService(
+        ?StorageRepository $storageRepository = null,
+        ?ConnectionPool $connectionPool = null,
+    ): FileService {
+        return new FileService(
+            $storageRepository ?? $this->createStub(StorageRepository::class),
+            $connectionPool ?? $this->createStub(ConnectionPool::class),
+            // Applying the user's mounts/permissions to a storage is covered by
+            // StoragePermissionServiceTest. Stub it here so each case can configure its storage
+            // stub explicitly instead of having those calls overwritten.
+            $this->createStub(StoragePermissionService::class),
+        );
     }
 }
