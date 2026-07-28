@@ -36,8 +36,48 @@ use const PHP_URL_SCHEME;
 
 readonly class FileService
 {
-    public function __construct(private StorageRepository $storageRepository, private ConnectionPool $connectionPool)
+    public function __construct(
+        private StorageRepository $storageRepository,
+        private ConnectionPool $connectionPool,
+        private StoragePermissionService $storagePermissionService,
+    ) {
+    }
+
+    /**
+     * Accessible storages and the filemounts that bound them.
+     *
+     * Without this the client has no way to learn where it may work: a non-admin's storage root is
+     * normally outside their mounts, so probing with `file_list('/')` only yields a permission error.
+     *
+     * @return array{storages: list<array{uid: int, name: string, fullAccess: bool, mounts: list<array{path: string, title: string, readOnly: bool}>}>}
+     */
+    public function listStorages(): array
     {
+        $backendUser = $GLOBALS['BE_USER'] ?? null;
+        if (!$backendUser instanceof BackendUserAuthentication) {
+            return ['storages' => []];
+        }
+
+        $storages = [];
+        foreach ($backendUser->getFileStorages() as $storageUid => $storage) {
+            $this->storagePermissionService->applyUserPermissions($storage, $backendUser);
+
+            $mounts = array_map(static fn (array $mount): array => [
+                'path' => $mount['folder']->getIdentifier(),
+                'title' => $mount['title'],
+                'readOnly' => $mount['readOnly'],
+            ], $this->getFileMounts($storage));
+
+            $storages[] = [
+                'uid' => (int) $storageUid,
+                'name' => $storage->getName(),
+                // Admins are not confined to mounts; for them every path from '/' down is valid.
+                'fullAccess' => !$storage->getEvaluatePermissions(),
+                'mounts' => $mounts,
+            ];
+        }
+
+        return ['storages' => $storages];
     }
 
     /** @return array{files: list<array{name: string, identifier: string, size: int, mimeType: string, extension: string, modificationTime: int}>, directories: list<array{name: string, identifier: string, modificationTime: int}>, totalFiles: int, totalDirectories: int} */
@@ -46,6 +86,20 @@ readonly class FileService
         $limit = min(max($limit, 1), 500);
 
         $storage = $this->getStorage($storageUid);
+
+        // A mounted non-admin cannot read the storage root, so listing '/' would only ever throw a
+        // permission error and leave the client stuck. Mirror the backend file list and present the
+        // mount folders as the entries of the root instead.
+        $mountFolders = $this->getRootMountFolders($storage, $directoryPath);
+        if ($mountFolders !== null) {
+            return [
+                'files' => [],
+                'directories' => array_map($this->mapFolderToArray(...), array_slice($mountFolders, $offset, $limit)),
+                'totalFiles' => 0,
+                'totalDirectories' => count($mountFolders),
+            ];
+        }
+
         $folder = $storage->getFolder($directoryPath);
 
         $totalFiles = $storage->countFilesInFolder($folder);
@@ -471,14 +525,20 @@ readonly class FileService
     private function getStorage(int $storageUid): ResourceStorage
     {
         // Resolve through the backend user's accessible storages rather than StorageRepository
-        // directly: getFileStorages() returns only the storages the user may use, each already
-        // configured with the user's filemounts and permission evaluation (admins get every
-        // storage with full access). This enforces filemounts/file-operation rights instead of
-        // the unrestricted storage a programmatic lookup would return.
+        // directly: getFileStorages() returns only the storages the user may use (admins get every
+        // storage with full access), so a programmatic lookup cannot be used to reach a storage the
+        // user holds no mount in.
+        //
+        // That call alone does *not* confine the user within the storage, though: the filemounts and
+        // file-operation rights are attached by core's StoragePermissionsAspect, which only runs for
+        // backend requests and so never fires on the MCP paths. StoragePermissionService applies them
+        // here — see its class comment.
         $backendUser = $GLOBALS['BE_USER'] ?? null;
         if ($backendUser instanceof BackendUserAuthentication) {
             $storage = $backendUser->getFileStorages()[$storageUid] ?? null;
             if ($storage instanceof ResourceStorage) {
+                $this->storagePermissionService->applyUserPermissions($storage, $backendUser);
+
                 return $storage;
             }
 
@@ -492,6 +552,71 @@ readonly class FileService
         }
 
         return $storage;
+    }
+
+    /**
+     * Typed view of the filemounts registered with a storage.
+     *
+     * `ResourceStorage::getFileMounts()` is untyped and its rows are raw `sys_filemounts` records
+     * with a `folder` object grafted on, so narrow them once here rather than at each use site.
+     *
+     * @return list<array{folder: Folder, title: string, readOnly: bool}>
+     */
+    private function getFileMounts(ResourceStorage $storage): array
+    {
+        $mounts = [];
+
+        /** @var mixed $fileMount */
+        foreach ($storage->getFileMounts() as $fileMount) {
+            if (!is_array($fileMount)) {
+                continue;
+            }
+
+            /** @var mixed $folder */
+            $folder = $fileMount['folder'] ?? null;
+            if (!$folder instanceof Folder) {
+                continue;
+            }
+
+            /** @var mixed $title */
+            $title = $fileMount['title'] ?? null;
+
+            $mounts[] = [
+                'folder' => $folder,
+                'title' => is_string($title) ? $title : '',
+                'readOnly' => (bool) ($fileMount['read_only'] ?? false),
+            ];
+        }
+
+        return $mounts;
+    }
+
+    /**
+     * The user's filemount folders, when they should stand in for the storage root listing.
+     *
+     * Returns null whenever the requested path can be listed normally: a path other than the root,
+     * an unrestricted (admin) storage, a storage whose root is itself a mount, or a restricted
+     * storage with no usable mount at all — the last case falls through to the regular code path so
+     * the caller gets core's permission error rather than a misleading empty listing.
+     *
+     * @return list<Folder>|null
+     */
+    private function getRootMountFolders(ResourceStorage $storage, string $directoryPath): ?array
+    {
+        if (!in_array(trim($directoryPath), ['', '/'], true) || !$storage->getEvaluatePermissions()) {
+            return null;
+        }
+
+        $folders = [];
+        foreach ($this->getFileMounts($storage) as $mount) {
+            if ($mount['folder']->getIdentifier() === '/') {
+                return null;
+            }
+
+            $folders[] = $mount['folder'];
+        }
+
+        return $folders === [] ? null : $folders;
     }
 
     /** @return array{name: string, identifier: string, size: int, mimeType: string, extension: string, modificationTime: int} */

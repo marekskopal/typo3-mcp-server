@@ -64,3 +64,16 @@ ON DUPLICATE KEY UPDATE hidden = 0, deleted = 0, perms_everybody = 1;
 -- The editor must be able to list it through the pid-0 allowance of the page read constraint.
 INSERT IGNORE INTO sys_redirect (uid, pid, source_host, source_path, target, deleted, disabled, createdon, updatedon)
 VALUES (900, 0, '*', '/integration-fixture-redirect', 'https://example.com/', 0, 0, UNIX_TIMESTAMP(), UNIX_TIMESTAMP());
+
+-- Editor filemount: confines the editor to fileadmin/user_upload/ within storage 1.
+-- The folders themselves are created by setup-typo3.sh; core silently drops a filemount whose
+-- folder does not exist, which would leave the editor unrestricted and mask the test.
+INSERT INTO sys_filemounts (uid, pid, title, identifier, read_only, hidden, deleted, sorting, tstamp)
+VALUES (10, 0, 'Editor Uploads', '1:/user_upload/', 0, 0, 0, 1, UNIX_TIMESTAMP())
+ON DUPLICATE KEY UPDATE title = 'Editor Uploads', identifier = '1:/user_upload/', read_only = 0, hidden = 0, deleted = 0;
+
+-- Attach the mount to the editor group and grant the file operations the scenario exercises.
+UPDATE be_groups
+SET file_mountpoints = '10',
+    file_permissions = 'readFolder,writeFolder,addFolder,renameFolder,moveFolder,copyFolder,deleteFolder,readFile,writeFile,addFile,renameFile,replaceFile,moveFile,copyFile,deleteFile'
+WHERE uid = 10;

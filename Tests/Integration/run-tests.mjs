@@ -265,8 +265,28 @@ class IntegrationTestRunner {
     async testFileOperations() {
         section('File Operations');
 
+        // Storage discovery. An admin is not mount-confined, so every path from '/' down is valid.
+        const storages = await this.testTool('file_storage_list', {});
+        this.check(
+            'file_storage_list reports full access for an admin',
+            (storages?.storages ?? []).some(s => s.uid === 1 && s.fullAccess === true),
+            `storage 1 not reported with fullAccess: ${JSON.stringify(storages?.storages)}`,
+        );
+
         // List root
         await this.testTool('file_list', { directoryPath: '/' });
+
+        // Planted for the editor's filemount checks: one file inside the editor's mount and one
+        // outside it, both indexed in sys_file. The editor must see the first and never the second.
+        // Deleted first so repeated runs don't accumulate RENAME-suffixed copies.
+        for (const [directoryPath, fileName] of [['/user_upload', 'reachable.txt'], ['/outside-mount', 'unreachable.txt']]) {
+            await this.callToolSafe('file_delete', { fileIdentifier: `${directoryPath}/${fileName}` });
+            await this.testTool('file_upload', {
+                fileName,
+                content: `planted in ${directoryPath}`,
+                directoryPath,
+            });
+        }
 
         // Directory create
         await this.testTool('directory_create', { directoryName: 'mcp-int-test' });
@@ -826,6 +846,81 @@ class IntegrationTestRunner {
             'search excludes pages outside webmount',
             !searchRecords.some(r => r.uid === 90 || r.uid === 91),
             'out-of-mount page leaked into search results',
+        );
+
+        section('Editor: filemount containment');
+
+        // Regression guard for issue #8. Core attaches filemounts through StoragePermissionsAspect,
+        // which only runs for backend requests — the MCP endpoint is a frontend/CLI context, so the
+        // extension has to apply them itself. Without that, an editor reaches all of fileadmin.
+        const storages = await this.testTool('file_storage_list', {});
+        const storageRows = Array.isArray(storages?.storages) ? storages.storages : [];
+        const fileadmin = storageRows.find(s => s.uid === 1);
+        const mountPaths = Array.isArray(fileadmin?.mounts) ? fileadmin.mounts.map(m => m.path) : [];
+
+        this.check(
+            'file_storage_list reports the editor as mount-confined',
+            fileadmin?.fullAccess === false,
+            `storage 1 reported fullAccess=${fileadmin?.fullAccess} (mounts: ${mountPaths.join(', ') || 'none'})`,
+        );
+        this.check(
+            'file_storage_list exposes the user_upload filemount',
+            mountPaths.includes('/user_upload/'),
+            `mounts were: ${mountPaths.join(', ') || 'none'}`,
+        );
+
+        // The storage root is outside the mount, so listing '/' must surface the mounts rather
+        // than the whole of fileadmin.
+        const root = await this.testTool('file_list', { directoryPath: '/', storageUid: 1 });
+        const rootDirs = Array.isArray(root?.directories) ? root.directories.map(d => d.identifier) : [];
+        this.check(
+            'file_list of the root returns the filemounts',
+            rootDirs.length > 0 && rootDirs.every(d => d === '/user_upload/'),
+            `root listing returned: ${rootDirs.join(', ') || 'nothing'}`,
+        );
+
+        // Inside the mount: allowed.
+        const inMount = await this.callToolSafe('file_list', { directoryPath: '/user_upload/', storageUid: 1 });
+        this.check(
+            'file_list inside the filemount',
+            inMount !== null && !inMount.error,
+            `listing the mount failed: ${inMount?.error ?? 'no result'}`,
+        );
+
+        // Outside the mount: refused, both for reads and for writes. The write case is the one
+        // reported in issue #8 — an upload to an unmounted directory silently succeeded.
+        const outsideList = await this.callToolSafe('file_list', { directoryPath: '/outside-mount/', storageUid: 1 });
+        this.check(
+            'file_list outside the filemount refused',
+            outsideList === null || !!outsideList.error,
+            'editor listed a directory outside their filemount',
+        );
+
+        const outsideUpload = await this.callToolSafe('file_upload', {
+            fileName: 'mount-escape.txt',
+            content: 'should never be written',
+            directoryPath: '/outside-mount/',
+            storageUid: 1,
+        });
+        this.check(
+            'file_upload outside the filemount refused',
+            outsideUpload === null || !!outsideUpload.error,
+            `editor uploaded into a directory outside their filemount: ${JSON.stringify(outsideUpload)}`,
+        );
+
+        // file_search must not leak metadata from outside the mount either. Both planted files are
+        // indexed in sys_file, so this distinguishes real confinement from an empty result.
+        const found = await this.testTool('file_search', { extension: 'txt', storageUid: 1 });
+        const identifiers = (found?.files ?? []).map(f => f.identifier);
+        this.check(
+            'file_search returns the in-mount file',
+            identifiers.includes('/user_upload/reachable.txt'),
+            `search returned: ${identifiers.join(', ') || 'nothing'}`,
+        );
+        this.check(
+            'file_search stays within the filemount',
+            identifiers.every(i => i.startsWith('/user_upload/')),
+            `search leaked files outside the mount: ${identifiers.filter(i => !i.startsWith('/user_upload/')).join(', ')}`,
         );
 
         section('Editor: table grants still enforced');

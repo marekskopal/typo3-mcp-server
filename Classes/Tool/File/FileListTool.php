@@ -14,7 +14,12 @@ readonly class FileListTool
     {
     }
 
-    #[McpTool(name: 'file_list', description: 'List files and directories in a storage directory with pagination.')]
+    #[McpTool(
+        name: 'file_list',
+        description: 'List files and directories in a storage directory with pagination.'
+            . ' For a user confined to file mounts, listing the root "/" returns the mount folders,'
+            . ' which are the only paths their file operations may descend from.',
+    )]
     public function execute(string $directoryPath = '/', int $storageUid = 1, int $limit = 20, int $offset = 0): string
     {
         $result = $this->fileService->listDirectory($storageUid, $directoryPath, $limit, $offset);

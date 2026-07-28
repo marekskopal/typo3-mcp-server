@@ -17,7 +17,8 @@ readonly class FileCopyTool
     #[McpTool(
         name: 'file_copy',
         description: 'Copy a file to a directory within the same storage.'
-            . ' Provide the file identifier and the target directory path.',
+            . ' Provide the file identifier and the target directory path.'
+            . ' Directory paths must lie inside the user\'s file mounts; call file_storage_list first if the valid roots are not already known.',
     )]
     public function execute(string $fileIdentifier, string $targetDirectory, int $storageUid = 1): FileCopiedResult
     {
