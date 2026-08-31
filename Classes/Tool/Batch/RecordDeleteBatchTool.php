@@ -21,9 +21,11 @@ readonly class RecordDeleteBatchTool
         name: 'record_delete_batch',
         description: 'Delete multiple records from any table in a single operation.'
             . ' Pass UIDs as a comma-separated string (e.g. "1,2,3").'
-            . ' Non-existent UIDs are skipped and reported in skippedUids.',
+            . ' Non-existent UIDs are skipped and reported in skippedUids.'
+            . ' Set dryRun to true to preview the change: the response lists exactly what would be'
+            . ' affected and nothing is written.',
     )]
-    public function execute(string $tableName, string $uids): BatchRecordsDeletedResult
+    public function execute(string $tableName, string $uids, bool $dryRun = false): BatchRecordsDeletedResult
     {
         $uidList = UidListParser::parse($uids);
         $existingUids = $this->recordService->findExistingUids($tableName, $uidList);
@@ -33,8 +35,11 @@ readonly class RecordDeleteBatchTool
         }
 
         $skippedUids = array_values(array_diff($uidList, $existingUids));
-        $this->dataHandlerService->deleteRecords($tableName, $existingUids);
 
-        return new BatchRecordsDeletedResult($existingUids, count($existingUids), $skippedUids);
+        if (!$dryRun) {
+            $this->dataHandlerService->deleteRecords($tableName, $existingUids);
+        }
+
+        return new BatchRecordsDeletedResult($existingUids, count($existingUids), $skippedUids, $dryRun);
     }
 }

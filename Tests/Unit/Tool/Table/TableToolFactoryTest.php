@@ -8,6 +8,7 @@ use MarekSkopal\MsMcpServer\Logging\AuditLogger;
 use MarekSkopal\MsMcpServer\Service\DataHandlerService;
 use MarekSkopal\MsMcpServer\Service\RecordService;
 use MarekSkopal\MsMcpServer\Tool\Result\ErrorResult;
+use MarekSkopal\MsMcpServer\Tool\Result\RecordDeletedResult;
 use MarekSkopal\MsMcpServer\Tool\Result\RecordUpdatedResult;
 use MarekSkopal\MsMcpServer\Tool\Table\Handler\CreateHandler;
 use MarekSkopal\MsMcpServer\Tool\Table\Handler\ListHandler;
@@ -117,6 +118,54 @@ final class TableToolFactoryTest extends TestCase
         $handler(7, '{"title":');
     }
 
+    /**
+     * The shared batch handlers back the dynamic `*_delete_batch` tools, so the flag has to reach
+     * them too — and nothing may be written when it is set.
+     */
+    public function testDeleteBatchDryRunPreviewsWithoutDeleting(): void
+    {
+        $recordService = $this->createStub(RecordService::class);
+        $recordService->method('findExistingUids')->willReturn([1, 3]);
+
+        $dataHandlerService = $this->createMock(DataHandlerService::class);
+        $dataHandlerService->expects(self::never())->method('deleteRecords');
+
+        $handler = $this->factory($dataHandlerService, recordService: $recordService)
+            ->deleteBatch($this->config());
+        $result = $handler('1,2,3', dryRun: true);
+
+        self::assertTrue($result->dryRun);
+        self::assertSame([1, 3], $result->uids);
+        self::assertSame([2], $result->skippedUids);
+    }
+
+    public function testDeleteDryRunReportsWithoutDeleting(): void
+    {
+        $recordService = $this->createStub(RecordService::class);
+        $recordService->method('findByUid')->willReturn(['uid' => 4]);
+
+        $dataHandlerService = $this->createMock(DataHandlerService::class);
+        $dataHandlerService->expects(self::never())->method('deleteRecord');
+
+        $result = $this->factory($dataHandlerService, recordService: $recordService)
+            ->delete($this->config())(4, dryRun: true);
+
+        self::assertInstanceOf(RecordDeletedResult::class, $result);
+        self::assertTrue($result->dryRun);
+        self::assertFalse($result->deleted);
+    }
+
+    public function testDeleteDryRunReportsAnUnreachableRecord(): void
+    {
+        $recordService = $this->createStub(RecordService::class);
+        $recordService->method('findByUid')->willReturn(null);
+
+        $result = $this->factory(recordService: $recordService)->delete($this->config())(999, dryRun: true);
+
+        self::assertInstanceOf(ErrorResult::class, $result);
+        self::assertSame('Thing record not found: 999', $result->error);
+    }
+
     /** @return list<string> */
     private function parameterNames(object $handler): array
     {
@@ -140,10 +189,13 @@ final class TableToolFactoryTest extends TestCase
         );
     }
 
-    private function factory(?DataHandlerService $dataHandlerService = null, ?AuditLogger $auditLogger = null): TableToolFactory
-    {
+    private function factory(
+        ?DataHandlerService $dataHandlerService = null,
+        ?AuditLogger $auditLogger = null,
+        ?RecordService $recordService = null,
+    ): TableToolFactory {
         return new TableToolFactory(
-            $this->createStub(RecordService::class),
+            $recordService ?? $this->createStub(RecordService::class),
             $dataHandlerService ?? $this->createStub(DataHandlerService::class),
             $auditLogger ?? $this->createStub(AuditLogger::class),
             new NullLogger(),

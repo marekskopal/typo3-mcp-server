@@ -36,6 +36,32 @@ final class RecordUpdateBatchToolTest extends TestCase
         unset($GLOBALS['TCA']['pages']);
     }
 
+    public function testDryRunPreviewsWithoutUpdating(): void
+    {
+        $GLOBALS['TCA']['pages'] = [
+            'ctrl' => ['label' => 'title'],
+            'columns' => ['title' => ['config' => ['type' => 'input']]],
+        ];
+
+        $recordService = $this->createStub(RecordService::class);
+        $recordService->method('findExistingUids')->willReturn([1, 2]);
+
+        $dataHandlerService = $this->createMock(DataHandlerService::class);
+        $dataHandlerService->expects(self::never())->method('updateRecords');
+
+        $tool = new RecordUpdateBatchTool($dataHandlerService, new TcaSchemaService(), $recordService);
+        $result = $tool->execute('pages', '1,2', '{"title":"New","nope":1}', dryRun: true);
+
+        self::assertTrue($result->dryRun);
+        self::assertSame([1, 2], $result->uids);
+        // The preview reports the fields that would be written and the ones that would be dropped,
+        // which is what makes it worth calling before the real thing.
+        self::assertSame(['title'], $result->updatedFields);
+        self::assertSame(['nope'], $result->ignoredFields);
+
+        unset($GLOBALS['TCA']['pages']);
+    }
+
     public function testExecuteUpdatesMultipleRecords(): void
     {
         $recordService = $this->createStub(RecordService::class);

@@ -16,6 +16,23 @@ use PHPUnit\Framework\TestCase;
 #[CoversClass(RecordMoveBatchTool::class)]
 final class RecordMoveBatchToolTest extends TestCase
 {
+    public function testDryRunPreviewsWithoutMoving(): void
+    {
+        $recordService = $this->createStub(RecordService::class);
+        $recordService->method('findExistingUids')->willReturn([5, 6]);
+
+        $dataHandlerService = $this->createMock(DataHandlerService::class);
+        $dataHandlerService->expects(self::never())->method('moveRecords');
+
+        $tool = new RecordMoveBatchTool($dataHandlerService, $recordService);
+        $result = $tool->execute('tt_content', '5,6', targetPid: 12, dryRun: true);
+
+        self::assertInstanceOf(BatchRecordsMovedResult::class, $result);
+        self::assertTrue($result->dryRun);
+        self::assertSame([5, 6], $result->uids);
+        self::assertSame(12, $result->target);
+    }
+
     public function testExecuteMovesMultipleRecordsToTargetPage(): void
     {
         $recordService = $this->createStub(RecordService::class);

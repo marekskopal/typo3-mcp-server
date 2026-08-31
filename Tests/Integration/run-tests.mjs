@@ -458,6 +458,26 @@ class IntegrationTestRunner {
                 targetPid: pid,
             });
 
+            // ---- dryRun must report exactly what a real call would touch, and touch nothing.
+            //      Verified against the database by reading the records back afterwards. ----
+            const preview = await this.callToolSafe('record_delete_batch', {
+                tableName: 'tt_content',
+                uids,
+                dryRun: true,
+            });
+
+            const survived = await this.callToolSafe('content_get', { uid: uid1 });
+            if (preview?.dryRun === true && preview?.count === 2 && survived?.uid === uid1) {
+                this.passed.push({ tool: 'record_delete_batch (dryRun)' });
+                pass('record_delete_batch dryRun previewed 2 records and deleted nothing');
+            } else {
+                const why = survived?.uid !== uid1
+                    ? 'dryRun actually deleted the record'
+                    : `expected dryRun:true and count:2, got dryRun=${preview?.dryRun} count=${preview?.count}`;
+                this.failed.push({ tool: 'record_delete_batch (dryRun)', error: why });
+                fail('record_delete_batch (dryRun)', why);
+            }
+
             await this.testTool('record_delete_batch', {
                 tableName: 'tt_content',
                 uids,

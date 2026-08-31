@@ -27,9 +27,11 @@ readonly class RecordUpdateBatchTool
         description: 'Update the same fields on multiple records in any table.'
             . ' Pass UIDs as comma-separated (e.g. "1,2,3") and fields as a JSON object (e.g. {"hidden":1}).'
             . ' All specified records will be updated with the same field values.'
-            . ' Non-existent UIDs are skipped and reported in skippedUids.',
+            . ' Non-existent UIDs are skipped and reported in skippedUids.'
+            . ' Set dryRun to true to preview the change: the response lists exactly what would be'
+            . ' affected and nothing is written.',
     )]
-    public function execute(string $tableName, string $uids, string $fields): BatchRecordsUpdatedResult
+    public function execute(string $tableName, string $uids, string $fields, bool $dryRun = false): BatchRecordsUpdatedResult
     {
         $uidList = UidListParser::parse($uids);
         $existingUids = $this->recordService->findExistingUids($tableName, $uidList);
@@ -57,7 +59,9 @@ readonly class RecordUpdateBatchTool
             throw new ToolCallException('No valid writable fields provided');
         }
 
-        $this->dataHandlerService->updateRecords($tableName, $existingUids, $validFields);
+        if (!$dryRun) {
+            $this->dataHandlerService->updateRecords($tableName, $existingUids, $validFields);
+        }
 
         return new BatchRecordsUpdatedResult(
             $existingUids,
@@ -65,6 +69,7 @@ readonly class RecordUpdateBatchTool
             array_keys($validFields),
             $ignoredFields,
             $skippedUids,
+            $dryRun,
         );
     }
 }

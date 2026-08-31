@@ -39,13 +39,20 @@ final readonly class MoveBatchHandler extends AbstractTableToolHandler
             . ' Pass UIDs as comma-separated (e.g. "1,2,3").'
             . ' Provide exactly one of: targetPid (move all to the top of that page)'
             . ' or afterUid (place all after that sibling record).'
-            . ' Non-existent UIDs are skipped and reported in skippedUids.';
+            . ' Non-existent UIDs are skipped and reported in skippedUids.'
+            . ' Set dryRun to true to preview the change: the response lists exactly what would be'
+            . ' affected and nothing is written.';
     }
 
-    public function __invoke(string $uids, int $targetPid = -1, int $afterUid = 0): BatchRecordsMovedResult|ErrorResult
+    public function __invoke(
+        string $uids,
+        int $targetPid = -1,
+        int $afterUid = 0,
+        bool $dryRun = false,
+    ): BatchRecordsMovedResult|ErrorResult
     {
         return $this->run(
-            function () use ($uids, $targetPid, $afterUid): BatchRecordsMovedResult|ErrorResult {
+            function () use ($uids, $targetPid, $afterUid, $dryRun): BatchRecordsMovedResult|ErrorResult {
                 $target = MoveTarget::resolve($targetPid, $afterUid);
                 if ($target instanceof ErrorResult) {
                     return $target;
@@ -60,11 +67,13 @@ final readonly class MoveBatchHandler extends AbstractTableToolHandler
 
                 $skippedUids = array_values(array_diff($uidList, $existingUids));
 
-                $this->dataHandlerService->moveRecords($this->config->tableName, $existingUids, $target);
+                if (!$dryRun) {
+                    $this->dataHandlerService->moveRecords($this->config->tableName, $existingUids, $target);
+                }
 
-                return new BatchRecordsMovedResult($existingUids, count($existingUids), $target, $skippedUids);
+                return new BatchRecordsMovedResult($existingUids, count($existingUids), $target, $skippedUids, $dryRun);
             },
-            [$uids, $targetPid, $afterUid],
+            [$uids, $targetPid, $afterUid, $dryRun],
         );
     }
 }

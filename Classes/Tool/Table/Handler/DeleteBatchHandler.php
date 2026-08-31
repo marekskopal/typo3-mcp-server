@@ -35,13 +35,15 @@ final readonly class DeleteBatchHandler extends AbstractTableToolHandler
     {
         return 'Delete multiple ' . $this->config->subject() . 's in a single operation.'
             . ' Pass UIDs as a comma-separated string (e.g. "1,2,3").'
-            . ' Non-existent UIDs are skipped and reported in skippedUids.';
+            . ' Non-existent UIDs are skipped and reported in skippedUids.'
+            . ' Set dryRun to true to preview the change: the response lists exactly what would be'
+            . ' affected and nothing is written.';
     }
 
-    public function __invoke(string $uids): BatchRecordsDeletedResult
+    public function __invoke(string $uids, bool $dryRun = false): BatchRecordsDeletedResult
     {
         return $this->run(
-            function () use ($uids): BatchRecordsDeletedResult {
+            function () use ($uids, $dryRun): BatchRecordsDeletedResult {
                 $uidList = UidListParser::parse($uids);
                 $existingUids = $this->recordService->findExistingUids($this->config->tableName, $uidList);
 
@@ -51,11 +53,13 @@ final readonly class DeleteBatchHandler extends AbstractTableToolHandler
 
                 $skippedUids = array_values(array_diff($uidList, $existingUids));
 
-                $this->dataHandlerService->deleteRecords($this->config->tableName, $existingUids);
+                if (!$dryRun) {
+                    $this->dataHandlerService->deleteRecords($this->config->tableName, $existingUids);
+                }
 
-                return new BatchRecordsDeletedResult($existingUids, count($existingUids), $skippedUids);
+                return new BatchRecordsDeletedResult($existingUids, count($existingUids), $skippedUids, $dryRun);
             },
-            [$uids],
+            [$uids, $dryRun],
         );
     }
 }
