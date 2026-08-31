@@ -75,8 +75,8 @@ vendor/bin/typo3 mcp:server --user=admin
 - `Tool/Search/ContentSearchTool` — Search content elements by header with language filtering
 - `Tool/Search/SearchConditionParser` — Shared condition parsing for search tools
 - `Tool/Batch/*` — Batch operations (record_delete_batch, record_update_batch, record_move_batch) for any table
-- `Tool/Redirect/RedirectToolRegistrar` — Conditionally registers redirect management tools (list, get, create, update, delete) when `typo3/cms-redirects` is installed
-- `Tool/Scheduler/SchedulerToolRegistrar` — Conditionally registers scheduler task tools (list, get, update, delete) when `typo3/cms-scheduler` is installed
+- `Tool/Redirect/RedirectToolRegistrar` — Conditionally registers redirect management tools when `typo3/cms-redirects` is installed. Get/update/delete come from `TableToolFactory`; only the filtered list and the explicit-parameter create are hand-written.
+- `Tool/Scheduler/SchedulerToolRegistrar` — Conditionally registers scheduler task tools when `typo3/cms-scheduler` is installed, with field lists introspected from the table because the columns vary by TYPO3 version. Get/update/delete come from `TableToolFactory`; only the task-type list is hand-written.
 - `Tool/Workspace/WorkspaceToolRegistrar` — Conditionally registers workspace tools (`workspace_list`, `_get`, `_switch`, `_changes_list`, `_publish`, `_discard`, `_stage_set`) when `typo3/cms-workspaces` is installed. `workspace_switch` persists to `be_users.workspace_id`, so every later read and write in the session runs in that workspace.
 - `Tool/Translation/*` — `record_translate` (localize a record into a target language via DataHandler) and `site_languages` (the languages configured for a page's site)
 - `Tool/Permission/*` — Permission checking tools (check table read/write access, page-level permissions, full permission summary)
@@ -91,7 +91,10 @@ vendor/bin/typo3 mcp:server --user=admin
 - `Tool/Cache/CacheClearTool` — Flush TYPO3 caches (all, pages, or specific cache groups)
 - `Logging/AuditLogger` — Writes tool/resource invocations to `sys_log` table with user, timing, and outcome
 - `Resource/BackendLayoutResource` — MCP Resource Template exposing backend layout and column positions for a page (`typo3://pages/{pageId}/backend-layout`)
-- `Tool/Dynamic/DynamicToolRegistrar` — Registers CRUD + batch tools at runtime for tables configured via `EXTCONF` and discovered tables from `tx_msmcpserver_discovered_table`
+- `Tool/Dynamic/DynamicToolRegistrar` — Decides which tables get tools (from `EXTCONF` and the enabled rows of `tx_msmcpserver_discovered_table`) and resolves their field lists from TCA; the tools themselves come from `TableToolFactory`
+- `Tool/Table/TableToolConfig` — Value object describing a table to the generated tools: name, label, prefix, list/read/writable fields, translation fields, and the `noun` its rows are called in tool text (`record`, or `task` for the scheduler)
+- `Tool/Table/TableToolFactory` — Builds and registers the CRUD + batch tools from a `TableToolConfig`. Shared by the dynamic, redirect and scheduler registrars, which each used to hand-roll the same get/update/delete bodies — the drift between those copies is what produced the TMS-31 bug.
+- `Tool/Table/Handler/*` — One invokable object per generated tool, registered as `[$handler, '__invoke']` (the SDK's instance-handler form) so `__invoke`'s signature *is* the tool's input schema. List and create have a `Translatable*` variant because the translatable form differs in signature. Each handler owns its name and description and runs its body through `AbstractTableToolHandler::run()`, the only path to `RegistrarToolRunner` — so a decode can no longer end up outside the audit wrapper.
 - `Service/ExtensionTableDiscoveryService` — Scans TCA for extension tables, generates label/prefix, filters system tables
 - `Repository/DiscoveredTableRepository` — CRUD for `tx_msmcpserver_discovered_table` (discovered extension tables with enable/disable)
 - `Repository/McpSessionRepository` — CRUD for `tx_msmcpserver_mcp_session` (persistent MCP session storage)
@@ -148,7 +151,7 @@ readonly class MyTool
 
 ## Testing
 
-775 unit tests covering:
+782 unit tests covering:
 - All static MCP tools + batch tools (Pages/Content/File/Schema/Search/Translation/Cache/Permission/BackendUser/BackendGroup/Batch CRUD)
 - Dynamic tool registration and execution (DynamicToolRegistrar), including merged EXTCONF + discovered tables
 - OAuth classes (AuthorizationService incl. revocation, ClientRepository, PkceVerifier, OAuthTokenPair, RateLimitService)
@@ -160,7 +163,7 @@ readonly class MyTool
 - BackendUserBootstrap, McpServerFactory, McpServerMiddleware
 - Services (RecordService, DataHandlerService, FileService, StoragePermissionService, TcaSchemaService, BackendLayoutService, PermissionService, WorkspaceContextService, CacheService, SiteLanguageService, McpPathProvider)
 - Resources (SystemInfo, SiteConfiguration, TcaTables, BackendUser, TcaTableSchema, BackendLayout)
-- Prompts (all six), tool helpers (UidListParser, JsonObjectParser)
+- Prompts (all six), tool helpers (UidListParser, JsonObjectParser), TableToolFactory + TableToolConfig
 - CleanupExpiredTokensCommand
 
 Plus an **integration suite** under `Tests/Integration/` (`setup-typo3.sh` + `run-tests.mjs`) that drives the tools over `mcp:server` against a real TYPO3 and database, in both an admin and a non-admin (editor) scenario. It runs only in the `Integration Tests` GitHub Actions workflow — `vendor/bin/phpunit` does **not** exercise it. It is the only place that covers what unit tests structurally cannot: page/file mount containment for a real editor, and workspace overlay behaviour (a record deleted in a workspace leaves a `DELETE_PLACEHOLDER` that only the overlay drops).

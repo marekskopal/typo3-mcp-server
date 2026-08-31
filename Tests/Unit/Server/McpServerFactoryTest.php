@@ -35,6 +35,7 @@ use MarekSkopal\MsMcpServer\Tool\Content\ContentMoveTool;
 use MarekSkopal\MsMcpServer\Tool\Content\ContentUpdateTool;
 use MarekSkopal\MsMcpServer\Repository\DiscoveredTableRepository;
 use MarekSkopal\MsMcpServer\Tool\Dynamic\DynamicToolRegistrar;
+use MarekSkopal\MsMcpServer\Tool\Table\TableToolFactory;
 use MarekSkopal\MsMcpServer\Tool\Redirect\RedirectToolRegistrar;
 use MarekSkopal\MsMcpServer\Tool\Scheduler\SchedulerToolRegistrar;
 use MarekSkopal\MsMcpServer\Tool\Workspace\WorkspaceToolRegistrar;
@@ -192,9 +193,10 @@ final class McpServerFactoryTest extends TestCase
 
         $discoveredTableRepository = $this->createStub(DiscoveredTableRepository::class);
         $discoveredTableRepository->method('findEnabled')->willReturn([]);
-        $dynamicToolRegistrar = new DynamicToolRegistrar($recordService, $dataHandlerService, $tcaSchemaService, $discoveredTableRepository, $logger, $auditLogger);
-        $redirectToolRegistrar = new RedirectToolRegistrar($recordService, $dataHandlerService, $logger, $auditLogger);
-        $schedulerToolRegistrar = new SchedulerToolRegistrar($recordService, $dataHandlerService, $connectionPool, $logger, $auditLogger);
+        $tableToolFactory = new TableToolFactory($recordService, $dataHandlerService, $auditLogger, $logger);
+        $dynamicToolRegistrar = new DynamicToolRegistrar($tcaSchemaService, $discoveredTableRepository, $logger, $tableToolFactory);
+        $redirectToolRegistrar = new RedirectToolRegistrar($recordService, $dataHandlerService, $logger, $auditLogger, $tableToolFactory);
+        $schedulerToolRegistrar = new SchedulerToolRegistrar($recordService, $connectionPool, $logger, $auditLogger, $tableToolFactory);
         $workspaceToolRegistrar = new WorkspaceToolRegistrar($recordService, $dataHandlerService, $connectionPool, $logger, $auditLogger);
 
         $sessionRepository = $this->createStub(McpSessionRepository::class);
@@ -227,7 +229,7 @@ final class McpServerFactoryTest extends TestCase
     public function testAllToolClassesHaveMcpToolAttribute(): void
     {
         $toolDir = __DIR__ . '/../../../Classes/Tool';
-        $excludedDirs = ['Result', 'Dynamic', 'Redirect', 'Scheduler', 'Workspace', 'Helper'];
+        $excludedDirs = ['Result', 'Dynamic', 'Redirect', 'Scheduler', 'Workspace', 'Helper', 'Table'];
         $excludedFiles = ['SearchConditionParser.php', 'SearchParamResolver.php'];
 
         $iterator = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($toolDir));

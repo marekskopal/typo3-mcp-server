@@ -17,6 +17,7 @@ use Mcp\Exception\ToolCallException;
 use Mcp\Server;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
+use MarekSkopal\MsMcpServer\Tool\Table\TableToolFactory;
 use Psr\Log\NullLogger;
 use TYPO3\CMS\Core\Database\Connection;
 use TYPO3\CMS\Core\Database\ConnectionPool;
@@ -339,15 +340,20 @@ final class SchedulerToolRegistrarTest extends TestCase
         ?DataHandlerService $dataHandlerService = null,
         ?ConnectionPool $connectionPool = null,
     ): SchedulerToolRegistrar {
+        $recordService ??= $this->createStub(RecordService::class);
+        $dataHandlerService ??= $this->createStub(DataHandlerService::class);
+        $logger = new NullLogger();
+        $auditLogger = $this->createStub(AuditLogger::class);
+
         return new SchedulerToolRegistrar(
-            $recordService ?? $this->createStub(RecordService::class),
-            $dataHandlerService ?? $this->createStub(DataHandlerService::class),
+            $recordService,
             $connectionPool ?? $this->createConnectionPoolWithColumns([
                 'uid', 'pid', 'tasktype', 'task_group', 'description', 'disable',
                 'nextexecution', 'lastexecution_time', 'lastexecution_failure', 'lastexecution_context',
             ]),
-            new NullLogger(),
-            $this->createStub(AuditLogger::class),
+            $logger,
+            $auditLogger,
+            new TableToolFactory($recordService, $dataHandlerService, $auditLogger, $logger),
         );
     }
 
@@ -396,15 +402,24 @@ final class SchedulerToolRegistrarTest extends TestCase
     }
 
     /**
+     * The shared table tools are registered as `[$handler, '__invoke']` instance callables;
+     * wrapping them in a Closure keeps the call sites reading as plain function calls.
+     *
      * @return list<array{handler: \Closure, name: string}>
      */
     private function getRegisteredTools(Server\Builder $builder): array
     {
         $reflection = new \ReflectionClass($builder);
         $property = $reflection->getProperty('tools');
-        /** @var list<array{handler: \Closure, name: string}> $tools */
+        /** @var list<array{handler: callable, name: string}> $tools */
         $tools = $property->getValue($builder);
 
-        return $tools;
+        return array_map(
+            static fn(array $tool): array => [
+                'handler' => \Closure::fromCallable($tool['handler']),
+                'name' => $tool['name'],
+            ],
+            $tools,
+        );
     }
 }

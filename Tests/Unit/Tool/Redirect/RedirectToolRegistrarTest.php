@@ -16,6 +16,7 @@ use Mcp\Exception\ToolCallException;
 use Mcp\Server;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
+use MarekSkopal\MsMcpServer\Tool\Table\TableToolFactory;
 use Psr\Log\NullLogger;
 use TYPO3\CMS\Core\Package\PackageManager;
 use TYPO3\CMS\Core\Utility\ExtensionManagementUtility;
@@ -474,11 +475,25 @@ final class RedirectToolRegistrarTest extends TestCase
         ?RecordService $recordService = null,
         ?DataHandlerService $dataHandlerService = null,
     ): RedirectToolRegistrar {
-        return new RedirectToolRegistrar(
+        return $this->makeRegistrar(
             $recordService ?? $this->createStub(RecordService::class),
             $dataHandlerService ?? $this->createStub(DataHandlerService::class),
-            new NullLogger(),
-            $this->createStub(AuditLogger::class),
+        );
+    }
+
+    private function makeRegistrar(
+        RecordService $recordService,
+        DataHandlerService $dataHandlerService,
+    ): RedirectToolRegistrar {
+        $logger = new NullLogger();
+        $auditLogger = $this->createStub(AuditLogger::class);
+
+        return new RedirectToolRegistrar(
+            $recordService,
+            $dataHandlerService,
+            $logger,
+            $auditLogger,
+            new TableToolFactory($recordService, $dataHandlerService, $auditLogger, $logger),
         );
     }
 
@@ -487,7 +502,7 @@ final class RedirectToolRegistrarTest extends TestCase
         DataHandlerService $dataHandlerService,
         string $toolType,
     ): \Closure {
-        $registrar = new RedirectToolRegistrar($recordService, $dataHandlerService, new NullLogger(), $this->createStub(AuditLogger::class));
+        $registrar = $this->makeRegistrar($recordService, $dataHandlerService);
 
         $builder = Server::builder();
         $registrar->register($builder);
@@ -508,15 +523,24 @@ final class RedirectToolRegistrarTest extends TestCase
     }
 
     /**
+     * The shared table tools are registered as `[$handler, '__invoke']` instance callables;
+     * wrapping them in a Closure keeps the call sites reading as plain function calls.
+     *
      * @return list<array{handler: \Closure, name: string}>
      */
     private function getRegisteredTools(Server\Builder $builder): array
     {
         $reflection = new \ReflectionClass($builder);
         $property = $reflection->getProperty('tools');
-        /** @var list<array{handler: \Closure, name: string}> $tools */
+        /** @var list<array{handler: callable, name: string}> $tools */
         $tools = $property->getValue($builder);
 
-        return $tools;
+        return array_map(
+            static fn(array $tool): array => [
+                'handler' => \Closure::fromCallable($tool['handler']),
+                'name' => $tool['name'],
+            ],
+            $tools,
+        );
     }
 }
