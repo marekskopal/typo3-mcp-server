@@ -179,11 +179,7 @@ readonly class OAuthMiddleware implements MiddlewareInterface
             ->withHeader('Content-Security-Policy', "frame-ancestors 'none'")
             ->withHeader('Cache-Control', 'no-store')
             ->withHeader('X-Content-Type-Options', 'nosniff')
-            ->withHeader('Set-Cookie', sprintf(
-                'mcp_csrf=%s; Path=%s; HttpOnly; SameSite=Strict; Secure; Max-Age=600',
-                $csrfToken,
-                $this->pathProvider->getOAuthCookiePath(),
-            ))
+            ->withHeader('Set-Cookie', $this->buildCsrfCookie($request, $csrfToken, 600))
             ->withBody($this->streamFactory->createStream($html));
     }
 
@@ -251,10 +247,7 @@ readonly class OAuthMiddleware implements MiddlewareInterface
 
         return $this->responseFactory->createResponse(302)
             ->withHeader('Location', $redirectTarget)
-            ->withHeader('Set-Cookie', sprintf(
-                'mcp_csrf=; Path=%s; HttpOnly; SameSite=Strict; Secure; Max-Age=0',
-                $this->pathProvider->getOAuthCookiePath(),
-            ));
+            ->withHeader('Set-Cookie', $this->buildCsrfCookie($request, '', 0));
     }
 
     private function handleToken(ServerRequestInterface $request): ResponseInterface
@@ -555,6 +548,26 @@ readonly class OAuthMiddleware implements MiddlewareInterface
         $normalizedParams = $request->getAttribute('normalizedParams');
 
         return $normalizedParams instanceof NormalizedParams ? $normalizedParams->getRemoteAddress() : '';
+    }
+
+    /**
+     * Builds the `Set-Cookie` header for the consent-screen CSRF token.
+     *
+     * `Secure` is derived from the request scheme rather than hardcoded: on a plain-HTTP
+     * install the browser silently discards a Secure cookie, so the consent POST would
+     * find no cookie and reject every submission with "CSRF validation failed" — pointing
+     * at the wrong cause. Mirrors OAuthContinuationCookie, which already does this.
+     */
+    private function buildCsrfCookie(ServerRequestInterface $request, string $token, int $maxAge): string
+    {
+        $cookie = sprintf(
+            'mcp_csrf=%s; Path=%s; HttpOnly; SameSite=Strict; Max-Age=%d',
+            $token,
+            $this->pathProvider->getOAuthCookiePath(),
+            $maxAge,
+        );
+
+        return $request->getUri()->getScheme() === 'https' ? $cookie . '; Secure' : $cookie;
     }
 
     private function extractCsrfFromCookie(ServerRequestInterface $request): string

@@ -59,6 +59,8 @@ readonly class BackendGroupListTool
             $result['records'],
         );
 
-        return new BackendGroupListResult($records, $result['total']);
+        // be_users/be_groups are not workspace-aware, so search() always takes the counted
+        // path; fall back to the page size rather than assuming the key for the type checker.
+        return new BackendGroupListResult($records, $result['total'] ?? count($records));
     }
 }

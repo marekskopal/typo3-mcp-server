@@ -124,6 +124,25 @@ vendor/bin/typo3 setup \
     --no-interaction \
     --force
 
+# --- Register the news table for dynamic-tool testing ---
+# The extension exposes no extension table by default; registering one is an explicit
+# operator decision. Do here what an operator would do, so the dynamic-tool tests keep
+# exercising a real third-party table. An entry for a table missing from TCA resolves to
+# no read fields and is skipped, so this is harmless when news failed to install above.
+echo ""
+echo "Registering tx_news_domain_model_news via EXTCONF..."
+mkdir -p config/system
+cat > config/system/additional.php <<'PHP'
+<?php
+
+declare(strict_types=1);
+
+$GLOBALS['TYPO3_CONF_VARS']['EXTCONF']['ms_mcp_server']['tables']['tx_news_domain_model_news'] = [
+    'label' => 'News',
+    'prefix' => 'news',
+];
+PHP
+
 # --- Apply extension database schema ---
 echo ""
 echo "Updating database schema..."

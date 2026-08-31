@@ -19,6 +19,13 @@ readonly class RecordService
     /** Operators accepted in search conditions; anything else is rejected with a client-visible error. */
     public const array SUPPORTED_OPERATORS = ['eq', 'neq', 'gt', 'gte', 'lt', 'lte', 'in', 'null', 'notNull', 'like'];
 
+    /**
+     * Upper bound on rows read while paginating or counting over a workspace overlay. The overlay
+     * runs in PHP, so the only way to know how many rows survive it is to look at them; this keeps
+     * that bounded. Results that hit the cap are reported as inexact rather than silently truncated.
+     */
+    private const int OVERLAY_SCAN_LIMIT = 10000;
+
     public function __construct(
         private ConnectionPool $connectionPool,
         private WorkspaceContextService $workspaceContext,
@@ -93,8 +100,11 @@ readonly class RecordService
     }
 
     /**
+     * In a non-live workspace on a workspace-aware table the result carries `hasMore` instead of
+     * `total`; see paginateOverlaid() for why an exact total is not available there.
+     *
      * @param list<string> $fields
-     * @return array{records: list<array<string, mixed>>, total: int}
+     * @return array{records: list<array<string, mixed>>, total?: int, hasMore?: bool, workspaceOverlay?: string}
      */
     public function findByPid(
         string $table,
@@ -142,17 +152,20 @@ readonly class RecordService
             );
         }
 
+        $queryBuilder->orderBy('uid', 'ASC');
+
+        if ($this->overlayApplies($table)) {
+            return $this->paginateOverlaid($queryBuilder, $table, $limit, $offset);
+        }
+
         /** @var int|string $totalResult */
         $totalResult = $countQueryBuilder->executeQuery()->fetchOne();
 
         $records = $queryBuilder
             ->setMaxResults($limit)
             ->setFirstResult($offset)
-            ->orderBy('uid', 'ASC')
             ->executeQuery()
             ->fetchAllAssociative();
-
-        $records = $this->workspaceContext->overlayMany($table, $records);
 
         return [
             'records' => $records,
@@ -161,9 +174,12 @@ readonly class RecordService
     }
 
     /**
+     * In a non-live workspace on a workspace-aware table the result carries `hasMore` instead of
+     * `total`; see paginateOverlaid() for why an exact total is not available there.
+     *
      * @param list<string> $fields
      * @param array<string, array{operator: string, value: string}> $searchConditions field => {operator, value}
-     * @return array{records: list<array<string, mixed>>, total: int}
+     * @return array{records: list<array<string, mixed>>, total?: int, hasMore?: bool, workspaceOverlay?: string}
      */
     public function search(
         string $table,
@@ -212,17 +228,20 @@ readonly class RecordService
             $this->applyCondition($countQueryBuilder, $field, $condition);
         }
 
+        $queryBuilder->orderBy($orderBy ?? 'uid', $orderDirection);
+
+        if ($this->overlayApplies($table)) {
+            return $this->paginateOverlaid($queryBuilder, $table, $limit, $offset);
+        }
+
         /** @var int|string $totalResult */
         $totalResult = $countQueryBuilder->executeQuery()->fetchOne();
 
         $records = $queryBuilder
             ->setMaxResults($limit)
             ->setFirstResult($offset)
-            ->orderBy($orderBy ?? 'uid', $orderDirection)
             ->executeQuery()
             ->fetchAllAssociative();
-
-        $records = $this->workspaceContext->overlayMany($table, $records);
 
         return [
             'records' => $records,
@@ -363,9 +382,13 @@ readonly class RecordService
     /**
      * Count records matching optional conditions without fetching them.
      *
+     * `exact` is false only in a non-live workspace on a very large result set, where the overlay
+     * walk hits OVERLAY_SCAN_LIMIT and the returned count is a floor.
+     *
      * @param array<string, array{operator: string, value: string}> $searchConditions
+     * @return array{count: int, exact: bool}
      */
-    public function count(string $table, ?int $pid = null, array $searchConditions = []): int
+    public function count(string $table, ?int $pid = null, array $searchConditions = []): array
     {
         $this->assertReadAccess($table);
 
@@ -373,7 +396,13 @@ readonly class RecordService
         $queryBuilder->getRestrictions()->removeAll();
         $this->workspaceContext->applyRestriction($queryBuilder, $table);
 
-        $queryBuilder->count('uid')->from($table);
+        // A SQL COUNT cannot be workspace-overlaid, so in a non-live workspace it disagrees with
+        // the row count search() returns for the same query. Count what survives the overlay.
+        if ($this->overlayApplies($table)) {
+            $queryBuilder->select('*')->from($table);
+        } else {
+            $queryBuilder->count('uid')->from($table);
+        }
 
         $this->applyPageReadConstraint($queryBuilder, $table);
 
@@ -387,10 +416,91 @@ readonly class RecordService
             $this->applyCondition($queryBuilder, $field, $condition);
         }
 
+        if ($this->overlayApplies($table)) {
+            $scan = $this->scanOverlaid($queryBuilder->orderBy('uid', 'ASC'), $table, self::OVERLAY_SCAN_LIMIT);
+
+            return ['count' => count($scan['records']), 'exact' => !$scan['capped']];
+        }
+
         /** @var int|string $result */
         $result = $queryBuilder->executeQuery()->fetchOne();
 
-        return (int) $result;
+        return ['count' => (int) $result, 'exact' => true];
+    }
+
+    /**
+     * True when reads on $table go through a workspace overlay, i.e. rows can be dropped in PHP
+     * after the query has already applied LIMIT/OFFSET.
+     */
+    private function overlayApplies(string $table): bool
+    {
+        return !$this->workspaceContext->isLive() && $this->workspaceContext->isTableWorkspaceAware($table);
+    }
+
+    /**
+     * Paginate over the workspace-overlaid result set.
+     *
+     * The overlay drops rows hidden in the current workspace (a DELETE_PLACEHOLDER, for one), so
+     * applying setMaxResults() *before* it returned short pages while later records still existed,
+     * and a client walking `offset += limit` silently skipped records. The separate COUNT was never
+     * overlaid either, so `total` over-reported and appeared to confirm nothing was missing.
+     *
+     * Fetch, overlay, then slice — and report `hasMore` rather than a total, because knowing the
+     * exact total would mean overlaying every matching row.
+     *
+     * @return array{records: list<array<string, mixed>>, hasMore: bool, workspaceOverlay: string}
+     */
+    private function paginateOverlaid(QueryBuilder $queryBuilder, string $table, int $limit, int $offset): array
+    {
+        // One past the page, so a full page can be told apart from the last one.
+        $scan = $this->scanOverlaid($queryBuilder, $table, $offset + $limit + 1);
+
+        return [
+            'records' => array_slice($scan['records'], $offset, $limit),
+            'hasMore' => count($scan['records']) > $offset + $limit,
+            'workspaceOverlay' => sprintf(
+                'Records are overlaid for workspace %d. An exact total is not available here'
+                    . ' — page with offset and hasMore.',
+                $this->workspaceContext->getCurrentWorkspaceId(),
+            ),
+        ];
+    }
+
+    /**
+     * Reads windows of rows and overlays them until $needed overlaid rows are available or the
+     * source is exhausted, capped at OVERLAY_SCAN_LIMIT rows read.
+     *
+     * @return array{records: list<array<string, mixed>>, capped: bool}
+     */
+    private function scanOverlaid(QueryBuilder $queryBuilder, string $table, int $needed): array
+    {
+        $overlaid = [];
+        $read = 0;
+        $window = min(max($needed, 100), self::OVERLAY_SCAN_LIMIT);
+
+        while (count($overlaid) < $needed && $read < self::OVERLAY_SCAN_LIMIT) {
+            $rows = (clone $queryBuilder)
+                ->setMaxResults(min($window, self::OVERLAY_SCAN_LIMIT - $read))
+                ->setFirstResult($read)
+                ->executeQuery()
+                ->fetchAllAssociative();
+
+            if ($rows === []) {
+                return ['records' => $overlaid, 'capped' => false];
+            }
+
+            $read += count($rows);
+            foreach ($this->workspaceContext->overlayMany($table, $rows) as $row) {
+                $overlaid[] = $row;
+            }
+
+            // A short read means the source is exhausted, so what we have is everything.
+            if (count($rows) < $window) {
+                return ['records' => $overlaid, 'capped' => false];
+            }
+        }
+
+        return ['records' => $overlaid, 'capped' => count($overlaid) < $needed];
     }
 
     /**

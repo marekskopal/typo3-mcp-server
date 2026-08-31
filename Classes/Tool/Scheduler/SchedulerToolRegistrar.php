@@ -7,6 +7,7 @@ namespace MarekSkopal\MsMcpServer\Tool\Scheduler;
 use MarekSkopal\MsMcpServer\Logging\AuditLogger;
 use MarekSkopal\MsMcpServer\Service\DataHandlerService;
 use MarekSkopal\MsMcpServer\Service\RecordService;
+use MarekSkopal\MsMcpServer\Tool\Helper\JsonObjectParser;
 use MarekSkopal\MsMcpServer\Tool\Helper\RegistrarToolRunner;
 use MarekSkopal\MsMcpServer\Tool\Result\ErrorResult;
 use MarekSkopal\MsMcpServer\Tool\Result\RecordDeletedResult;
@@ -218,8 +219,7 @@ readonly class SchedulerToolRegistrar
                     $uid,
                     $fields,
                 ): RecordUpdatedResult|ErrorResult {
-                    /** @var array<string, mixed> $data */
-                    $data = json_decode($fields, true, 512, JSON_THROW_ON_ERROR);
+                    $data = JsonObjectParser::parse($fields, 'fields');
 
                     $filteredData = array_intersect_key($data, array_flip($writableFields));
                     $ignoredFields = array_values(array_diff(array_keys($data), array_keys($filteredData)));

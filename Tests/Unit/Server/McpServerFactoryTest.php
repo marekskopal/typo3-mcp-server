@@ -228,7 +228,7 @@ final class McpServerFactoryTest extends TestCase
     {
         $toolDir = __DIR__ . '/../../../Classes/Tool';
         $excludedDirs = ['Result', 'Dynamic', 'Redirect', 'Scheduler', 'Workspace', 'Helper'];
-        $excludedFiles = ['SearchConditionParser.php'];
+        $excludedFiles = ['SearchConditionParser.php', 'SearchParamResolver.php'];
 
         $iterator = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($toolDir));
         $missing = [];

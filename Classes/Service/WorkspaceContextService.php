@@ -22,9 +22,20 @@ readonly class WorkspaceContextService
         return (int) $GLOBALS['BE_USER']->workspace;
     }
 
+    /**
+     * True when reads need no workspace overlay.
+     *
+     * `0` is the live workspace. A *negative* id is core's "no workspace access" sentinel: when a
+     * user can reach neither live (no `workspace_perms` bit) nor any custom workspace,
+     * `BackendUserAuthentication::setDefaultWorkspace()` parks them at `-99`. That names the
+     * absence of a workspace, not one to overlay into — treating it as a workspace made a plain
+     * editor take the overlay path and lose the record `total`. The `WorkspaceRestriction` added
+     * in applyRestriction() still uses the raw id, so such a user keeps seeing live-shaped rows
+     * only; this affects the overlay alone.
+     */
     public function isLive(): bool
     {
-        return $this->getCurrentWorkspaceId() === 0;
+        return $this->getCurrentWorkspaceId() <= 0;
     }
 
     public function isTableWorkspaceAware(string $table): bool

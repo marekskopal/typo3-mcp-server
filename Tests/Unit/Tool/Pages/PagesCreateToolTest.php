@@ -9,6 +9,7 @@ use MarekSkopal\MsMcpServer\Service\TcaSchemaService;
 use MarekSkopal\MsMcpServer\Tool\Pages\PagesCreateTool;
 use MarekSkopal\MsMcpServer\Tool\Result\ErrorResult;
 use MarekSkopal\MsMcpServer\Tool\Result\RecordCreatedResult;
+use Mcp\Exception\ToolCallException;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 use const JSON_THROW_ON_ERROR;
@@ -38,6 +39,37 @@ final class PagesCreateToolTest extends TestCase
     protected function tearDown(): void
     {
         unset($GLOBALS['TCA']['pages']);
+    }
+
+    /**
+     * `fields` used to be decoded under a @\var annotation that asserted an object shape without
+     * checking it, so a bare scalar reached array_intersect_key() and surfaced as the opaque
+     * "An internal error occurred" — nothing a client could act on.
+     */
+    public function testExecuteRejectsNonObjectFields(): void
+    {
+        $dataHandlerService = $this->createMock(DataHandlerService::class);
+        $dataHandlerService->expects(self::never())->method('createRecord');
+
+        $tool = new PagesCreateTool($dataHandlerService, new TcaSchemaService());
+
+        $this->expectException(ToolCallException::class);
+        $this->expectExceptionMessage('fields must be a JSON object, got a number.');
+
+        $tool->execute(5, '5');
+    }
+
+    public function testExecuteRejectsMalformedFieldsJson(): void
+    {
+        $dataHandlerService = $this->createMock(DataHandlerService::class);
+        $dataHandlerService->expects(self::never())->method('createRecord');
+
+        $tool = new PagesCreateTool($dataHandlerService, new TcaSchemaService());
+
+        $this->expectException(ToolCallException::class);
+        $this->expectExceptionMessage('fields must be a JSON object, but is not valid JSON');
+
+        $tool->execute(5, '{"title":"Broken"');
     }
 
     public function testExecuteCreatesPageAndReturnsResult(): void

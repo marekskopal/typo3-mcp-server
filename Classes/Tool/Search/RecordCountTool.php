@@ -19,7 +19,9 @@ readonly class RecordCountTool
         name: 'record_count',
         description: 'Count records in any table without fetching them. Optionally filter by pid and/or search conditions.'
             . ' Pass search as a JSON object with field names as keys (same format as record_search).'
-            . ' Returns only the count, not the records themselves.',
+            . ' Returns only the count, not the records themselves.'
+            . ' In a non-live workspace the count is of workspace-overlaid records, matching record_search;'
+            . ' an "exact": false in the response means the result set was too large to overlay in full.',
     )]
     public function execute(string $tableName, int $pid = -1, string $search = '',): string
     {
@@ -28,28 +30,20 @@ readonly class RecordCountTool
             return json_encode(['error' => 'Table not found or has no readable fields: ' . $tableName], JSON_THROW_ON_ERROR);
         }
 
-        $searchConditions = [];
-        $ignoredFields = [];
-
-        if ($search !== '') {
-            try {
-                /** @var array<string, mixed> $searchData */
-                $searchData = json_decode($search, true, 512, JSON_THROW_ON_ERROR);
-            } catch (\JsonException $e) {
-                return json_encode(
-                    ['error' => 'Invalid JSON in search parameter: ' . $e->getMessage()],
-                    JSON_THROW_ON_ERROR,
-                );
-            }
-
-            $allowedFields = array_merge(['uid', 'pid'], $readFields);
-            $searchConditions = SearchConditionParser::fromArray($searchData, $allowedFields);
-            $ignoredFields = array_values(array_diff(array_keys($searchData), $allowedFields));
-        }
+        $allowedFields = array_merge(['uid', 'pid'], $readFields);
+        $parsed = SearchParamResolver::parseSearch($search, $allowedFields);
+        $searchConditions = $parsed['conditions'];
+        $ignoredFields = $parsed['ignoredFields'];
 
         $count = $this->recordService->count($tableName, $pid >= 0 ? $pid : null, $searchConditions);
 
-        $response = ['table' => $tableName, 'count' => $count];
+        $response = ['table' => $tableName, 'count' => $count['count']];
+        // Only ever false in a non-live workspace on a result set too large to overlay in full,
+        // where the count is a floor. Say so rather than let it read as exact.
+        if (!$count['exact']) {
+            $response['exact'] = false;
+        }
+
         if ($ignoredFields !== []) {
             $response['ignoredFields'] = $ignoredFields;
         }

@@ -23,7 +23,9 @@ readonly class RecordSearchTool
             . ' Supported operators: eq, neq, like, gt, gte, lt, lte, in (comma-separated), null, notNull.'
             . ' Pass an empty string or "{}" for no field filter (useful to list everything in a pid).'
             . ' Optionally filter by pid. Use orderBy to sort results by a field name and orderDirection (ASC or DESC).'
-            . ' Returns matching records with pagination.',
+            . ' Returns matching records with pagination.'
+            . ' In a non-live workspace, results are workspace-overlaid: the response carries "hasMore"'
+            . ' instead of "total" (a SQL COUNT cannot be overlaid) — page with offset until hasMore is false.',
     )]
     public function execute(
         string $tableName,
@@ -40,42 +42,21 @@ readonly class RecordSearchTool
             return json_encode(['error' => 'Table not found or has no readable fields: ' . $tableName], JSON_THROW_ON_ERROR);
         }
 
-        $searchData = [];
-        if (trim($search) !== '') {
-            try {
-                /** @var array<string, mixed> $searchData */
-                $searchData = json_decode($search, true, 512, JSON_THROW_ON_ERROR);
-            } catch (\JsonException $e) {
-                return json_encode(['error' => 'Invalid JSON in search parameter: ' . $e->getMessage()], JSON_THROW_ON_ERROR);
-            }
-        }
-
         // Filter search fields to only allow readable fields and parse conditions
         $allowedFields = array_merge(['uid', 'pid'], $readFields);
-        $validSearch = SearchConditionParser::fromArray($searchData, $allowedFields);
-        $ignoredFields = array_values(array_diff(array_keys($searchData), $allowedFields));
+        $parsed = SearchParamResolver::parseSearch($search, $allowedFields);
+        $validSearch = $parsed['conditions'];
+        $ignoredFields = $parsed['ignoredFields'];
 
-        if ($validSearch === [] && $searchData !== []) {
+        if ($validSearch === [] && $ignoredFields !== []) {
             return json_encode(
                 ['error' => 'No valid search fields provided', 'ignoredFields' => $ignoredFields],
                 JSON_THROW_ON_ERROR,
             );
         }
 
-        $resolvedOrderBy = null;
-        if ($orderBy !== '') {
-            if (!in_array($orderBy, $allowedFields, true)) {
-                return json_encode(
-                    ['error' => 'Invalid orderBy field: ' . $orderBy, 'allowedFields' => $allowedFields],
-                    JSON_THROW_ON_ERROR,
-                );
-            }
-            $resolvedOrderBy = $orderBy;
-        }
-
-        if (!in_array($orderDirection, ['ASC', 'DESC'], true)) {
-            $orderDirection = 'ASC';
-        }
+        $resolvedOrderBy = SearchParamResolver::resolveOrderBy($orderBy, $allowedFields);
+        $orderDirection = SearchParamResolver::normalizeOrderDirection($orderDirection);
 
         $result = $this->recordService->search(
             $tableName,

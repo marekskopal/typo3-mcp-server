@@ -21,7 +21,9 @@ readonly class ContentSearchTool
             . ' (e.g. "hello") or a JSON object for advanced conditions'
             . ' (e.g. {"CType":{"op":"eq","value":"text"}, "header":"Welcome"}).'
             . ' Supports operators: eq, neq, like, gt, gte, lt, lte, in, null, notNull.'
-            . ' Filter by pid and/or sysLanguageUid. Use orderBy and orderDirection for sorting.',
+            . ' Filter by pid and/or sysLanguageUid. Use orderBy and orderDirection for sorting.'
+            . ' In a non-live workspace, results are workspace-overlaid: the response carries "hasMore"'
+            . ' instead of "total" (a SQL COUNT cannot be overlaid) — page with offset until hasMore is false.',
     )]
     public function execute(
         string $search,
@@ -34,7 +36,7 @@ readonly class ContentSearchTool
     ): string {
         $readFields = $this->tcaSchemaService->getReadFields('tt_content');
         $allowedFields = array_merge(['uid', 'pid'], $readFields);
-        $searchConditions = $this->parseSearch($search, $allowedFields);
+        $searchConditions = SearchParamResolver::parseSearch($search, $allowedFields, 'header')['conditions'];
 
         if ($searchConditions === []) {
             return json_encode(['error' => 'No valid search conditions provided'], JSON_THROW_ON_ERROR);
@@ -44,14 +46,8 @@ readonly class ContentSearchTool
             $searchConditions['sys_language_uid'] = ['operator' => 'eq', 'value' => (string) $sysLanguageUid];
         }
 
-        $resolvedOrderBy = null;
-        if ($orderBy !== '' && in_array($orderBy, $allowedFields, true)) {
-            $resolvedOrderBy = $orderBy;
-        }
-
-        if (!in_array($orderDirection, ['ASC', 'DESC'], true)) {
-            $orderDirection = 'ASC';
-        }
+        $resolvedOrderBy = SearchParamResolver::resolveOrderBy($orderBy, $allowedFields);
+        $orderDirection = SearchParamResolver::normalizeOrderDirection($orderDirection);
 
         return json_encode(
             $this->recordService->search(
@@ -66,20 +62,5 @@ readonly class ContentSearchTool
             ),
             JSON_THROW_ON_ERROR,
         );
-    }
-
-    /**
-     * @param list<string> $allowedFields
-     * @return array<string, array{operator: string, value: string}>
-     */
-    private function parseSearch(string $search, array $allowedFields): array
-    {
-        /** @var array<string, mixed>|null $jsonData */
-        $jsonData = json_decode($search, true);
-        if (is_array($jsonData)) {
-            return SearchConditionParser::fromArray($jsonData, $allowedFields);
-        }
-
-        return ['header' => ['operator' => 'like', 'value' => $search]];
     }
 }
