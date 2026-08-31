@@ -12,6 +12,7 @@ use MarekSkopal\MsMcpServer\OAuth\OAuthContinuationCookie;
 use MarekSkopal\MsMcpServer\OAuth\RateLimitService;
 use MarekSkopal\MsMcpServer\Service\McpPathProvider;
 use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Http\Message\ResponseFactoryInterface;
 use Psr\Http\Message\ResponseInterface;
@@ -315,6 +316,104 @@ final class OAuthMiddlewareTest extends TestCase
         self::assertSame('no-store', $this->capturedHeaders['Cache-Control'] ?? null);
     }
 
+    /** @return iterable<string, array{0: string, 1: bool}> */
+    public static function csrfCookieSchemeProvider(): iterable
+    {
+        yield 'https keeps Secure' => ['https', true];
+        yield 'http drops Secure' => ['http', false];
+    }
+
+    /**
+     * A hardcoded `Secure` flag made the browser discard the cookie on a plain-HTTP
+     * install, so every consent submission failed CSRF validation.
+     */
+    #[DataProvider('csrfCookieSchemeProvider')]
+    public function testAuthorizeGetSetsSecureOnCsrfCookieOnlyOverHttps(string $scheme, bool $expectSecure): void
+    {
+        $beUser = $this->createStub(BackendUserAuthentication::class);
+        $beUser->method('getUserId')->willReturn(42);
+        $beUser->method('getUserName')->willReturn('editor');
+        $GLOBALS['BE_USER'] = $beUser;
+
+        $request = $this->createRequest('/mcp/oauth/authorize', 'GET', $scheme);
+        $request->method('getQueryParams')->willReturn([
+            'response_type' => 'code',
+            'client_id' => 'client-abc',
+            'redirect_uri' => 'https://client.example/cb',
+            'code_challenge' => 'challenge-value',
+            'code_challenge_method' => 'S256',
+            'state' => 'opaque-state',
+        ]);
+
+        $clientRepository = $this->createStub(ClientRepository::class);
+        $clientRepository->method('findByClientId')->willReturn([
+            'client_id' => 'client-abc',
+            'client_name' => 'Test Client',
+            'redirect_uris' => ['https://client.example/cb'],
+        ]);
+        $clientRepository->method('validateRedirectUri')->willReturn(true);
+
+        $handler = $this->createMock(RequestHandlerInterface::class);
+        $handler->expects(self::never())->method('handle');
+
+        $middleware = $this->createMiddlewareWithCapture(clientRepository: $clientRepository);
+        $middleware->process($request, $handler);
+
+        $cookie = $this->capturedHeaders['Set-Cookie'] ?? '';
+        self::assertStringStartsWith('mcp_csrf=', $cookie);
+        self::assertStringContainsString('HttpOnly; SameSite=Strict', $cookie);
+        self::assertStringContainsString('Max-Age=600', $cookie);
+        self::assertSame($expectSecure, str_contains($cookie, '; Secure'));
+    }
+
+    #[DataProvider('csrfCookieSchemeProvider')]
+    public function testAuthorizePostClearsCsrfCookieWithMatchingSecureFlag(string $scheme, bool $expectSecure): void
+    {
+        $beUser = $this->createStub(BackendUserAuthentication::class);
+        $beUser->method('getUserId')->willReturn(42);
+        $beUser->method('getUserName')->willReturn('editor');
+        $GLOBALS['BE_USER'] = $beUser;
+
+        $request = $this->createRequest('/mcp/oauth/authorize', 'POST', $scheme);
+        $csrf = bin2hex(random_bytes(16));
+        $request->method('getCookieParams')->willReturn(['mcp_csrf' => $csrf]);
+        $request->method('getParsedBody')->willReturn([
+            'csrf_token' => $csrf,
+            'client_id' => 'client-abc',
+            'redirect_uri' => 'https://client.example/cb',
+            'code_challenge' => 'challenge-value',
+            'code_challenge_method' => 'S256',
+            'state' => 'opaque-state',
+        ]);
+
+        $clientRepository = $this->createStub(ClientRepository::class);
+        $clientRepository->method('findByClientId')->willReturn([
+            'uid' => 1,
+            'client_id' => 'client-abc',
+            'client_name' => 'Test Client',
+            'redirect_uris' => '["https://client.example/cb"]',
+            'be_user' => 0,
+        ]);
+        $clientRepository->method('validateRedirectUri')->willReturn(true);
+
+        $authorizationService = $this->createStub(AuthorizationService::class);
+        $authorizationService->method('createAuthorizationCode')->willReturn('auth-code-xyz');
+
+        $handler = $this->createMock(RequestHandlerInterface::class);
+        $handler->expects(self::never())->method('handle');
+
+        $middleware = $this->createMiddlewareWithCapture(
+            clientRepository: $clientRepository,
+            authorizationService: $authorizationService,
+        );
+        $middleware->process($request, $handler);
+
+        $cookie = $this->capturedHeaders['Set-Cookie'] ?? '';
+        self::assertStringStartsWith('mcp_csrf=;', $cookie);
+        self::assertStringContainsString('Max-Age=0', $cookie);
+        self::assertSame($expectSecure, str_contains($cookie, '; Secure'));
+    }
+
     public function testAuthorizePostWithoutBackendSessionReturns401(): void
     {
         $request = $this->createRequest('/mcp/oauth/authorize', 'POST');
@@ -545,11 +644,11 @@ final class OAuthMiddlewareTest extends TestCase
     }
 
     /** @return ServerRequestInterface&\PHPUnit\Framework\MockObject\Stub */
-    private function createRequest(string $path, string $method): ServerRequestInterface
+    private function createRequest(string $path, string $method, string $scheme = 'https'): ServerRequestInterface
     {
         $uri = $this->createStub(UriInterface::class);
         $uri->method('getPath')->willReturn($path);
-        $uri->method('getScheme')->willReturn('https');
+        $uri->method('getScheme')->willReturn($scheme);
         $uri->method('getHost')->willReturn('example.com');
         $uri->method('getPort')->willReturn(null);
 
