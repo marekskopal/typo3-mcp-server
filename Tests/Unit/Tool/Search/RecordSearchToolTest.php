@@ -7,6 +7,7 @@ namespace MarekSkopal\MsMcpServer\Tests\Unit\Tool\Search;
 use MarekSkopal\MsMcpServer\Service\RecordService;
 use MarekSkopal\MsMcpServer\Service\TcaSchemaService;
 use MarekSkopal\MsMcpServer\Tool\Search\RecordSearchTool;
+use Mcp\Exception\ToolCallException;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 use const JSON_THROW_ON_ERROR;
@@ -111,15 +112,32 @@ final class RecordSearchToolTest extends TestCase
         self::assertStringContainsString('unknown_table', $result['error']);
     }
 
-    public function testExecuteReturnsErrorForInvalidJson(): void
+    public function testExecuteReportsInvalidJson(): void
     {
         $recordService = $this->createStub(RecordService::class);
 
         $tool = new RecordSearchTool($recordService, new TcaSchemaService());
-        $result = json_decode($tool->execute('pages', 'not-json'), true, 512, JSON_THROW_ON_ERROR);
 
-        self::assertArrayHasKey('error', $result);
-        self::assertStringContainsString('Invalid JSON', $result['error']);
+        $this->expectException(ToolCallException::class);
+        $this->expectExceptionMessage('search must be a JSON object, but is not valid JSON');
+
+        $tool->execute('pages', 'not-json');
+    }
+
+    /**
+     * `search: "5"` is valid JSON but not an object; it used to reach SearchConditionParser as an
+     * int and surface as the opaque "internal error".
+     */
+    public function testExecuteReportsNonObjectSearch(): void
+    {
+        $recordService = $this->createStub(RecordService::class);
+
+        $tool = new RecordSearchTool($recordService, new TcaSchemaService());
+
+        $this->expectException(ToolCallException::class);
+        $this->expectExceptionMessage('search must be a JSON object, got a number.');
+
+        $tool->execute('pages', '5');
     }
 
     public function testExecuteReturnsErrorWhenNoValidSearchFields(): void
@@ -326,21 +344,16 @@ final class RecordSearchToolTest extends TestCase
         $tool->execute('pages', '{"title":"Test"}', 20, 0, -1, 'title', 'DESC');
     }
 
-    public function testExecuteWithInvalidOrderByFieldReturnsError(): void
+    public function testExecuteReportsInvalidOrderByField(): void
     {
         $recordService = $this->createStub(RecordService::class);
 
         $tool = new RecordSearchTool($recordService, new TcaSchemaService());
-        $result = json_decode(
-            $tool->execute('pages', '{"title":"Test"}', 20, 0, -1, 'nonexistent_field'),
-            true,
-            512,
-            JSON_THROW_ON_ERROR,
-        );
 
-        self::assertArrayHasKey('error', $result);
-        self::assertStringContainsString('Invalid orderBy field', $result['error']);
-        self::assertStringContainsString('nonexistent_field', $result['error']);
+        $this->expectException(ToolCallException::class);
+        $this->expectExceptionMessage('Invalid orderBy field: nonexistent_field. Allowed fields: uid, pid, title');
+
+        $tool->execute('pages', '{"title":"Test"}', 20, 0, -1, 'nonexistent_field');
     }
 
     public function testExecuteThrowsExceptionOnError(): void

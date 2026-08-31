@@ -28,24 +28,10 @@ readonly class RecordCountTool
             return json_encode(['error' => 'Table not found or has no readable fields: ' . $tableName], JSON_THROW_ON_ERROR);
         }
 
-        $searchConditions = [];
-        $ignoredFields = [];
-
-        if ($search !== '') {
-            try {
-                /** @var array<string, mixed> $searchData */
-                $searchData = json_decode($search, true, 512, JSON_THROW_ON_ERROR);
-            } catch (\JsonException $e) {
-                return json_encode(
-                    ['error' => 'Invalid JSON in search parameter: ' . $e->getMessage()],
-                    JSON_THROW_ON_ERROR,
-                );
-            }
-
-            $allowedFields = array_merge(['uid', 'pid'], $readFields);
-            $searchConditions = SearchConditionParser::fromArray($searchData, $allowedFields);
-            $ignoredFields = array_values(array_diff(array_keys($searchData), $allowedFields));
-        }
+        $allowedFields = array_merge(['uid', 'pid'], $readFields);
+        $parsed = SearchParamResolver::parseSearch($search, $allowedFields);
+        $searchConditions = $parsed['conditions'];
+        $ignoredFields = $parsed['ignoredFields'];
 
         $count = $this->recordService->count($tableName, $pid >= 0 ? $pid : null, $searchConditions);
 

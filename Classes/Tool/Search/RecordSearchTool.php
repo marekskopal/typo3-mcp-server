@@ -40,42 +40,21 @@ readonly class RecordSearchTool
             return json_encode(['error' => 'Table not found or has no readable fields: ' . $tableName], JSON_THROW_ON_ERROR);
         }
 
-        $searchData = [];
-        if (trim($search) !== '') {
-            try {
-                /** @var array<string, mixed> $searchData */
-                $searchData = json_decode($search, true, 512, JSON_THROW_ON_ERROR);
-            } catch (\JsonException $e) {
-                return json_encode(['error' => 'Invalid JSON in search parameter: ' . $e->getMessage()], JSON_THROW_ON_ERROR);
-            }
-        }
-
         // Filter search fields to only allow readable fields and parse conditions
         $allowedFields = array_merge(['uid', 'pid'], $readFields);
-        $validSearch = SearchConditionParser::fromArray($searchData, $allowedFields);
-        $ignoredFields = array_values(array_diff(array_keys($searchData), $allowedFields));
+        $parsed = SearchParamResolver::parseSearch($search, $allowedFields);
+        $validSearch = $parsed['conditions'];
+        $ignoredFields = $parsed['ignoredFields'];
 
-        if ($validSearch === [] && $searchData !== []) {
+        if ($validSearch === [] && $ignoredFields !== []) {
             return json_encode(
                 ['error' => 'No valid search fields provided', 'ignoredFields' => $ignoredFields],
                 JSON_THROW_ON_ERROR,
             );
         }
 
-        $resolvedOrderBy = null;
-        if ($orderBy !== '') {
-            if (!in_array($orderBy, $allowedFields, true)) {
-                return json_encode(
-                    ['error' => 'Invalid orderBy field: ' . $orderBy, 'allowedFields' => $allowedFields],
-                    JSON_THROW_ON_ERROR,
-                );
-            }
-            $resolvedOrderBy = $orderBy;
-        }
-
-        if (!in_array($orderDirection, ['ASC', 'DESC'], true)) {
-            $orderDirection = 'ASC';
-        }
+        $resolvedOrderBy = SearchParamResolver::resolveOrderBy($orderBy, $allowedFields);
+        $orderDirection = SearchParamResolver::normalizeOrderDirection($orderDirection);
 
         $result = $this->recordService->search(
             $tableName,

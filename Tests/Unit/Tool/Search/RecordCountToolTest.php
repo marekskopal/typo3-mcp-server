@@ -7,6 +7,7 @@ namespace MarekSkopal\MsMcpServer\Tests\Unit\Tool\Search;
 use MarekSkopal\MsMcpServer\Service\RecordService;
 use MarekSkopal\MsMcpServer\Service\TcaSchemaService;
 use MarekSkopal\MsMcpServer\Tool\Search\RecordCountTool;
+use Mcp\Exception\ToolCallException;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 use const JSON_THROW_ON_ERROR;
@@ -98,15 +99,16 @@ final class RecordCountToolTest extends TestCase
         self::assertStringContainsString('unknown_table', $result['error']);
     }
 
-    public function testExecuteReturnsErrorForInvalidJson(): void
+    public function testExecuteReportsInvalidJson(): void
     {
         $recordService = $this->createStub(RecordService::class);
 
         $tool = new RecordCountTool($recordService, new TcaSchemaService());
-        $result = json_decode($tool->execute('pages', -1, 'not-json'), true, 512, JSON_THROW_ON_ERROR);
 
-        self::assertArrayHasKey('error', $result);
-        self::assertStringContainsString('Invalid JSON', $result['error']);
+        $this->expectException(ToolCallException::class);
+        $this->expectExceptionMessage('search must be a JSON object, but is not valid JSON');
+
+        $tool->execute('pages', -1, 'not-json');
     }
 
     public function testExecuteReportsIgnoredFields(): void

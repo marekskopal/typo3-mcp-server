@@ -33,20 +33,14 @@ readonly class PagesSearchTool
     ): string {
         $readFields = $this->tcaSchemaService->getReadFields('pages');
         $allowedFields = array_merge(['uid', 'pid'], $readFields);
-        $searchConditions = $this->parseSearch($search, $allowedFields);
+        $searchConditions = SearchParamResolver::parseSearch($search, $allowedFields, 'title')['conditions'];
 
         if ($searchConditions === []) {
             return json_encode(['error' => 'No valid search conditions provided'], JSON_THROW_ON_ERROR);
         }
 
-        $resolvedOrderBy = null;
-        if ($orderBy !== '' && in_array($orderBy, $allowedFields, true)) {
-            $resolvedOrderBy = $orderBy;
-        }
-
-        if (!in_array($orderDirection, ['ASC', 'DESC'], true)) {
-            $orderDirection = 'ASC';
-        }
+        $resolvedOrderBy = SearchParamResolver::resolveOrderBy($orderBy, $allowedFields);
+        $orderDirection = SearchParamResolver::normalizeOrderDirection($orderDirection);
 
         return json_encode(
             $this->recordService->search(
@@ -61,20 +55,5 @@ readonly class PagesSearchTool
             ),
             JSON_THROW_ON_ERROR,
         );
-    }
-
-    /**
-     * @param list<string> $allowedFields
-     * @return array<string, array{operator: string, value: string}>
-     */
-    private function parseSearch(string $search, array $allowedFields): array
-    {
-        /** @var array<string, mixed>|null $jsonData */
-        $jsonData = json_decode($search, true);
-        if (is_array($jsonData)) {
-            return SearchConditionParser::fromArray($jsonData, $allowedFields);
-        }
-
-        return ['title' => ['operator' => 'like', 'value' => $search]];
     }
 }
