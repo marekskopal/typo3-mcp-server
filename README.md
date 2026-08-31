@@ -529,7 +529,9 @@ Registered only when `typo3/cms-workspaces` is installed. Direct (live-mode) ope
 
 ### Dynamic Extension Tools
 
-Additional CRUD tools are registered automatically for tables configured via `EXTCONF` or enabled through the **Extension Tables** backend module (auto-discovery). News is pre-configured and generates 9 tools:
+Additional CRUD tools are registered automatically for tables configured via `EXTCONF` or enabled through the **Extension Tables** backend module (auto-discovery). No extension table is exposed by default — enabling one is always an explicit administrator decision.
+
+Each registered table generates 9 tools. For `tx_news_domain_model_news` registered under the prefix `news`:
 
 | Tool | Description |
 |------|-------------|
@@ -582,11 +584,18 @@ Go to **System > MCP Server > Manage Extension Tables**, click **Discover Extens
 Register custom tables in your extension's `ext_localconf.php`:
 
 ```php
+$GLOBALS['TYPO3_CONF_VARS']['EXTCONF']['ms_mcp_server']['tables']['tx_news_domain_model_news'] = [
+    'label' => 'News',
+    'prefix' => 'news',
+];
+
 $GLOBALS['TYPO3_CONF_VARS']['EXTCONF']['ms_mcp_server']['tables']['tx_blog_domain_model_post'] = [
     'label' => 'Blog Post',
     'prefix' => 'blog_post',
 ];
 ```
+
+Unlike auto-discovery, `EXTCONF` entries are treated as trusted operator configuration and are **not** run through the table/prefix/label validation the discovery module applies — so only register tables you control.
 
 This automatically creates 9 tools (`blog_post_list`, `blog_post_get`, `blog_post_create`, `blog_post_update`, `blog_post_delete`, `blog_post_move`, plus the batch variants `blog_post_delete_batch`, `blog_post_update_batch`, `blog_post_move_batch`) with fields resolved from TCA.
 
