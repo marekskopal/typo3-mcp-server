@@ -488,6 +488,57 @@ final class FileServiceTest extends TestCase
         }
     }
 
+    /**
+     * The pattern is a literal substring. Unescaped, "report_2024" also matched "reportX2024"
+     * and "%" returned the whole (mount-scoped) storage.
+     */
+    public function testSearchFilesEscapesLikeWildcardsInNamePattern(): void
+    {
+        $storage = $this->createStub(ResourceStorage::class);
+        $backendUser = $this->createStub(BackendUserAuthentication::class);
+        $backendUser->method('getFileStorages')->willReturn([7 => $storage]);
+        $GLOBALS['BE_USER'] = $backendUser;
+
+        try {
+            $dbResult = $this->createStub(Result::class);
+            $dbResult->method('fetchOne')->willReturn(0);
+            $dbResult->method('fetchAllAssociative')->willReturn([]);
+
+            $capturedParameters = [];
+
+            $queryBuilder = $this->createStub(QueryBuilder::class);
+            $queryBuilder->method('select')->willReturnSelf();
+            $queryBuilder->method('count')->willReturnSelf();
+            $queryBuilder->method('from')->willReturnSelf();
+            $queryBuilder->method('andWhere')->willReturnSelf();
+            $queryBuilder->method('setMaxResults')->willReturnSelf();
+            $queryBuilder->method('setFirstResult')->willReturnSelf();
+            $queryBuilder->method('orderBy')->willReturnSelf();
+            $queryBuilder->method('expr')->willReturn($this->createStub(ExpressionBuilder::class));
+            $queryBuilder->method('escapeLikeWildcards')
+                ->willReturnCallback(static fn(string $value): string => addcslashes($value, '_%'));
+            $queryBuilder->method('createNamedParameter')
+                ->willReturnCallback(static function (mixed $value) use (&$capturedParameters): string {
+                    $capturedParameters[] = $value;
+
+                    return "'x'";
+                });
+            $queryBuilder->method('getRestrictions')->willReturn($this->createStub(QueryRestrictionContainerInterface::class));
+            $queryBuilder->method('executeQuery')->willReturn($dbResult);
+
+            $connectionPool = $this->createStub(ConnectionPool::class);
+            $connectionPool->method('getQueryBuilderForTable')->willReturn($queryBuilder);
+
+            $service = $this->createService(null, $connectionPool);
+            $service->searchFiles(7, 'report_2024', '', 20, 0);
+
+            self::assertContains('%report\\_2024%', $capturedParameters);
+            self::assertNotContains('%report_2024%', $capturedParameters);
+        } finally {
+            unset($GLOBALS['BE_USER']);
+        }
+    }
+
     public function testSearchFilesReturnsEmptyWhenPermissionsEvaluatedAndNoFileMounts(): void
     {
         // A non-admin user without any filemount in the storage may reach nothing in it,

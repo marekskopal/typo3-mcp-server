@@ -481,12 +481,23 @@ readonly class FileService
             }
         }
 
+        // The pattern is a literal substring, not a LIKE expression: escape `%` and `_` so
+        // "report_2024" cannot also match "reportX2024" and "%" cannot match everything.
+        // Matches the mount filter directly above and RecordService::applyCondition().
         if ($namePattern !== '') {
             $queryBuilder->andWhere(
-                $queryBuilder->expr()->like('name', $queryBuilder->createNamedParameter('%' . $namePattern . '%')),
+                $queryBuilder->expr()->like(
+                    'name',
+                    $queryBuilder->createNamedParameter('%' . $queryBuilder->escapeLikeWildcards($namePattern) . '%'),
+                ),
             );
             $countQueryBuilder->andWhere(
-                $countQueryBuilder->expr()->like('name', $countQueryBuilder->createNamedParameter('%' . $namePattern . '%')),
+                $countQueryBuilder->expr()->like(
+                    'name',
+                    $countQueryBuilder->createNamedParameter(
+                        '%' . $countQueryBuilder->escapeLikeWildcards($namePattern) . '%',
+                    ),
+                ),
             );
         }
 
