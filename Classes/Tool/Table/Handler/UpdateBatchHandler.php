@@ -37,13 +37,15 @@ final readonly class UpdateBatchHandler extends AbstractTableToolHandler
         return 'Update the same fields on multiple ' . $this->config->subject() . 's.'
             . ' Pass UIDs as comma-separated (e.g. "1,2,3") and fields as a JSON object (e.g. {"hidden":1}).'
             . ' Available fields: ' . $this->config->writableFieldList() . '.'
-            . ' Non-existent UIDs are skipped and reported in skippedUids.';
+            . ' Non-existent UIDs are skipped and reported in skippedUids.'
+            . ' Set dryRun to true to preview the change: the response lists exactly what would be'
+            . ' affected and nothing is written.';
     }
 
-    public function __invoke(string $uids, string $fields): BatchRecordsUpdatedResult
+    public function __invoke(string $uids, string $fields, bool $dryRun = false): BatchRecordsUpdatedResult
     {
         return $this->run(
-            function () use ($uids, $fields): BatchRecordsUpdatedResult {
+            function () use ($uids, $fields, $dryRun): BatchRecordsUpdatedResult {
                 $uidList = UidListParser::parse($uids);
                 $existingUids = $this->recordService->findExistingUids($this->config->tableName, $uidList);
 
@@ -69,7 +71,9 @@ final readonly class UpdateBatchHandler extends AbstractTableToolHandler
                     throw new ToolCallException('No valid writable fields provided');
                 }
 
-                $this->dataHandlerService->updateRecords($this->config->tableName, $existingUids, $validFields);
+                if (!$dryRun) {
+                    $this->dataHandlerService->updateRecords($this->config->tableName, $existingUids, $validFields);
+                }
 
                 return new BatchRecordsUpdatedResult(
                     $existingUids,
@@ -77,9 +81,10 @@ final readonly class UpdateBatchHandler extends AbstractTableToolHandler
                     array_keys($validFields),
                     $ignoredFields,
                     $skippedUids,
+                    $dryRun,
                 );
             },
-            [$uids, $fields],
+            [$uids, $fields, $dryRun],
         );
     }
 }

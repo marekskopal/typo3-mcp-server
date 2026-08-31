@@ -365,7 +365,7 @@ The **System > MCP Server** backend module provides:
 | `pages_get` | Get a single page with all readable fields. |
 | `pages_create` | Create a new page. Pass fields as JSON, set language with `sysLanguageUid`. |
 | `pages_update` | Update page fields. Pass a JSON object with field names and new values. |
-| `pages_delete` | Delete a page by UID. |
+| `pages_delete` | Delete a page by UID. Supports `dryRun`. |
 | `pages_copy` | Copy a page. Set `includeSubpages: true` to copy the entire subtree. |
 | `pages_move` | Move a page in the tree. Subpages move with the page. |
 | `pages_tree` | Get the page tree hierarchy with configurable depth (1-10, default 3). |
@@ -381,7 +381,7 @@ The **System > MCP Server** backend module provides:
 | `content_get` | Get a single content element with all readable fields. |
 | `content_create` | Create a content element. Pass fields as JSON, set language with `sysLanguageUid`. |
 | `content_update` | Update content element fields. |
-| `content_delete` | Delete a content element by UID. |
+| `content_delete` | Delete a content element by UID. Supports `dryRun`. |
 | `content_move` | Move a content element to a new position. |
 | `content_copy` | Copy a content element to a new position. |
 | `content_search` | Search content by header (plain text) or advanced conditions (JSON). Supports language filtering and sorting. |
@@ -462,6 +462,10 @@ orderBy: "title", orderDirection: "DESC"
 | `record_move_batch` | Move multiple records to a target position. |
 
 All batch tools work on any TCA table.
+
+**Dry-run mode.** The destructive tools take `dryRun: true`, which returns exactly what *would* change — the affected UIDs, the ones skipped as non-existent, and for updates the fields that would be written and the ones that would be ignored — without touching the database. The response carries `"dryRun": true`, and single-record deletes additionally report `"deleted": false`, so a preview cannot be mistaken for a completed change.
+
+Available on `record_delete_batch`, `record_update_batch`, `record_move_batch`, `pages_delete`, `content_delete`, and every generated table tool's `<prefix>_delete`, `<prefix>_delete_batch`, `<prefix>_update_batch` and `<prefix>_move_batch`. Worth a first pass whenever the UID list came from interpreting an instruction rather than from an explicit list: the gap between "delete the old news items" and what that actually resolves to is where the risk lives.
 
 ### Cache
 

@@ -98,7 +98,7 @@ readonly class TableToolFactory
 
     public function delete(TableToolConfig $config): DeleteHandler
     {
-        return new DeleteHandler($config, $this->auditLogger, $this->logger, $this->dataHandlerService);
+        return new DeleteHandler($config, $this->auditLogger, $this->logger, $this->dataHandlerService, $this->recordService);
     }
 
     public function move(TableToolConfig $config): MoveHandler

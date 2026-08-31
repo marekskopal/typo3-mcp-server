@@ -34,6 +34,38 @@ final class RecordDeleteBatchToolTest extends TestCase
         self::assertSame([], $result->skippedUids);
     }
 
+    /**
+     * The whole point of the flag: the affected set is reported exactly as a real call would, and
+     * DataHandler is never reached.
+     */
+    public function testDryRunPreviewsWithoutDeleting(): void
+    {
+        $recordService = $this->createStub(RecordService::class);
+        $recordService->method('findExistingUids')->willReturn([1, 3]);
+
+        $dataHandlerService = $this->createMock(DataHandlerService::class);
+        $dataHandlerService->expects(self::never())->method('deleteRecords');
+
+        $tool = new RecordDeleteBatchTool($dataHandlerService, $recordService);
+        $result = $tool->execute('pages', '1,2,3', dryRun: true);
+
+        self::assertInstanceOf(BatchRecordsDeletedResult::class, $result);
+        self::assertTrue($result->dryRun);
+        self::assertSame([1, 3], $result->uids);
+        self::assertSame(2, $result->count);
+        self::assertSame([2], $result->skippedUids);
+    }
+
+    public function testRealCallIsNotMarkedAsADryRun(): void
+    {
+        $recordService = $this->createStub(RecordService::class);
+        $recordService->method('findExistingUids')->willReturn([1]);
+
+        $tool = new RecordDeleteBatchTool($this->createStub(DataHandlerService::class), $recordService);
+
+        self::assertFalse($tool->execute('pages', '1')->dryRun);
+    }
+
     public function testExecuteHandlesSingleUid(): void
     {
         $recordService = $this->createStub(RecordService::class);

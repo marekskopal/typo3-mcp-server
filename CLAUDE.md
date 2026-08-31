@@ -74,7 +74,7 @@ vendor/bin/typo3 mcp:server --user=admin
 - `Tool/Search/PagesSearchTool` — Search pages by title (plain text LIKE) or JSON conditions
 - `Tool/Search/ContentSearchTool` — Search content elements by header with language filtering
 - `Tool/Search/SearchConditionParser` — Shared condition parsing for search tools
-- `Tool/Batch/*` — Batch operations (record_delete_batch, record_update_batch, record_move_batch) for any table
+- `Tool/Batch/*` — Batch operations (record_delete_batch, record_update_batch, record_move_batch) for any table. All take `dryRun`, which reports the affected set without calling DataHandler; the result DTOs carry a `dryRun` flag so a preview is distinguishable from a real change.
 - `Tool/Redirect/RedirectToolRegistrar` — Conditionally registers redirect management tools when `typo3/cms-redirects` is installed. Get/update/delete come from `TableToolFactory`; only the filtered list and the explicit-parameter create are hand-written.
 - `Tool/Scheduler/SchedulerToolRegistrar` — Conditionally registers scheduler task tools when `typo3/cms-scheduler` is installed, with field lists introspected from the table because the columns vary by TYPO3 version. Get/update/delete come from `TableToolFactory`; only the task-type list is hand-written.
 - `Tool/Workspace/WorkspaceToolRegistrar` — Conditionally registers workspace tools (`workspace_list`, `_get`, `_switch`, `_changes_list`, `_publish`, `_discard`, `_stage_set`) when `typo3/cms-workspaces` is installed. `workspace_switch` persists to `be_users.workspace_id`, so every later read and write in the session runs in that workspace.
@@ -151,7 +151,7 @@ readonly class MyTool
 
 ## Testing
 
-782 unit tests covering:
+793 unit tests covering:
 - All static MCP tools + batch tools (Pages/Content/File/Schema/Search/Translation/Cache/Permission/BackendUser/BackendGroup/Batch CRUD)
 - Dynamic tool registration and execution (DynamicToolRegistrar), including merged EXTCONF + discovered tables
 - OAuth classes (AuthorizationService incl. revocation, ClientRepository, PkceVerifier, OAuthTokenPair, RateLimitService)

@@ -25,9 +25,17 @@ readonly class RecordMoveBatchTool
             . ' Pass UIDs as comma-separated (e.g. "1,2,3").'
             . ' Provide exactly one of: targetPid (move all to the top of that page)'
             . ' or afterUid (place all after that sibling record).'
-            . ' Non-existent UIDs are skipped and reported in skippedUids.',
+            . ' Non-existent UIDs are skipped and reported in skippedUids.'
+            . ' Set dryRun to true to preview the change: the response lists exactly what would be'
+            . ' affected and nothing is written.',
     )]
-    public function execute(string $tableName, string $uids, int $targetPid = -1, int $afterUid = 0): BatchRecordsMovedResult|ErrorResult
+    public function execute(
+        string $tableName,
+        string $uids,
+        int $targetPid = -1,
+        int $afterUid = 0,
+        bool $dryRun = false,
+    ): BatchRecordsMovedResult|ErrorResult
     {
         $target = MoveTarget::resolve($targetPid, $afterUid);
         if ($target instanceof ErrorResult) {
@@ -42,8 +50,11 @@ readonly class RecordMoveBatchTool
         }
 
         $skippedUids = array_values(array_diff($uidList, $existingUids));
-        $this->dataHandlerService->moveRecords($tableName, $existingUids, $target);
 
-        return new BatchRecordsMovedResult($existingUids, count($existingUids), $target, $skippedUids);
+        if (!$dryRun) {
+            $this->dataHandlerService->moveRecords($tableName, $existingUids, $target);
+        }
+
+        return new BatchRecordsMovedResult($existingUids, count($existingUids), $target, $skippedUids, $dryRun);
     }
 }
