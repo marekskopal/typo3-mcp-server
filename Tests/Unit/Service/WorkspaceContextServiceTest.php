@@ -61,6 +61,23 @@ final class WorkspaceContextServiceTest extends TestCase
         self::assertFalse($service->isLive());
     }
 
+    /**
+     * -99 is core's "no workspace access" sentinel, not a workspace. A non-admin without the
+     * live-workspace permission bit is parked there, and treating it as a workspace put every
+     * such editor on the overlay path.
+     */
+    public function testNoWorkspaceAccessSentinelCountsAsLive(): void
+    {
+        $beUser = $this->createStub(BackendUserAuthentication::class);
+        $beUser->workspace = -99;
+        $GLOBALS['BE_USER'] = $beUser;
+
+        $service = new WorkspaceContextService();
+
+        self::assertSame(-99, $service->getCurrentWorkspaceId());
+        self::assertTrue($service->isLive());
+    }
+
     public function testIsTableWorkspaceAwareReadsTcaCtrl(): void
     {
         $GLOBALS['TCA'] = [
