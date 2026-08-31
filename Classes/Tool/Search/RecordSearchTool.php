@@ -23,7 +23,9 @@ readonly class RecordSearchTool
             . ' Supported operators: eq, neq, like, gt, gte, lt, lte, in (comma-separated), null, notNull.'
             . ' Pass an empty string or "{}" for no field filter (useful to list everything in a pid).'
             . ' Optionally filter by pid. Use orderBy to sort results by a field name and orderDirection (ASC or DESC).'
-            . ' Returns matching records with pagination.',
+            . ' Returns matching records with pagination.'
+            . ' In a non-live workspace, results are workspace-overlaid: the response carries "hasMore"'
+            . ' instead of "total" (a SQL COUNT cannot be overlaid) — page with offset until hasMore is false.',
     )]
     public function execute(
         string $tableName,

@@ -37,7 +37,7 @@ final class RecordCountToolTest extends TestCase
         $recordService->expects(self::once())
             ->method('count')
             ->with('pages', null, [])
-            ->willReturn(42);
+            ->willReturn(['count' => 42, 'exact' => true]);
 
         $tool = new RecordCountTool($recordService, new TcaSchemaService());
         $result = json_decode($tool->execute('pages'), true, 512, JSON_THROW_ON_ERROR);
@@ -52,7 +52,7 @@ final class RecordCountToolTest extends TestCase
         $recordService->expects(self::once())
             ->method('count')
             ->with('pages', 5, [])
-            ->willReturn(10);
+            ->willReturn(['count' => 10, 'exact' => true]);
 
         $tool = new RecordCountTool($recordService, new TcaSchemaService());
         $result = json_decode($tool->execute('pages', 5), true, 512, JSON_THROW_ON_ERROR);
@@ -66,7 +66,7 @@ final class RecordCountToolTest extends TestCase
         $recordService->expects(self::once())
             ->method('count')
             ->with('pages', null, ['title' => ['operator' => 'like', 'value' => 'News']])
-            ->willReturn(3);
+            ->willReturn(['count' => 3, 'exact' => true]);
 
         $tool = new RecordCountTool($recordService, new TcaSchemaService());
         $result = json_decode($tool->execute('pages', -1, '{"title":"News"}'), true, 512, JSON_THROW_ON_ERROR);
@@ -80,7 +80,7 @@ final class RecordCountToolTest extends TestCase
         $recordService->expects(self::once())
             ->method('count')
             ->with('pages', 10, ['hidden' => ['operator' => 'eq', 'value' => '0']])
-            ->willReturn(7);
+            ->willReturn(['count' => 7, 'exact' => true]);
 
         $tool = new RecordCountTool($recordService, new TcaSchemaService());
         $result = json_decode($tool->execute('pages', 10, '{"hidden":{"op":"eq","value":"0"}}'), true, 512, JSON_THROW_ON_ERROR);
@@ -114,7 +114,7 @@ final class RecordCountToolTest extends TestCase
     public function testExecuteReportsIgnoredFields(): void
     {
         $recordService = $this->createStub(RecordService::class);
-        $recordService->method('count')->willReturn(0);
+        $recordService->method('count')->willReturn(['count' => 0, 'exact' => true]);
 
         $tool = new RecordCountTool($recordService, new TcaSchemaService());
         $result = json_decode(
@@ -134,7 +134,7 @@ final class RecordCountToolTest extends TestCase
         $recordService->expects(self::once())
             ->method('count')
             ->with('pages', null, [])
-            ->willReturn(100);
+            ->willReturn(['count' => 100, 'exact' => true]);
 
         $tool = new RecordCountTool($recordService, new TcaSchemaService());
         $result = json_decode($tool->execute('pages', -1, ''), true, 512, JSON_THROW_ON_ERROR);

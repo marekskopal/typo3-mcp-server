@@ -1090,7 +1090,7 @@ final class RecordServiceTest extends TestCase
         $service = new RecordService($connectionPool, new WorkspaceContextService(), $this->createEditorPermissionService());
         $count = $service->count('pages');
 
-        self::assertSame(3, $count);
+        self::assertSame(['count' => 3, 'exact' => true], $count);
         $pagePermissionRestrictions = array_filter(
             $addedRestrictions,
             static fn(object $restriction): bool => $restriction instanceof PagePermissionRestriction,
@@ -1222,6 +1222,148 @@ final class RecordServiceTest extends TestCase
         $this->expectExceptionMessageMatches('/Unsupported search operator "regexp"\. Supported operators: eq, /');
 
         $service->search('pages', ['title' => ['operator' => 'regexp', 'value' => 'x']], 20, 0, ['uid', 'title']);
+    }
+
+    /**
+     * A workspace context standing in a non-live workspace on a workspace-aware table, whose
+     * overlay drops the rows in $hiddenUids — what a DELETE_PLACEHOLDER does in a real workspace.
+     *
+     * @param list<int> $hiddenUids
+     */
+    /**
+     * setMaxResults() used to be applied *before* the overlay, so a page came back short while
+     * later records still existed, and the separate COUNT was never overlaid — `total` claimed 5
+     * where only 3 rows are visible.
+     */
+    public function testSearchPaginatesOverTheOverlaidSetInAWorkspace(): void
+    {
+        $rows = [
+            ['uid' => 1, 'title' => 'One'],
+            ['uid' => 2, 'title' => 'Two'],
+            ['uid' => 3, 'title' => 'Three'],
+            ['uid' => 4, 'title' => 'Four'],
+            ['uid' => 5, 'title' => 'Five'],
+        ];
+
+        $service = new RecordService(
+            $this->createOverlayConnectionPool($rows),
+            $this->createWorkspaceContext([2, 4]),
+            $this->createAllowingPermissionService(),
+        );
+
+        $result = $service->search('tt_content', [], 2, 0, ['uid', 'title']);
+
+        self::assertSame([$rows[0], $rows[2]], $result['records']);
+        self::assertTrue($result['hasMore']);
+        self::assertArrayNotHasKey('total', $result);
+        self::assertArrayHasKey('workspaceOverlay', $result);
+    }
+
+    /**
+     * The second page must continue where the overlaid first page ended. Paging over the raw
+     * ordering used to step past visible records, silently skipping them.
+     */
+    public function testSearchSecondPageDoesNotSkipOverlaidRecords(): void
+    {
+        $rows = [
+            ['uid' => 1, 'title' => 'One'],
+            ['uid' => 2, 'title' => 'Two'],
+            ['uid' => 3, 'title' => 'Three'],
+            ['uid' => 4, 'title' => 'Four'],
+            ['uid' => 5, 'title' => 'Five'],
+        ];
+
+        $service = new RecordService(
+            $this->createOverlayConnectionPool($rows),
+            $this->createWorkspaceContext([2, 4]),
+            $this->createAllowingPermissionService(),
+        );
+
+        $result = $service->search('tt_content', [], 2, 2, ['uid', 'title']);
+
+        self::assertSame([$rows[4]], $result['records']);
+        self::assertFalse($result['hasMore']);
+    }
+
+    public function testFindByPidPaginatesOverTheOverlaidSetInAWorkspace(): void
+    {
+        $rows = [
+            ['uid' => 1, 'title' => 'One'],
+            ['uid' => 2, 'title' => 'Two'],
+            ['uid' => 3, 'title' => 'Three'],
+        ];
+
+        $service = new RecordService(
+            $this->createOverlayConnectionPool($rows),
+            $this->createWorkspaceContext([2]),
+            $this->createAllowingPermissionService(),
+        );
+
+        $result = $service->findByPid('tt_content', 10, 20, 0, ['uid', 'title']);
+
+        self::assertSame([$rows[0], $rows[2]], $result['records']);
+        self::assertFalse($result['hasMore']);
+        self::assertArrayNotHasKey('total', $result);
+    }
+
+    /** A SQL COUNT cannot be overlaid, so it used to disagree with what search() returned. */
+    public function testCountCountsOverlaidRowsInAWorkspace(): void
+    {
+        $rows = [
+            ['uid' => 1, 'title' => 'One'],
+            ['uid' => 2, 'title' => 'Two'],
+            ['uid' => 3, 'title' => 'Three'],
+        ];
+
+        $service = new RecordService(
+            $this->createOverlayConnectionPool($rows),
+            $this->createWorkspaceContext([2]),
+            $this->createAllowingPermissionService(),
+        );
+
+        self::assertSame(['count' => 2, 'exact' => true], $service->count('tt_content'));
+    }
+
+    /**
+     * @param list<array<string, mixed>> $rows every query returns these rows
+     */
+    private function createOverlayConnectionPool(array $rows): ConnectionPool
+    {
+        $result = $this->createStub(Result::class);
+        $result->method('fetchAllAssociative')->willReturn($rows);
+        $result->method('fetchOne')->willReturn(count($rows));
+
+        $queryBuilder = $this->createQueryBuilderStub();
+        $queryBuilder->method('select')->willReturnSelf();
+        $queryBuilder->method('count')->willReturnSelf();
+        $queryBuilder->method('from')->willReturnSelf();
+        $queryBuilder->method('where')->willReturnSelf();
+        $queryBuilder->method('andWhere')->willReturnSelf();
+        $queryBuilder->method('setMaxResults')->willReturnSelf();
+        $queryBuilder->method('setFirstResult')->willReturnSelf();
+        $queryBuilder->method('orderBy')->willReturnSelf();
+        $queryBuilder->method('executeQuery')->willReturn($result);
+
+        $connectionPool = $this->createStub(ConnectionPool::class);
+        $connectionPool->method('getQueryBuilderForTable')->willReturn($queryBuilder);
+
+        return $connectionPool;
+    }
+
+    private function createWorkspaceContext(array $hiddenUids): WorkspaceContextService
+    {
+        $context = $this->createStub(WorkspaceContextService::class);
+        $context->method('isLive')->willReturn(false);
+        $context->method('isTableWorkspaceAware')->willReturn(true);
+        $context->method('getCurrentWorkspaceId')->willReturn(1);
+        $context->method('overlayMany')->willReturnCallback(
+            static fn(string $table, array $rows): array => array_values(array_filter(
+                $rows,
+                static fn(array $row): bool => !in_array($row['uid'], $hiddenUids, true),
+            )),
+        );
+
+        return $context;
     }
 
     private function createAllowingPermissionService(): PermissionService

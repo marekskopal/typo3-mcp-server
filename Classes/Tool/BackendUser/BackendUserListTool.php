@@ -79,6 +79,8 @@ readonly class BackendUserListTool
             $result['records'],
         );
 
-        return new BackendUserListResult($records, $result['total']);
+        // be_users/be_groups are not workspace-aware, so search() always takes the counted
+        // path; fall back to the page size rather than assuming the key for the type checker.
+        return new BackendUserListResult($records, $result['total'] ?? count($records));
     }
 }

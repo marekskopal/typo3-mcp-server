@@ -21,7 +21,9 @@ readonly class PagesSearchTool
             . ' (e.g. "hello") or a JSON object for advanced conditions'
             . ' (e.g. {"doktype":{"op":"eq","value":"1"}, "title":"Home"}).'
             . ' Supports operators: eq, neq, like, gt, gte, lt, lte, in, null, notNull.'
-            . ' Use orderBy and orderDirection for sorting.',
+            . ' Use orderBy and orderDirection for sorting.'
+            . ' In a non-live workspace, results are workspace-overlaid: the response carries "hasMore"'
+            . ' instead of "total" (a SQL COUNT cannot be overlaid) — page with offset until hasMore is false.',
     )]
     public function execute(
         string $search,

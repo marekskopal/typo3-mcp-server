@@ -21,7 +21,9 @@ readonly class ContentSearchTool
             . ' (e.g. "hello") or a JSON object for advanced conditions'
             . ' (e.g. {"CType":{"op":"eq","value":"text"}, "header":"Welcome"}).'
             . ' Supports operators: eq, neq, like, gt, gte, lt, lte, in, null, notNull.'
-            . ' Filter by pid and/or sysLanguageUid. Use orderBy and orderDirection for sorting.',
+            . ' Filter by pid and/or sysLanguageUid. Use orderBy and orderDirection for sorting.'
+            . ' In a non-live workspace, results are workspace-overlaid: the response carries "hasMore"'
+            . ' instead of "total" (a SQL COUNT cannot be overlaid) — page with offset until hasMore is false.',
     )]
     public function execute(
         string $search,

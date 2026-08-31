@@ -527,6 +527,8 @@ Registered only when `typo3/cms-workspaces` is installed. Direct (live-mode) ope
 | `workspace_discard` | Discard a workspace version, dropping unpublished changes. |
 | `workspace_stage_set` | Move a workspace version to a different stage (`-10` ready to publish, `-20` ready to review, `0` editing, or a custom stage uid). |
 
+**Pagination in a workspace.** A workspace overlay runs in PHP after the query, dropping records that are hidden in the current workspace (a page deleted in the workspace leaves a `DELETE_PLACEHOLDER` row behind). A SQL `COUNT` cannot be overlaid, so outside the live workspace the listing and search tools return `hasMore` in place of `total`, and paginate over the overlaid result set — page with `offset` until `hasMore` is `false`. `record_count` counts overlaid records too, and marks its answer `"exact": false` if the result set was too large to overlay in full.
+
 ### Dynamic Extension Tools
 
 Additional CRUD tools are registered automatically for tables configured via `EXTCONF` or enabled through the **Extension Tables** backend module (auto-discovery). No extension table is exposed by default — enabling one is always an explicit administrator decision.

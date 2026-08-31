@@ -18,7 +18,9 @@ readonly class ContentListTool
     #[McpTool(
         name: 'content_list',
         description: 'List content elements by page ID with pagination. Use sysLanguageUid to filter by language (0 = default, -1 = all).'
-            . ' Use selectFields (comma-separated) to choose which fields to return.',
+            . ' Use selectFields (comma-separated) to choose which fields to return.'
+            . ' In a non-live workspace, results are workspace-overlaid: the response carries "hasMore"'
+            . ' instead of "total" (a SQL COUNT cannot be overlaid) — page with offset until hasMore is false.',
     )]
     public function execute(int $pid, int $limit = 20, int $offset = 0, int $sysLanguageUid = -1, string $selectFields = ''): string
     {

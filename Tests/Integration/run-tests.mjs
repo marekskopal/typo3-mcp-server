@@ -685,6 +685,49 @@ class IntegrationTestRunner {
                 }
             }
 
+            // ---- Overlay-aware pagination: a page deleted in the workspace must disappear from
+            //      search results and from the count, and search must report hasMore, not a total
+            //      (a SQL COUNT cannot be overlaid, so it would over-report). ----
+            const placeholderTitle = `WS Placeholder ${Date.now()}`;
+            const placeholder = await this.callToolSafe('pages_create', {
+                pid: pageUid ?? 1,
+                fields: JSON.stringify({ title: placeholderTitle, doktype: 1 }),
+            });
+
+            if (placeholder?.uid) {
+                // Deleting inside a workspace writes a DELETE_PLACEHOLDER rather than removing the row,
+                // so the record is still returned by the query and only the overlay drops it.
+                await this.callToolSafe('pages_delete', { uid: placeholder.uid });
+
+                const wsSearch = await this.callToolSafe('pages_search', { search: placeholderTitle });
+                const stillVisible = (wsSearch?.records ?? []).some(r => r.uid === placeholder.uid);
+                if (!stillVisible && wsSearch?.total === undefined && wsSearch?.hasMore !== undefined) {
+                    this.passed.push({ tool: 'workspace overlay (pages_search paging)' });
+                    pass('workspace overlay (deleted page absent, hasMore instead of total)');
+                } else {
+                    const why = stillVisible
+                        ? 'deleted page still returned by pages_search'
+                        : `expected hasMore and no total, got total=${wsSearch?.total} hasMore=${wsSearch?.hasMore}`;
+                    this.failed.push({ tool: 'workspace overlay (pages_search paging)', error: why });
+                    fail('workspace overlay (pages_search paging)', why);
+                }
+
+                const wsCount = await this.callToolSafe('record_count', {
+                    tableName: 'pages',
+                    search: JSON.stringify({ title: placeholderTitle }),
+                });
+                if (wsCount?.count === 0) {
+                    this.passed.push({ tool: 'workspace overlay (record_count)' });
+                    pass('workspace overlay (record_count excludes the deleted page)');
+                } else {
+                    const why = `expected count 0 for a page deleted in the workspace, got ${wsCount?.count}`;
+                    this.failed.push({ tool: 'workspace overlay (record_count)', error: why });
+                    fail('workspace overlay (record_count)', why);
+                }
+            } else {
+                skip('workspace overlay (paging)', 'could not create the placeholder page');
+            }
+
             // ---- Make a fresh change, exercise stage_set, then publish ----
             const publishedTitle = 'Workspace Published Title';
             await this.callToolSafe('pages_update', {
