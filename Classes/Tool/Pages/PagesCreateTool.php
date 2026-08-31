@@ -6,10 +6,10 @@ namespace MarekSkopal\MsMcpServer\Tool\Pages;
 
 use MarekSkopal\MsMcpServer\Service\DataHandlerService;
 use MarekSkopal\MsMcpServer\Service\TcaSchemaService;
+use MarekSkopal\MsMcpServer\Tool\Helper\JsonObjectParser;
 use MarekSkopal\MsMcpServer\Tool\Result\ErrorResult;
 use MarekSkopal\MsMcpServer\Tool\Result\RecordCreatedResult;
 use Mcp\Capability\Attribute\McpTool;
-use const JSON_THROW_ON_ERROR;
 
 readonly class PagesCreateTool
 {
@@ -24,8 +24,7 @@ readonly class PagesCreateTool
     )]
     public function execute(int $pid, string $fields, int $sysLanguageUid = 0): RecordCreatedResult|ErrorResult
     {
-        /** @var array<string, mixed> $data */
-        $data = json_decode($fields, true, 512, JSON_THROW_ON_ERROR);
+        $data = JsonObjectParser::parse($fields, 'fields');
 
         $writableFields = $this->tcaSchemaService->getWritableFields('pages');
         $filteredData = array_intersect_key($data, array_flip($writableFields));

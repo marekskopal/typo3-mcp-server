@@ -233,6 +233,68 @@ final class DynamicToolRegistrarTest extends TestCase
         self::assertSame(42, $result->uid);
     }
 
+    /**
+     * The decode used to happen outside RegistrarToolRunner, so a malformed `fields` threw a
+     * JsonException straight past it: no sys_log entry and no error sanitisation, the two
+     * guarantees the runner exists to provide.
+     */
+    public function testCreateToolAuditsAndReportsMalformedFields(): void
+    {
+        $auditLogger = $this->createMock(AuditLogger::class);
+        $auditLogger->expects(self::once())
+            ->method('logFailure')
+            ->with('item_create', 'tool', ['{"title":"Broken"', 10, 0], self::anything(), self::anything(), self::TABLE, 0);
+        $auditLogger->expects(self::never())->method('logSuccess');
+
+        $dataHandlerService = $this->createMock(DataHandlerService::class);
+        $dataHandlerService->expects(self::never())->method('createRecord');
+
+        $registrar = new DynamicToolRegistrar(
+            $this->createStub(RecordService::class),
+            $dataHandlerService,
+            new TcaSchemaService(),
+            $this->createEmptyDiscoveredTableRepository(),
+            new NullLogger(),
+            $auditLogger,
+        );
+
+        $builder = Server::builder();
+        $registrar->register($builder);
+
+        $closure = null;
+        foreach ($this->getRegisteredTools($builder) as $tool) {
+            if (($tool['name'] ?? null) === 'item_create') {
+                $closure = $tool['handler'];
+
+                break;
+            }
+        }
+
+        self::assertNotNull($closure);
+
+        $this->expectException(ToolCallException::class);
+        $this->expectExceptionMessage('fields must be a JSON object, but is not valid JSON');
+
+        $closure(10, '{"title":"Broken"');
+    }
+
+    public function testCreateToolRejectsNonObjectFields(): void
+    {
+        $dataHandlerService = $this->createMock(DataHandlerService::class);
+        $dataHandlerService->expects(self::never())->method('createRecord');
+
+        $closure = $this->getRegisteredClosure(
+            $this->createStub(RecordService::class),
+            $dataHandlerService,
+            'create',
+        );
+
+        $this->expectException(ToolCallException::class);
+        $this->expectExceptionMessage('fields must be a JSON object, got a number.');
+
+        $closure(10, '5');
+    }
+
     public function testCreateToolFiltersInvalidFields(): void
     {
         $dataHandlerService = $this->createMock(DataHandlerService::class);

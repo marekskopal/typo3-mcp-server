@@ -9,6 +9,7 @@ use MarekSkopal\MsMcpServer\Repository\DiscoveredTableRepository;
 use MarekSkopal\MsMcpServer\Service\DataHandlerService;
 use MarekSkopal\MsMcpServer\Service\RecordService;
 use MarekSkopal\MsMcpServer\Service\TcaSchemaService;
+use MarekSkopal\MsMcpServer\Tool\Helper\JsonObjectParser;
 use MarekSkopal\MsMcpServer\Tool\Helper\MoveTarget;
 use MarekSkopal\MsMcpServer\Tool\Helper\RegistrarToolRunner;
 use MarekSkopal\MsMcpServer\Tool\Helper\UidListParser;
@@ -401,9 +402,12 @@ readonly class DynamicToolRegistrar
         $writableFields = $config['writableFields'];
         $languageField = $config['translationConfig']['languageField'];
 
-        /** @param array<string, mixed> $data */
+        // Takes the raw JSON string, not a decoded array: decoding outside RegistrarToolRunner
+        // let a JsonException escape past it, so a malformed `fields` produced no audit entry and
+        // no error sanitisation. Every sibling (*_update, *_update_batch, redirect_update,
+        // scheduler_update) already decodes inside the wrapped closure.
         $createHandler = static function (
-            array $data,
+            string $fields,
             int $pid,
             int $sysLanguageUid,
         ) use (
@@ -420,10 +424,12 @@ readonly class DynamicToolRegistrar
                 $tableName,
                 $writableFields,
                 $languageField,
-                $data,
+                $fields,
                 $pid,
                 $sysLanguageUid,
             ): RecordCreatedResult|ErrorResult {
+                $data = JsonObjectParser::parse($fields, 'fields');
+
                 $filteredData = array_intersect_key($data, array_flip($writableFields));
 
                 if ($languageField !== null) {
@@ -440,7 +446,7 @@ readonly class DynamicToolRegistrar
                 $uid = $dataHandlerService->createRecord($tableName, $pid, $filteredData);
 
                 return new RecordCreatedResult($uid, $ignoredFields);
-            }, arguments: [$data, $pid, $sysLanguageUid], tableName: $tableName);
+            }, arguments: [$fields, $pid, $sysLanguageUid], tableName: $tableName);
         };
 
         $description = 'Create a new ' . $config['label'] . ' record. Pass fields as a JSON object string.'
@@ -453,10 +459,7 @@ readonly class DynamicToolRegistrar
                     string $fields,
                     int $sysLanguageUid = 0,
                 ) use ($createHandler): RecordCreatedResult|ErrorResult {
-                    /** @var array<string, mixed> $data */
-                    $data = json_decode($fields, true, 512, JSON_THROW_ON_ERROR);
-
-                    return $createHandler($data, $pid, $sysLanguageUid);
+                    return $createHandler($fields, $pid, $sysLanguageUid);
                 },
                 name: $config['prefix'] . '_create',
                 description: $description
@@ -468,10 +471,7 @@ readonly class DynamicToolRegistrar
                     int $pid,
                     string $fields,
                 ) use ($createHandler): RecordCreatedResult|ErrorResult {
-                    /** @var array<string, mixed> $data */
-                    $data = json_decode($fields, true, 512, JSON_THROW_ON_ERROR);
-
-                    return $createHandler($data, $pid, 0);
+                    return $createHandler($fields, $pid, 0);
                 },
                 name: $config['prefix'] . '_create',
                 description: $description,
@@ -507,8 +507,7 @@ readonly class DynamicToolRegistrar
                     $uid,
                     $fields,
                 ): RecordUpdatedResult|ErrorResult {
-                    /** @var array<string, mixed> $data */
-                    $data = json_decode($fields, true, 512, JSON_THROW_ON_ERROR);
+                    $data = JsonObjectParser::parse($fields, 'fields');
 
                     $filteredData = array_intersect_key($data, array_flip($writableFields));
                     $ignoredFields = array_values(array_diff(array_keys($data), array_keys($filteredData)));
@@ -681,8 +680,7 @@ readonly class DynamicToolRegistrar
 
                     $skippedUids = array_values(array_diff($uidList, $existingUids));
 
-                    /** @var array<string, mixed> $fieldData */
-                    $fieldData = json_decode($fields, true, 512, JSON_THROW_ON_ERROR);
+                    $fieldData = JsonObjectParser::parse($fields, 'fields');
 
                     $validFields = [];
                     $ignoredFields = [];

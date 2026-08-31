@@ -7,11 +7,11 @@ namespace MarekSkopal\MsMcpServer\Tool\Batch;
 use MarekSkopal\MsMcpServer\Service\DataHandlerService;
 use MarekSkopal\MsMcpServer\Service\RecordService;
 use MarekSkopal\MsMcpServer\Service\TcaSchemaService;
+use MarekSkopal\MsMcpServer\Tool\Helper\JsonObjectParser;
 use MarekSkopal\MsMcpServer\Tool\Helper\UidListParser;
 use MarekSkopal\MsMcpServer\Tool\Result\BatchRecordsUpdatedResult;
 use Mcp\Capability\Attribute\McpTool;
 use Mcp\Exception\ToolCallException;
-use const JSON_THROW_ON_ERROR;
 
 readonly class RecordUpdateBatchTool
 {
@@ -41,8 +41,7 @@ readonly class RecordUpdateBatchTool
         $skippedUids = array_values(array_diff($uidList, $existingUids));
         $writableFields = $this->tcaSchemaService->getWritableFields($tableName);
 
-        /** @var array<string, mixed> $fieldData */
-        $fieldData = json_decode($fields, true, 512, JSON_THROW_ON_ERROR);
+        $fieldData = JsonObjectParser::parse($fields, 'fields');
 
         $validFields = [];
         $ignoredFields = [];

@@ -7,6 +7,7 @@ namespace MarekSkopal\MsMcpServer\Tool\Redirect;
 use MarekSkopal\MsMcpServer\Logging\AuditLogger;
 use MarekSkopal\MsMcpServer\Service\DataHandlerService;
 use MarekSkopal\MsMcpServer\Service\RecordService;
+use MarekSkopal\MsMcpServer\Tool\Helper\JsonObjectParser;
 use MarekSkopal\MsMcpServer\Tool\Helper\RegistrarToolRunner;
 use MarekSkopal\MsMcpServer\Tool\Result\ErrorResult;
 use MarekSkopal\MsMcpServer\Tool\Result\RecordCreatedResult;
@@ -223,8 +224,7 @@ readonly class RedirectToolRegistrar
                     ];
 
                     if ($fields !== '') {
-                        /** @var array<string, mixed> $extra */
-                        $extra = json_decode($fields, true, 512, JSON_THROW_ON_ERROR);
+                        $extra = JsonObjectParser::parse($fields, 'fields');
                         // Explicit params take precedence over fields JSON
                         $merged = array_merge($extra, $required);
                     } else {
@@ -263,8 +263,7 @@ readonly class RedirectToolRegistrar
                     $auditLogger,
                     $logger,
                     static function () use ($dataHandlerService, $uid, $fields): RecordUpdatedResult|ErrorResult {
-                        /** @var array<string, mixed> $data */
-                        $data = json_decode($fields, true, 512, JSON_THROW_ON_ERROR);
+                        $data = JsonObjectParser::parse($fields, 'fields');
 
                         $filteredData = array_intersect_key($data, array_flip(self::WRITABLE_FIELDS));
                         $ignoredFields = array_values(array_diff(array_keys($data), array_keys($filteredData)));
