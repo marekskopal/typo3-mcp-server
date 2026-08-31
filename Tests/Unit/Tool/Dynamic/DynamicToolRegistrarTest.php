@@ -22,6 +22,8 @@ use Mcp\Exception\ToolCallException;
 use Mcp\Server;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
+use MarekSkopal\MsMcpServer\Tool\Table\TableToolFactory;
+use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use const JSON_THROW_ON_ERROR;
 
@@ -93,10 +95,9 @@ final class DynamicToolRegistrarTest extends TestCase
             ->with(self::TABLE, 0, 20, 0, ['uid', 'pid', 'title'])
             ->willReturn(['records' => [], 'total' => 0]);
 
-        $registrar = new DynamicToolRegistrar(
+        $registrar = $this->makeRegistrar(
             $recordService,
             $this->createStub(DataHandlerService::class),
-            new TcaSchemaService(),
             $this->createEmptyDiscoveredTableRepository(),
             new NullLogger(),
             $this->createStub(AuditLogger::class),
@@ -249,10 +250,9 @@ final class DynamicToolRegistrarTest extends TestCase
         $dataHandlerService = $this->createMock(DataHandlerService::class);
         $dataHandlerService->expects(self::never())->method('createRecord');
 
-        $registrar = new DynamicToolRegistrar(
+        $registrar = $this->makeRegistrar(
             $this->createStub(RecordService::class),
             $dataHandlerService,
-            new TcaSchemaService(),
             $this->createEmptyDiscoveredTableRepository(),
             new NullLogger(),
             $auditLogger,
@@ -557,10 +557,9 @@ final class DynamicToolRegistrarTest extends TestCase
             )
             ->willReturn(['records' => [], 'total' => 0]);
 
-        $registrar = new DynamicToolRegistrar(
+        $registrar = $this->makeRegistrar(
             $recordService,
             $this->createStub(DataHandlerService::class),
-            new TcaSchemaService(),
             $this->createEmptyDiscoveredTableRepository(),
             new NullLogger(),
             $this->createStub(AuditLogger::class),
@@ -618,10 +617,9 @@ final class DynamicToolRegistrarTest extends TestCase
             ->with(self::TABLE, 1, 'sys_language_uid', 'l10n_parent')
             ->willReturn([['uid' => 2, 'sys_language_uid' => 1]]);
 
-        $registrar = new DynamicToolRegistrar(
+        $registrar = $this->makeRegistrar(
             $recordService,
             $this->createStub(DataHandlerService::class),
-            new TcaSchemaService(),
             $this->createEmptyDiscoveredTableRepository(),
             new NullLogger(),
             $this->createStub(AuditLogger::class),
@@ -940,10 +938,9 @@ final class DynamicToolRegistrarTest extends TestCase
             ->method('logSuccess')
             ->with('item_update', 'tool', [5, '{"title":"New"}'], self::anything(), self::TABLE, 5);
 
-        $registrar = new DynamicToolRegistrar(
+        $registrar = $this->makeRegistrar(
             $this->createStub(RecordService::class),
             $this->createStub(DataHandlerService::class),
-            new TcaSchemaService(),
             $this->createEmptyDiscoveredTableRepository(),
             new NullLogger(),
             $auditLogger,
@@ -976,10 +973,9 @@ final class DynamicToolRegistrarTest extends TestCase
             ->method('logFailure')
             ->with('item_list', 'tool', [10, 20, 0, ''], self::anything(), 'DB error', self::TABLE, 0);
 
-        $registrar = new DynamicToolRegistrar(
+        $registrar = $this->makeRegistrar(
             $recordService,
             $this->createStub(DataHandlerService::class),
-            new TcaSchemaService(),
             $this->createEmptyDiscoveredTableRepository(),
             new NullLogger(),
             $auditLogger,
@@ -1007,10 +1003,9 @@ final class DynamicToolRegistrarTest extends TestCase
         ?DataHandlerService $dataHandlerService = null,
         ?DiscoveredTableRepository $discoveredTableRepository = null,
     ): DynamicToolRegistrar {
-        return new DynamicToolRegistrar(
+        return $this->makeRegistrar(
             $recordService ?? $this->createStub(RecordService::class),
             $dataHandlerService ?? $this->createStub(DataHandlerService::class),
-            new TcaSchemaService(),
             $discoveredTableRepository ?? $this->createEmptyDiscoveredTableRepository(),
             new NullLogger(),
             $this->createStub(AuditLogger::class),
@@ -1029,12 +1024,27 @@ final class DynamicToolRegistrarTest extends TestCase
      * Registers tools on a builder and extracts the closure for a specific tool type.
      * Uses reflection to access the builder's internal tools array.
      */
+    private function makeRegistrar(
+        RecordService $recordService,
+        DataHandlerService $dataHandlerService,
+        DiscoveredTableRepository $discoveredTableRepository,
+        LoggerInterface $logger,
+        AuditLogger $auditLogger,
+    ): DynamicToolRegistrar {
+        return new DynamicToolRegistrar(
+            new TcaSchemaService(),
+            $discoveredTableRepository,
+            $logger,
+            new TableToolFactory($recordService, $dataHandlerService, $auditLogger, $logger),
+        );
+    }
+
     private function getRegisteredClosure(
         RecordService $recordService,
         DataHandlerService $dataHandlerService,
         string $toolType,
     ): \Closure {
-        $registrar = new DynamicToolRegistrar($recordService, $dataHandlerService, new TcaSchemaService(), $this->createEmptyDiscoveredTableRepository(), new NullLogger(), $this->createStub(AuditLogger::class));
+        $registrar = $this->makeRegistrar($recordService, $dataHandlerService, $this->createEmptyDiscoveredTableRepository(), new NullLogger(), $this->createStub(AuditLogger::class));
 
         $builder = Server::builder();
         $registrar->register($builder);
@@ -1055,15 +1065,24 @@ final class DynamicToolRegistrarTest extends TestCase
     }
 
     /**
+     * Handlers are registered as `[$handler, '__invoke']` instance callables; wrapping them in a
+     * Closure keeps the call sites below reading as plain function calls.
+     *
      * @return list<array{handler: \Closure, name: string}>
      */
     private function getRegisteredTools(Server\Builder $builder): array
     {
         $reflection = new \ReflectionClass($builder);
         $property = $reflection->getProperty('tools');
-        /** @var list<array{handler: \Closure, name: string}> $tools */
+        /** @var list<array{handler: callable, name: string}> $tools */
         $tools = $property->getValue($builder);
 
-        return $tools;
+        return array_map(
+            static fn(array $tool): array => [
+                'handler' => \Closure::fromCallable($tool['handler']),
+                'name' => $tool['name'],
+            ],
+            $tools,
+        );
     }
 }
