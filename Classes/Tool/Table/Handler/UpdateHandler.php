@@ -38,7 +38,7 @@ final readonly class UpdateHandler extends AbstractTableToolHandler
 
     public function description(): string
     {
-        return 'Update an existing ' . $this->config->label . ' record. Pass fields as a JSON object string'
+        return 'Update an existing ' . $this->config->subject() . '. Pass fields as a JSON object string'
             . ' with field names and their new values. Available fields: ' . $this->config->writableFieldList() . '.';
     }
 

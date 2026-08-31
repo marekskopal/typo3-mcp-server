@@ -5,13 +5,10 @@ declare(strict_types=1);
 namespace MarekSkopal\MsMcpServer\Tool\Scheduler;
 
 use MarekSkopal\MsMcpServer\Logging\AuditLogger;
-use MarekSkopal\MsMcpServer\Service\DataHandlerService;
 use MarekSkopal\MsMcpServer\Service\RecordService;
-use MarekSkopal\MsMcpServer\Tool\Helper\JsonObjectParser;
 use MarekSkopal\MsMcpServer\Tool\Helper\RegistrarToolRunner;
-use MarekSkopal\MsMcpServer\Tool\Result\ErrorResult;
-use MarekSkopal\MsMcpServer\Tool\Result\RecordDeletedResult;
-use MarekSkopal\MsMcpServer\Tool\Result\RecordUpdatedResult;
+use MarekSkopal\MsMcpServer\Tool\Table\TableToolConfig;
+use MarekSkopal\MsMcpServer\Tool\Table\TableToolFactory;
 use Mcp\Server\Builder;
 use Psr\Log\LoggerInterface;
 use TYPO3\CMS\Core\Database\ConnectionPool;
@@ -43,11 +40,35 @@ readonly class SchedulerToolRegistrar
 
     public function __construct(
         private RecordService $recordService,
-        private DataHandlerService $dataHandlerService,
         private ConnectionPool $connectionPool,
         private LoggerInterface $logger,
         private AuditLogger $auditLogger,
+        private TableToolFactory $tableToolFactory,
     ) {
+    }
+
+    /**
+     * `tx_scheduler_task` described for the shared table tools. Field lists are introspected rather
+     * than fixed, because which columns exist varies across TYPO3 versions. `noun: 'task'` keeps the
+     * tool text reading "scheduler task" rather than "scheduler task record"; the not-found message
+     * capitalises it back to "Scheduler task not found".
+     *
+     * Only `scheduler_list` stays hand-written: it filters on task type, group and disabled state.
+     *
+     * @param list<string> $fields
+     * @param list<string> $writableFields
+     */
+    private function config(array $fields, array $writableFields): TableToolConfig
+    {
+        return new TableToolConfig(
+            tableName: self::TABLE,
+            label: 'scheduler',
+            prefix: 'scheduler',
+            listFields: $fields,
+            readFields: $fields,
+            writableFields: $writableFields,
+            noun: 'task',
+        );
     }
 
     public function register(Builder $builder): void
@@ -63,10 +84,12 @@ readonly class SchedulerToolRegistrar
 
         $writableFields = $this->filterExistingColumns(self::TABLE, self::CANDIDATE_WRITABLE_FIELDS);
 
+        $config = $this->config($fields, $writableFields);
+
         $this->registerListTool($builder, $fields);
-        $this->registerGetTool($builder, $fields);
-        $this->registerUpdateTool($builder, $writableFields);
-        $this->registerDeleteTool($builder);
+        $this->tableToolFactory->register($builder, $this->tableToolFactory->get($config));
+        $this->tableToolFactory->register($builder, $this->tableToolFactory->update($config));
+        $this->tableToolFactory->register($builder, $this->tableToolFactory->delete($config));
     }
 
     /**
@@ -161,108 +184,6 @@ readonly class SchedulerToolRegistrar
             description: 'List scheduler tasks with pagination and optional filtering.'
                 . ' Use tasktype for text search by task class name (LIKE; ignored when the column is unavailable).'
                 . ' Use taskGroup to filter by group ID. Use disable (0 or 1) to filter by status.',
-        );
-    }
-
-    /** @param list<string> $fields */
-    private function registerGetTool(Builder $builder, array $fields): void
-    {
-        $recordService = $this->recordService;
-        $logger = $this->logger;
-        $auditLogger = $this->auditLogger;
-
-        $builder->addTool(
-            handler: static function (int $uid) use ($recordService, $logger, $auditLogger, $fields): string {
-                return RegistrarToolRunner::run(
-                    'scheduler_get',
-                    $auditLogger,
-                    $logger,
-                    static function () use ($recordService, $uid, $fields): string {
-                        $record = $recordService->findByUid(self::TABLE, $uid, $fields);
-
-                        if ($record === null) {
-                            return json_encode(['error' => 'Scheduler task not found'], JSON_THROW_ON_ERROR);
-                        }
-
-                        return json_encode($record, JSON_THROW_ON_ERROR);
-                    },
-                    arguments: [$uid],
-                    tableName: self::TABLE,
-                    recordUid: $uid,
-                );
-            },
-            name: 'scheduler_get',
-            description: 'Get a single scheduler task by its uid.',
-        );
-    }
-
-    /** @param list<string> $writableFields */
-    private function registerUpdateTool(Builder $builder, array $writableFields): void
-    {
-        $dataHandlerService = $this->dataHandlerService;
-        $logger = $this->logger;
-        $auditLogger = $this->auditLogger;
-
-        $builder->addTool(
-            handler: static function (
-                int $uid,
-                string $fields,
-            ) use (
-                $dataHandlerService,
-                $logger,
-                $auditLogger,
-                $writableFields,
-            ): RecordUpdatedResult|ErrorResult {
-                return RegistrarToolRunner::run('scheduler_update', $auditLogger, $logger, static function () use (
-                    $dataHandlerService,
-                    $writableFields,
-                    $uid,
-                    $fields,
-                ): RecordUpdatedResult|ErrorResult {
-                    $data = JsonObjectParser::parse($fields, 'fields');
-
-                    $filteredData = array_intersect_key($data, array_flip($writableFields));
-                    $ignoredFields = array_values(array_diff(array_keys($data), array_keys($filteredData)));
-
-                    if ($filteredData === []) {
-                        return new ErrorResult('No valid fields provided', ['ignoredFields' => $ignoredFields]);
-                    }
-
-                    $dataHandlerService->updateRecord(self::TABLE, $uid, $filteredData);
-
-                    return new RecordUpdatedResult($uid, array_keys($filteredData), $ignoredFields);
-                }, arguments: [$uid, $fields], tableName: self::TABLE, recordUid: $uid);
-            },
-            name: 'scheduler_update',
-            description: 'Update a scheduler task. Pass fields as a JSON object string.'
-                . ' Available fields: ' . implode(', ', $writableFields) . '.',
-        );
-    }
-
-    private function registerDeleteTool(Builder $builder): void
-    {
-        $dataHandlerService = $this->dataHandlerService;
-        $logger = $this->logger;
-        $auditLogger = $this->auditLogger;
-
-        $builder->addTool(
-            handler: static function (int $uid) use ($dataHandlerService, $logger, $auditLogger): RecordDeletedResult {
-                return RegistrarToolRunner::run(
-                    'scheduler_delete',
-                    $auditLogger,
-                    $logger,
-                    static function () use ($dataHandlerService, $uid): RecordDeletedResult {
-                        $dataHandlerService->deleteRecord(self::TABLE, $uid);
-
-                        return new RecordDeletedResult($uid);
-                    },
-                    arguments: [$uid],
-                    tableName: self::TABLE,
-                    recordUid: $uid,
-                );
-            },
-            name: 'scheduler_delete',
-            description: 'Delete a scheduler task by its uid.',
         );
     }
 }

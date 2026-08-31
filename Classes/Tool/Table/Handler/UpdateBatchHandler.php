@@ -34,7 +34,7 @@ final readonly class UpdateBatchHandler extends AbstractTableToolHandler
 
     public function description(): string
     {
-        return 'Update the same fields on multiple ' . $this->config->label . ' records.'
+        return 'Update the same fields on multiple ' . $this->config->subject() . 's.'
             . ' Pass UIDs as comma-separated (e.g. "1,2,3") and fields as a JSON object (e.g. {"hidden":1}).'
             . ' Available fields: ' . $this->config->writableFieldList() . '.'
             . ' Non-existent UIDs are skipped and reported in skippedUids.';

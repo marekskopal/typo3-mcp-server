@@ -34,7 +34,7 @@ final readonly class GetHandler extends AbstractTableToolHandler
 
     public function description(): string
     {
-        return 'Get a single ' . $this->config->label . ' record by its uid.';
+        return 'Get a single ' . $this->config->subject() . ' by its uid.';
     }
 
     public function __invoke(int $uid): string
@@ -44,7 +44,10 @@ final readonly class GetHandler extends AbstractTableToolHandler
                 $record = $this->recordService->findByUid($this->config->tableName, $uid, $this->config->readFields);
 
                 if ($record === null) {
-                    return json_encode(['error' => $this->config->label . ' record not found'], JSON_THROW_ON_ERROR);
+                    return json_encode(
+                        ['error' => $this->config->subjectSentenceStart() . ' not found'],
+                        JSON_THROW_ON_ERROR,
+                    );
                 }
 
                 $translations = $this->findTranslations($uid, $record);

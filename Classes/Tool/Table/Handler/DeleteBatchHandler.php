@@ -33,7 +33,7 @@ final readonly class DeleteBatchHandler extends AbstractTableToolHandler
 
     public function description(): string
     {
-        return 'Delete multiple ' . $this->config->label . ' records in a single operation.'
+        return 'Delete multiple ' . $this->config->subject() . 's in a single operation.'
             . ' Pass UIDs as a comma-separated string (e.g. "1,2,3").'
             . ' Non-existent UIDs are skipped and reported in skippedUids.';
     }

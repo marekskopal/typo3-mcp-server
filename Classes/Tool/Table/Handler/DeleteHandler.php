@@ -29,7 +29,7 @@ final readonly class DeleteHandler extends AbstractTableToolHandler
 
     public function description(): string
     {
-        return 'Delete a ' . $this->config->label . ' record by its uid.';
+        return 'Delete a ' . $this->config->subject() . ' by its uid.';
     }
 
     public function __invoke(int $uid): RecordDeletedResult

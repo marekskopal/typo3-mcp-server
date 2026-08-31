@@ -34,7 +34,7 @@ final readonly class TranslatableListHandler extends AbstractTableToolHandler
 
     public function description(): string
     {
-        return 'List ' . $this->config->label . ' records by parent page ID with pagination.'
+        return 'List ' . $this->config->subject() . 's by parent page ID with pagination.'
             . ' Use sysLanguageUid to filter by language (0 = default, -1 = all).'
             . ' Use selectFields (comma-separated) to choose which fields to return.';
     }

@@ -21,6 +21,8 @@ final readonly class TableToolConfig
      * @param list<string> $writableFields fields create/update accept; everything else is reported as ignored
      * @param string|null $languageField TCA `languageField`, or null when the table is not translatable
      * @param string|null $transOrigPointerField TCA `transOrigPointerField`, or null as above
+     * @param string $noun what one row is called in tool text — "record" for most tables, but the
+     *                     scheduler's rows are "tasks", and "Scheduler task record" reads wrong
      */
     public function __construct(
         public string $tableName,
@@ -31,7 +33,20 @@ final readonly class TableToolConfig
         public array $writableFields,
         public ?string $languageField = null,
         public ?string $transOrigPointerField = null,
+        public string $noun = 'record',
     ) {
+    }
+
+    /** "News record", "redirect record", "Scheduler task". */
+    public function subject(): string
+    {
+        return $this->label . ' ' . $this->noun;
+    }
+
+    /** Sentence-initial form of {@see subject()}, for a message that starts with it. */
+    public function subjectSentenceStart(): string
+    {
+        return ucfirst($this->subject());
     }
 
     public function toolName(string $suffix): string

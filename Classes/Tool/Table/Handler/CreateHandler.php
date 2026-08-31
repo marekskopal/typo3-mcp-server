@@ -35,7 +35,7 @@ final readonly class CreateHandler extends AbstractTableToolHandler
 
     public function description(): string
     {
-        return 'Create a new ' . $this->config->label . ' record. Pass fields as a JSON object string.'
+        return 'Create a new ' . $this->config->subject() . '. Pass fields as a JSON object string.'
             . ' Available fields: ' . $this->config->writableFieldList() . '.';
     }
 

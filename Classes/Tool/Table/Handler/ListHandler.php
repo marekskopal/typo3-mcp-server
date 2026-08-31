@@ -35,7 +35,7 @@ final readonly class ListHandler extends AbstractTableToolHandler
 
     public function description(): string
     {
-        return 'List ' . $this->config->label . ' records by parent page ID with pagination.'
+        return 'List ' . $this->config->subject() . 's by parent page ID with pagination.'
             . ' Use selectFields (comma-separated) to choose which fields to return.';
     }
 

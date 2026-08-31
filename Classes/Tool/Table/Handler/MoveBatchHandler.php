@@ -35,7 +35,7 @@ final readonly class MoveBatchHandler extends AbstractTableToolHandler
 
     public function description(): string
     {
-        return 'Move multiple ' . $this->config->label . ' records to a new position in a single operation.'
+        return 'Move multiple ' . $this->config->subject() . 's to a new position in a single operation.'
             . ' Pass UIDs as comma-separated (e.g. "1,2,3").'
             . ' Provide exactly one of: targetPid (move all to the top of that page)'
             . ' or afterUid (place all after that sibling record).'

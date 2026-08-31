@@ -9,10 +9,9 @@ use MarekSkopal\MsMcpServer\Service\DataHandlerService;
 use MarekSkopal\MsMcpServer\Service\RecordService;
 use MarekSkopal\MsMcpServer\Tool\Helper\JsonObjectParser;
 use MarekSkopal\MsMcpServer\Tool\Helper\RegistrarToolRunner;
-use MarekSkopal\MsMcpServer\Tool\Result\ErrorResult;
 use MarekSkopal\MsMcpServer\Tool\Result\RecordCreatedResult;
-use MarekSkopal\MsMcpServer\Tool\Result\RecordDeletedResult;
-use MarekSkopal\MsMcpServer\Tool\Result\RecordUpdatedResult;
+use MarekSkopal\MsMcpServer\Tool\Table\TableToolConfig;
+use MarekSkopal\MsMcpServer\Tool\Table\TableToolFactory;
 use Mcp\Server\Builder;
 use Psr\Log\LoggerInterface;
 use TYPO3\CMS\Core\Utility\ExtensionManagementUtility;
@@ -74,7 +73,27 @@ readonly class RedirectToolRegistrar
         private DataHandlerService $dataHandlerService,
         private LoggerInterface $logger,
         private AuditLogger $auditLogger,
+        private TableToolFactory $tableToolFactory,
     ) {
+    }
+
+    /**
+     * `sys_redirect` described for the shared table tools. Only `redirect_list` and
+     * `redirect_create` are hand-written below: the list filters on redirect-specific columns and
+     * create takes the three required parts as explicit parameters, neither of which the generic
+     * tools model. Get, update and delete were near-copies of the dynamic ones and are now the
+     * same code.
+     */
+    private function config(): TableToolConfig
+    {
+        return new TableToolConfig(
+            tableName: self::TABLE,
+            label: 'redirect',
+            prefix: 'redirect',
+            listFields: self::LIST_FIELDS,
+            readFields: self::READ_FIELDS,
+            writableFields: self::WRITABLE_FIELDS,
+        );
     }
 
     public function register(Builder $builder): void
@@ -83,11 +102,13 @@ readonly class RedirectToolRegistrar
             return;
         }
 
+        $config = $this->config();
+
         $this->registerListTool($builder);
-        $this->registerGetTool($builder);
+        $this->tableToolFactory->register($builder, $this->tableToolFactory->get($config));
         $this->registerCreateTool($builder);
-        $this->registerUpdateTool($builder);
-        $this->registerDeleteTool($builder);
+        $this->tableToolFactory->register($builder, $this->tableToolFactory->update($config));
+        $this->tableToolFactory->register($builder, $this->tableToolFactory->delete($config));
     }
 
     private function registerListTool(Builder $builder): void
@@ -157,37 +178,6 @@ readonly class RedirectToolRegistrar
         );
     }
 
-    private function registerGetTool(Builder $builder): void
-    {
-        $recordService = $this->recordService;
-        $logger = $this->logger;
-        $auditLogger = $this->auditLogger;
-
-        $builder->addTool(
-            handler: static function (int $uid) use ($recordService, $logger, $auditLogger): string {
-                return RegistrarToolRunner::run(
-                    'redirect_get',
-                    $auditLogger,
-                    $logger,
-                    static function () use ($recordService, $uid): string {
-                        $record = $recordService->findByUid(self::TABLE, $uid, self::READ_FIELDS);
-
-                        if ($record === null) {
-                            return json_encode(['error' => 'Redirect record not found'], JSON_THROW_ON_ERROR);
-                        }
-
-                        return json_encode($record, JSON_THROW_ON_ERROR);
-                    },
-                    arguments: [$uid],
-                    tableName: self::TABLE,
-                    recordUid: $uid,
-                );
-            },
-            name: 'redirect_get',
-            description: 'Get a single redirect record by its uid.',
-        );
-    }
-
     private function registerCreateTool(Builder $builder): void
     {
         $dataHandlerService = $this->dataHandlerService;
@@ -247,70 +237,6 @@ readonly class RedirectToolRegistrar
                 . ' Optional: pid (default 0), targetStatuscode (default 301),'
                 . ' fields as JSON for additional options: is_regexp, force_https, keep_query_parameters,'
                 . ' respect_query_parameters, protected, disabled, description, starttime, endtime.',
-        );
-    }
-
-    private function registerUpdateTool(Builder $builder): void
-    {
-        $dataHandlerService = $this->dataHandlerService;
-        $logger = $this->logger;
-        $auditLogger = $this->auditLogger;
-
-        $builder->addTool(
-            handler: static function (int $uid, string $fields) use ($dataHandlerService, $logger, $auditLogger): RecordUpdatedResult|ErrorResult {
-                return RegistrarToolRunner::run(
-                    'redirect_update',
-                    $auditLogger,
-                    $logger,
-                    static function () use ($dataHandlerService, $uid, $fields): RecordUpdatedResult|ErrorResult {
-                        $data = JsonObjectParser::parse($fields, 'fields');
-
-                        $filteredData = array_intersect_key($data, array_flip(self::WRITABLE_FIELDS));
-                        $ignoredFields = array_values(array_diff(array_keys($data), array_keys($filteredData)));
-
-                        if ($filteredData === []) {
-                            return new ErrorResult('No valid fields provided', ['ignoredFields' => $ignoredFields]);
-                        }
-
-                        $dataHandlerService->updateRecord(self::TABLE, $uid, $filteredData);
-
-                        return new RecordUpdatedResult($uid, array_keys($filteredData), $ignoredFields);
-                    },
-                    arguments: [$uid, $fields],
-                    tableName: self::TABLE,
-                    recordUid: $uid,
-                );
-            },
-            name: 'redirect_update',
-            description: 'Update an existing redirect record. Pass fields as a JSON object string.'
-                . ' Available fields: ' . implode(', ', self::WRITABLE_FIELDS) . '.',
-        );
-    }
-
-    private function registerDeleteTool(Builder $builder): void
-    {
-        $dataHandlerService = $this->dataHandlerService;
-        $logger = $this->logger;
-        $auditLogger = $this->auditLogger;
-
-        $builder->addTool(
-            handler: static function (int $uid) use ($dataHandlerService, $logger, $auditLogger): RecordDeletedResult {
-                return RegistrarToolRunner::run(
-                    'redirect_delete',
-                    $auditLogger,
-                    $logger,
-                    static function () use ($dataHandlerService, $uid): RecordDeletedResult {
-                        $dataHandlerService->deleteRecord(self::TABLE, $uid);
-
-                        return new RecordDeletedResult($uid);
-                    },
-                    arguments: [$uid],
-                    tableName: self::TABLE,
-                    recordUid: $uid,
-                );
-            },
-            name: 'redirect_delete',
-            description: 'Delete a redirect record by its uid.',
         );
     }
 }
