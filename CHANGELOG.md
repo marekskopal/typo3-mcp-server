@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Changed
+- **mcp/sdk bumped to ^0.8.** v0.8.0 adds MCP spec revision `2026-07-28`: `StreamableHttpTransport` now classifies every request and routes it to either the handshake-era or the modern (stateless) dispatcher, so the same `/mcp` endpoint serves both client generations. `McpServerMiddleware` no longer passes `ProtocolVersionMiddleware` in its custom middleware list — since 0.8 that middleware belongs to the handshake leg only (`StreamableHttpTransport::handshakeMiddleware()`, applied by the transport itself), and running it at the edge would reject every modern-era request. The `DnsRebindingProtectionMiddleware` opt-out is unchanged. Every other SDK API the extension consumes (`Server::builder`, the `Builder` fluent methods, `SessionStoreInterface`, `StdioTransport`, `Server::run`, and the `ToolCallException`/`ResourceReadException`/`PromptGetException` exceptions) is unchanged; both eras share one registry, container and session manager, so `ErrorHandlingContainer`, `DatabaseSessionStore` and the audit log apply to modern-era traffic as well. Note that 0.8 answers a not-found tool/prompt/resource with JSON-RPC `-32602` instead of `-32002`.
+
 ## [1.1.0] - 2026-07-28
 
 ### Security

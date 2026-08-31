@@ -9,7 +9,6 @@ use MarekSkopal\MsMcpServer\OAuth\AuthorizationService;
 use MarekSkopal\MsMcpServer\Server\McpServerFactory;
 use MarekSkopal\MsMcpServer\Service\McpPathProvider;
 use Mcp\Server\Transport\Http\Middleware\CorsMiddleware;
-use Mcp\Server\Transport\Http\Middleware\ProtocolVersionMiddleware;
 use Mcp\Server\Transport\StreamableHttpTransport;
 use Psr\Http\Message\ResponseFactoryInterface;
 use Psr\Http\Message\ResponseInterface;
@@ -67,11 +66,14 @@ readonly class McpServerMiddleware implements MiddlewareInterface
         // Opt out of the SDK's default DnsRebindingProtectionMiddleware: it only allows
         // localhost Host/Origin and would 403 every request to a real TYPO3 deployment.
         // Bearer-token auth above is the actual protection here.
+        // ProtocolVersionMiddleware is deliberately NOT listed: since SDK 0.8 the transport
+        // applies it itself to handshake-era traffic only. Passing it here would run it before
+        // the era is classified and reject every modern-era (2026-07-28) request.
         $transport = new StreamableHttpTransport(
             $request,
             $this->responseFactory,
             $this->streamFactory,
-            middleware: [new CorsMiddleware(), new ProtocolVersionMiddleware()],
+            middleware: [new CorsMiddleware()],
         );
 
         /** @var ResponseInterface $response */
