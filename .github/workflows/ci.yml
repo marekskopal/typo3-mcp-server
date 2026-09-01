@@ -42,11 +42,11 @@ jobs:
       matrix:
         include:
           - php: '8.3'
-            typo3: '^13.4'
+            typo3: '^13.4.34'
           - php: '8.4'
-            typo3: '^13.4'
+            typo3: '^13.4.34'
           - php: '8.4'
-            typo3: '^14.3'
+            typo3: '^14.3.6'
     steps:
       - uses: actions/checkout@v4
       - uses: shivammathur/setup-php@v2

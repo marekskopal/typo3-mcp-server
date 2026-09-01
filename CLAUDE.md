@@ -144,7 +144,7 @@ readonly class MyTool
 - PHPStan at level **max** with bleeding edge, strict checks, and `checkImplicitMixed: true`
 - PHPCS with SlevomatCodingStandard (140 char line limit)
 - Classes are `readonly` where possible — do **not** use `final` (this is a library meant to be extended)
-- Supports TYPO3 v13.4 and v14.x
+- Supports TYPO3 v13.4.34+ and v14.3.6+ — the floor is a security floor (TYPO3-CORE-SA-2026-021), not just a compatibility one, so do not lower it without checking `composer audit`
 - Tool descriptions use `#[McpTool]` attributes from MCP SDK — tools are auto-discovered via DI tags
 - Error handling is centralized in `ErrorHandlingProxy` — tools do NOT need try/catch or `LoggerInterface`
 - CI runs PHPStan, PHPCS, and PHPUnit via GitHub Actions on PHP 8.3/8.4 with TYPO3 v13/v14 matrix

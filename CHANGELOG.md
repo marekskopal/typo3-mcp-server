@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+### Security
+- **Raised the TYPO3 requirement past TYPO3-CORE-SA-2026-021.** `typo3/cms-*` was constrained to `^13.4.24 || ^14.3.0`, both of which permit versions affected by CVE-2026-19418 (Broken Access Control in Backend and Install Tool, fixed in 13.4.34 / 14.3.6) — so a consumer's fresh `composer install` could land on a vulnerable core. The floor is now `^13.4.34 || ^14.3.6`, and the CI matrix legs are pinned to the same versions so the supported floor is what actually gets tested.
+- **Guzzle updated past five advisories** (`7.14.2` → `7.15.5`), the worst high severity: noncanonical host bypassing host-based checks (CVE-2026-69246), noncanonical cookie domain keeping subdomain scope (CVE-2026-69245), URI fragments disclosed in redirect `Referer` headers (CVE-2026-67354), host-only cookie scope not preserved (CVE-2026-67355), and unbounded response cookies risking denial of service (CVE-2026-67353). Guzzle is a transitive dependency of `typo3/cms-core`; **this extension does not use it anywhere**. `file_upload_from_url` — the only code here that fetches a remote URL — uses ext-curl directly with `CURLOPT_FOLLOWLOCATION` off, a manual redirect loop that re-resolves and re-validates every hop, and no cookie jar, so none of the five were reachable through it.
+- **PHP_CodeSniffer updated past CVE-2026-67434** (OS command injection, `4.0.1` → `4.0.4`). Development-only, but it runs in CI.
+
+`composer audit` is now clean.
+
 ### Fixed
 - **OAuth consent was broken on plain-HTTP installs.** The `mcp_csrf` cookie hardcoded `Secure`, so the browser silently discarded it and every consent submission was rejected with `403 CSRF validation failed` — the Authorize button appeared dead and the message named the wrong cause. The flag is now derived from the request scheme, as `OAuthContinuationCookie` already did for the sibling cookie in the same flow.
 - **`tx_news_domain_model_news` is no longer registered out of the box.** `ext_localconf.php` put it in `EXTCONF` on every installation, exposing nine CRUD and batch tools for it without the administrator opting in — bypassing the extension-table discovery module, burning the `news` prefix globally, and relying on the EXTCONF path that deliberately skips discovery's table/prefix/label validation. The registration moves into the README as a worked example.
