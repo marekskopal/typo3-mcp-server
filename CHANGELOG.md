@@ -4,7 +4,15 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [1.2.0] - 2026-09-01
+
+**Upgrading from 1.1.0.** No database changes. Three behaviours differ from 1.1.0 — none require action, but each is visible to a client or an extending integration:
+
+1. **Successful reads are no longer written to `sys_log`.** The new `auditLogLevel` setting defaults to `mutations`. Writes and *all* failures are still recorded. Set `auditLogLevel = all` in the extension configuration to keep 1.1.0's behaviour.
+2. **In a non-live workspace, `pages_list` / `content_list` / `record_search` and the generated `<prefix>_list` return `hasMore` instead of `total`,** and `record_count` reports `{count, exact}`. The live workspace is unchanged. A client that reads `total` unconditionally needs to handle its absence outside live — it was over-reporting there before, so the value it read was wrong anyway.
+3. **`record_search` and `record_count` report a malformed `search` or an unknown `orderBy` as a tool error** rather than a `200` carrying `{"error": ...}`. `pages_search` and `content_search`, which previously degraded silently, now report the same way.
+
+For PHP integrations extending the extension: `RecordService::count()` returns `array{count: int, exact: bool}` instead of `int`, and `findByPid()` / `search()` omit `total` outside the live workspace.
 
 ### Security
 - **Raised the TYPO3 requirement past TYPO3-CORE-SA-2026-021.** `typo3/cms-*` was constrained to `^13.4.24 || ^14.3.0`, both of which permit versions affected by CVE-2026-19418 (Broken Access Control in Backend and Install Tool, fixed in 13.4.34 / 14.3.6) — so a consumer's fresh `composer install` could land on a vulnerable core. The floor is now `^13.4.34 || ^14.3.6`, and the CI matrix legs are pinned to the same versions so the supported floor is what actually gets tested.
