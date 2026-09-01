@@ -7,6 +7,7 @@ namespace MarekSkopal\MsMcpServer\Logging;
 use Psr\Http\Message\ServerRequestInterface;
 use Psr\Log\LoggerInterface;
 use TYPO3\CMS\Core\Authentication\BackendUserAuthentication;
+use TYPO3\CMS\Core\Configuration\ExtensionConfiguration;
 use TYPO3\CMS\Core\Database\ConnectionPool;
 use TYPO3\CMS\Core\Http\NormalizedParams;
 use const JSON_THROW_ON_ERROR;
@@ -20,8 +21,15 @@ readonly class AuditLogger
 
     private const int MAX_ARGUMENT_LENGTH = 100;
 
-    public function __construct(private ConnectionPool $connectionPool, private LoggerInterface $logger)
-    {
+    private AuditLogLevel $level;
+
+    public function __construct(
+        private ConnectionPool $connectionPool,
+        private LoggerInterface $logger,
+        ExtensionConfiguration $extensionConfiguration,
+    ) {
+        $config = $extensionConfiguration->get('ms_mcp_server');
+        $this->level = AuditLogLevel::fromConfig(is_array($config) ? ($config['auditLogLevel'] ?? null) : null);
     }
 
     /** @param list<mixed> $arguments */
@@ -33,6 +41,10 @@ readonly class AuditLogger
         string $tableName = '',
         int $recordUid = 0,
     ): void {
+        if (!$this->shouldLog($handlerName, $type, isFailure: false)) {
+            return;
+        }
+
         $this->writeLog(
             handlerName: $handlerName,
             type: $type,
@@ -55,6 +67,10 @@ readonly class AuditLogger
         string $tableName = '',
         int $recordUid = 0,
     ): void {
+        if (!$this->shouldLog($handlerName, $type, isFailure: true)) {
+            return;
+        }
+
         $this->writeLog(
             handlerName: $handlerName,
             type: $type,
@@ -68,6 +84,15 @@ readonly class AuditLogger
             tableName: $tableName,
             recordUid: $recordUid,
         );
+    }
+
+    /**
+     * Gate the write before any of it happens — the INSERT sits in the hot path of the tool call,
+     * so a suppressed read must not pay for argument redaction or JSON encoding either.
+     */
+    private function shouldLog(string $handlerName, string $type, bool $isFailure): bool
+    {
+        return $this->level->shouldLog(MutationClassifier::isMutation($handlerName, $type), $isFailure);
     }
 
     /** @param list<mixed> $arguments */

@@ -6,10 +6,12 @@ namespace MarekSkopal\MsMcpServer\Tests\Unit\Logging;
 
 use MarekSkopal\MsMcpServer\Logging\AuditLogger;
 use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use TYPO3\CMS\Core\Authentication\BackendUserAuthentication;
+use TYPO3\CMS\Core\Configuration\ExtensionConfiguration;
 use TYPO3\CMS\Core\Database\Connection;
 use TYPO3\CMS\Core\Database\ConnectionPool;
 
@@ -57,7 +59,7 @@ final class AuditLoggerTest extends TestCase
         $connectionPool = $this->createStub(ConnectionPool::class);
         $connectionPool->method('getConnectionForTable')->willReturn($connection);
 
-        $auditLogger = new AuditLogger($connectionPool, new NullLogger());
+        $auditLogger = $this->createAuditLogger($connectionPool, new NullLogger());
         $auditLogger->logSuccess('PagesListTool', 'tool', [0, 20, 0], 42);
     }
 
@@ -85,7 +87,7 @@ final class AuditLoggerTest extends TestCase
         $connectionPool = $this->createStub(ConnectionPool::class);
         $connectionPool->method('getConnectionForTable')->willReturn($connection);
 
-        $auditLogger = new AuditLogger($connectionPool, new NullLogger());
+        $auditLogger = $this->createAuditLogger($connectionPool, new NullLogger());
         $auditLogger->logFailure('PagesDeleteTool', 'tool', [42], 12, 'Record not found');
     }
 
@@ -108,7 +110,7 @@ final class AuditLoggerTest extends TestCase
         $connectionPool = $this->createStub(ConnectionPool::class);
         $connectionPool->method('getConnectionForTable')->willReturn($connection);
 
-        $auditLogger = new AuditLogger($connectionPool, new NullLogger());
+        $auditLogger = $this->createAuditLogger($connectionPool, new NullLogger());
         $auditLogger->logSuccess('RecordUpdateTool', 'tool', [42, 'tt_content', ['title' => 'secret payload']], 5);
     }
 
@@ -125,7 +127,7 @@ final class AuditLoggerTest extends TestCase
             ->method('warning')
             ->with(self::stringContains('audit log write failed'), self::anything());
 
-        $auditLogger = new AuditLogger($connectionPool, $logger);
+        $auditLogger = $this->createAuditLogger($connectionPool, $logger);
         $auditLogger->logSuccess('PagesListTool', 'tool', [], 10);
     }
 
@@ -137,7 +139,7 @@ final class AuditLoggerTest extends TestCase
         $connectionPool = $this->createStub(ConnectionPool::class);
         $connectionPool->method('getConnectionForTable')->willReturn($connection);
 
-        $auditLogger = new AuditLogger($connectionPool, new NullLogger());
+        $auditLogger = $this->createAuditLogger($connectionPool, new NullLogger());
         $auditLogger->logSuccess('PagesListTool', 'tool', [], 10);
 
         self::assertTrue(true);
@@ -153,7 +155,84 @@ final class AuditLoggerTest extends TestCase
         $connectionPool = $this->createStub(ConnectionPool::class);
         $connectionPool->method('getConnectionForTable')->willReturn($connection);
 
-        $auditLogger = new AuditLogger($connectionPool, new NullLogger());
+        $auditLogger = $this->createAuditLogger($connectionPool, new NullLogger());
         $auditLogger->logSuccess('PagesListTool', 'tool', [], 10);
+    }
+
+    /** @return iterable<string, array{0: string, 1: string, 2: bool, 3: bool}> */
+    public static function levelProvider(): iterable
+    {
+        // level, handler, expect a row for a successful call, expect a row for a failed call
+        yield 'all logs a read' => ['all', 'PagesListTool', true, true];
+        yield 'all logs a write' => ['all', 'PagesCreateTool', true, true];
+        yield 'mutations drops a successful read' => ['mutations', 'PagesListTool', false, true];
+        yield 'mutations keeps a write' => ['mutations', 'PagesCreateTool', true, true];
+        yield 'errors drops both successes' => ['errors', 'PagesCreateTool', false, true];
+        yield 'off drops everything' => ['off', 'PagesCreateTool', false, false];
+        // An unreadable setting must not silently disable the trail.
+        yield 'unknown value falls back to the default' => ['nonsense', 'PagesListTool', false, true];
+    }
+
+    #[DataProvider('levelProvider')]
+    public function testLevelDecidesWhatReachesSysLog(
+        string $level,
+        string $handler,
+        bool $expectSuccessRow,
+        bool $expectFailureRow,
+    ): void {
+        foreach ([[false, $expectSuccessRow], [true, $expectFailureRow]] as [$isFailure, $expectRow]) {
+            $connection = $this->createMock(Connection::class);
+            $connection->expects($expectRow ? self::once() : self::never())->method('insert');
+
+            $connectionPool = $this->createStub(ConnectionPool::class);
+            $connectionPool->method('getConnectionForTable')->willReturn($connection);
+
+            $auditLogger = $this->createAuditLogger($connectionPool, new NullLogger(), $level);
+
+            if ($isFailure) {
+                $auditLogger->logFailure($handler, 'tool', [1], 5, 'boom');
+            } else {
+                $auditLogger->logSuccess($handler, 'tool', [1], 5);
+            }
+        }
+    }
+
+    /** A failed read stays in the trail: rare, diagnostic, and not the source of the volume problem. */
+    public function testMutationsLevelKeepsFailedReads(): void
+    {
+        $connection = $this->createMock(Connection::class);
+        $connection->expects(self::once())->method('insert');
+
+        $connectionPool = $this->createStub(ConnectionPool::class);
+        $connectionPool->method('getConnectionForTable')->willReturn($connection);
+
+        $this->createAuditLogger($connectionPool, new NullLogger(), 'mutations')
+            ->logFailure('RecordSearchTool', 'tool', ['pages'], 5, 'boom');
+    }
+
+    /** Registrar tools report an MCP tool name, not a class name — both conventions must be graded. */
+    public function testMutationsLevelGradesRegistrarToolNames(): void
+    {
+        $connection = $this->createMock(Connection::class);
+        $connection->expects(self::once())->method('insert');
+
+        $connectionPool = $this->createStub(ConnectionPool::class);
+        $connectionPool->method('getConnectionForTable')->willReturn($connection);
+
+        $auditLogger = $this->createAuditLogger($connectionPool, new NullLogger(), 'mutations');
+        $auditLogger->logSuccess('item_list', 'tool', [0], 5);
+        $auditLogger->logSuccess('item_delete', 'tool', [1], 5);
+    }
+
+    /** Existing cases exercise the write mechanics, so they pin the level rather than inherit the default. */
+    private function createAuditLogger(
+        ConnectionPool $connectionPool,
+        LoggerInterface $logger,
+        string $level = 'all',
+    ): AuditLogger {
+        $extensionConfiguration = $this->createStub(ExtensionConfiguration::class);
+        $extensionConfiguration->method('get')->willReturn(['auditLogLevel' => $level]);
+
+        return new AuditLogger($connectionPool, $logger, $extensionConfiguration);
     }
 }
