@@ -16,6 +16,9 @@ codeLifetime = 60
 # cat=session/enable; type=int+; label=MCP session idle lifetime (seconds, sliding TTL)
 sessionLifetime = 86400
 
+# cat=basic/enable; type=options[All invocations=all,Writes and failures=mutations,Failures only=errors,Disabled=off]; label=Audit log level: how much MCP traffic is written to sys_log. "mutations" (default) skips successful reads, which are the unbounded part - a busy agent session can otherwise write thousands of rows into a table shared with TYPO3 core logging.
+auditLogLevel = mutations
+
 # cat=rateLimit/enable; type=boolean; label=Enable rate limiting on OAuth endpoints
 rateLimitEnabled = 1
 

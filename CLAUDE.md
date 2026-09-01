@@ -89,7 +89,9 @@ vendor/bin/typo3 mcp:server --user=admin
 - `Tool/Helper/RegistrarToolRunner` — Execution wrapper for registrar (closure) tools, which bypass `ErrorHandlingProxy`. Brings them to parity: every call is audited to `sys_log` and raw exception messages are not relayed. Decode arguments **inside** the wrapped closure, or the failure escapes both guarantees.
 - `Tool/Search/SearchParamResolver` — Shared `search` / `orderBy` / `orderDirection` handling for all four search tools, so they cannot drift apart again. A value opening with `{` or `[` is read as JSON and parse failures are reported; anything else is a plain-text LIKE term.
 - `Tool/Cache/CacheClearTool` — Flush TYPO3 caches (all, pages, or specific cache groups)
-- `Logging/AuditLogger` — Writes tool/resource invocations to `sys_log` table with user, timing, and outcome
+- `Logging/AuditLogger` — Writes tool/resource invocations to `sys_log` with user, timing, redacted arguments and the affected table/record. Gated by the `auditLogLevel` setting **before** any work happens, since the INSERT sits in the hot path of the tool call.
+- `Logging/AuditLogLevel` — `all` / `mutations` (default) / `errors` / `off`. `mutations` keeps every failure, including failed reads — successful reads are the unbounded part.
+- `Logging/MutationClassifier` — Decides read vs write from the handler name. **Fail-closed**: it enumerates the read shapes and treats anything else as a write, so a new tool with an unfamiliar name is logged rather than silently dropped. Has to grade two naming conventions, because `ErrorHandlingProxy` reports a class short name (`PagesListTool`) while `RegistrarToolRunner` reports the MCP tool name (`item_list`).
 - `Resource/BackendLayoutResource` — MCP Resource Template exposing backend layout and column positions for a page (`typo3://pages/{pageId}/backend-layout`)
 - `Tool/Dynamic/DynamicToolRegistrar` — Decides which tables get tools (from `EXTCONF` and the enabled rows of `tx_msmcpserver_discovered_table`) and resolves their field lists from TCA; the tools themselves come from `TableToolFactory`
 - `Tool/Table/TableToolConfig` — Value object describing a table to the generated tools: name, label, prefix, list/read/writable fields, translation fields, and the `noun` its rows are called in tool text (`record`, or `task` for the scheduler)
@@ -111,7 +113,7 @@ vendor/bin/typo3 mcp:server --user=admin
 - `Configuration/RequestMiddlewares.php` — Registers OAuthMiddleware and McpServerMiddleware in frontend stack
 - `Configuration/Backend/Modules.php` — Backend module registration (OAuth client + extension table routes)
 - `Configuration/TCA/tx_msmcpserver_oauth_client.php` — TCA for OAuth client table
-- `ext_conf_template.txt` — Extension settings for the endpoint base path (mcpBasePath, default `/mcp`, read through `McpPathProvider`), token lifetimes (accessTokenLifetime, refreshTokenLifetime, refreshTokenMaxLifetime — the absolute cap past which a refresh chain cannot slide further, codeLifetime), session lifetime (sessionLifetime, sliding TTL in seconds, default 86400), and rate limiting (rateLimitEnabled, per-endpoint limits and windows)
+- `ext_conf_template.txt` — Extension settings for the endpoint base path (mcpBasePath, default `/mcp`, read through `McpPathProvider`), token lifetimes (accessTokenLifetime, refreshTokenLifetime, refreshTokenMaxLifetime — the absolute cap past which a refresh chain cannot slide further, codeLifetime), session lifetime (sessionLifetime, sliding TTL in seconds, default 86400), audit log level (auditLogLevel), and rate limiting (rateLimitEnabled, per-endpoint limits and windows)
 
 **SDK Workarounds:**
 - Tool classes must be `public: true` in Services.yaml because the SDK's `ReferenceHandler` calls `container->has()` which returns false for private TYPO3 services.
@@ -151,7 +153,7 @@ readonly class MyTool
 
 ## Testing
 
-793 unit tests covering:
+878 unit tests covering:
 - All static MCP tools + batch tools (Pages/Content/File/Schema/Search/Translation/Cache/Permission/BackendUser/BackendGroup/Batch CRUD)
 - Dynamic tool registration and execution (DynamicToolRegistrar), including merged EXTCONF + discovered tables
 - OAuth classes (AuthorizationService incl. revocation, ClientRepository, PkceVerifier, OAuthTokenPair, RateLimitService)

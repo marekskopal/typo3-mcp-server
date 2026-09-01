@@ -328,6 +328,25 @@ Configurable via **Settings > Extension Configuration > ms_mcp_server**:
 |---------|---------|-------------|
 | `sessionLifetime` | 86400 (1 day) | MCP session idle lifetime in seconds (sliding TTL — any activity extends it); idle sessions are removed by `mcp:cleanup` |
 
+### Audit Logging
+
+Every tool, resource and prompt invocation can be written to `sys_log` with the user, timing, arguments (redacted to size-capped scalars) and the affected table/record.
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `auditLogLevel` | `mutations` | How much reaches `sys_log` — see below |
+
+| Value | What is written |
+|-------|-----------------|
+| `all` | Every invocation, successful reads included |
+| `mutations` | Writes, plus **every** failure — including failed reads |
+| `errors` | Failures only |
+| `off` | Nothing |
+
+The default skips successful reads, because they are the unbounded part: an agent session doing a few thousand `pages_list` / `record_search` / `content_get` calls otherwise writes a few thousand rows, each an `INSERT` in the hot path of the tool call, into a table shared with TYPO3 core's own logging that `mcp:cleanup` does not prune. Set `auditLogLevel = all` to keep the previous behaviour.
+
+Classification is **fail-closed**: the read shapes are enumerated and anything unrecognised counts as a write, so a tool added under an unfamiliar name lands in the trail rather than quietly falling out of it.
+
 ### Rate Limiting
 
 OAuth endpoints are protected by IP-based rate limiting with configurable per-endpoint limits:
