@@ -30,11 +30,11 @@
         "php": ">=8.3",
         "ext-curl": "*",
         "mcp/sdk": "^0.8",
-        "typo3/cms-backend": "^13.4.24 || ^14.3.0",
-        "typo3/cms-core": "^13.4.24 || ^14.3.0",
-        "typo3/cms-extbase": "^13.4.24 || ^14.3.0",
-        "typo3/cms-fluid": "^13.4.24 || ^14.3.0",
-        "typo3/cms-frontend": "^13.4.24 || ^14.3.0"
+        "typo3/cms-backend": "^13.4.34 || ^14.3.6",
+        "typo3/cms-core": "^13.4.34 || ^14.3.6",
+        "typo3/cms-extbase": "^13.4.34 || ^14.3.6",
+        "typo3/cms-fluid": "^13.4.34 || ^14.3.6",
+        "typo3/cms-frontend": "^13.4.34 || ^14.3.6"
     },
     "require-dev": {
         "dg/bypass-finals": "^1.9",

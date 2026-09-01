@@ -31,7 +31,7 @@ These are the kinds of tasks an AI agent can accomplish autonomously through thi
 ## Requirements
 
 - PHP 8.3+
-- TYPO3 v13.4.24+ or v14.3+
+- TYPO3 v13.4.34+ or v14.3.6+ (these are the first releases past TYPO3-CORE-SA-2026-021)
 
 ## Installation
 
