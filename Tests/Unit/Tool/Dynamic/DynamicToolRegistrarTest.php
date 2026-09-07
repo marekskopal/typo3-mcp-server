@@ -218,6 +218,7 @@ final class DynamicToolRegistrarTest extends TestCase
     public function testCreateToolCallsDataHandlerService(): void
     {
         $dataHandlerService = $this->createMock(DataHandlerService::class);
+        $dataHandlerService->method('normalizeFields')->willReturnArgument(1);
         $dataHandlerService->expects(self::once())
             ->method('createRecord')
             ->with(self::TABLE, 10, ['title' => 'New Item'])
@@ -248,6 +249,8 @@ final class DynamicToolRegistrarTest extends TestCase
         $auditLogger->expects(self::never())->method('logSuccess');
 
         $dataHandlerService = $this->createMock(DataHandlerService::class);
+
+        $dataHandlerService->method('normalizeFields')->willReturnArgument(1);
         $dataHandlerService->expects(self::never())->method('createRecord');
 
         $registrar = $this->makeRegistrar(
@@ -281,6 +284,7 @@ final class DynamicToolRegistrarTest extends TestCase
     public function testCreateToolRejectsNonObjectFields(): void
     {
         $dataHandlerService = $this->createMock(DataHandlerService::class);
+        $dataHandlerService->method('normalizeFields')->willReturnArgument(1);
         $dataHandlerService->expects(self::never())->method('createRecord');
 
         $closure = $this->getRegisteredClosure(
@@ -298,6 +302,7 @@ final class DynamicToolRegistrarTest extends TestCase
     public function testCreateToolFiltersInvalidFields(): void
     {
         $dataHandlerService = $this->createMock(DataHandlerService::class);
+        $dataHandlerService->method('normalizeFields')->willReturnArgument(1);
         $dataHandlerService->expects(self::once())
             ->method('createRecord')
             ->with(self::TABLE, 10, ['title' => 'Valid'])
@@ -318,6 +323,7 @@ final class DynamicToolRegistrarTest extends TestCase
     public function testCreateToolReturnsErrorWhenNoValidFields(): void
     {
         $dataHandlerService = $this->createMock(DataHandlerService::class);
+        $dataHandlerService->method('normalizeFields')->willReturnArgument(1);
         $dataHandlerService->expects(self::never())->method('createRecord');
 
         $closure = $this->getRegisteredClosure(
@@ -351,6 +357,7 @@ final class DynamicToolRegistrarTest extends TestCase
     public function testUpdateToolCallsDataHandlerService(): void
     {
         $dataHandlerService = $this->createMock(DataHandlerService::class);
+        $dataHandlerService->method('normalizeFields')->willReturnArgument(1);
         $dataHandlerService->expects(self::once())
             ->method('updateRecord')
             ->with(self::TABLE, 1, ['title' => 'Updated']);
@@ -370,6 +377,7 @@ final class DynamicToolRegistrarTest extends TestCase
     public function testUpdateToolReturnsIgnoredFields(): void
     {
         $dataHandlerService = $this->createMock(DataHandlerService::class);
+        $dataHandlerService->method('normalizeFields')->willReturnArgument(1);
         $dataHandlerService->expects(self::once())
             ->method('updateRecord')
             ->with(self::TABLE, 1, ['title' => 'Updated']);
@@ -389,6 +397,7 @@ final class DynamicToolRegistrarTest extends TestCase
     public function testUpdateToolReturnsErrorWhenNoValidFields(): void
     {
         $dataHandlerService = $this->createMock(DataHandlerService::class);
+        $dataHandlerService->method('normalizeFields')->willReturnArgument(1);
         $dataHandlerService->expects(self::never())->method('updateRecord');
 
         $closure = $this->getRegisteredClosure(
@@ -422,6 +431,7 @@ final class DynamicToolRegistrarTest extends TestCase
     public function testMoveToolCallsDataHandlerServiceWithAfterUid(): void
     {
         $dataHandlerService = $this->createMock(DataHandlerService::class);
+        $dataHandlerService->method('normalizeFields')->willReturnArgument(1);
         // afterUid=3 → DataHandler target = -3
         $dataHandlerService->expects(self::once())
             ->method('moveRecord')
@@ -442,6 +452,7 @@ final class DynamicToolRegistrarTest extends TestCase
     public function testMoveToolCallsDataHandlerServiceWithTargetPid(): void
     {
         $dataHandlerService = $this->createMock(DataHandlerService::class);
+        $dataHandlerService->method('normalizeFields')->willReturnArgument(1);
         $dataHandlerService->expects(self::once())
             ->method('moveRecord')
             ->with(self::TABLE, 5, 10);
@@ -460,6 +471,7 @@ final class DynamicToolRegistrarTest extends TestCase
     public function testMoveToolReturnsErrorWhenNeitherTargetGiven(): void
     {
         $dataHandlerService = $this->createMock(DataHandlerService::class);
+        $dataHandlerService->method('normalizeFields')->willReturnArgument(1);
         $dataHandlerService->expects(self::never())->method('moveRecord');
 
         $closure = $this->getRegisteredClosure(
@@ -491,6 +503,7 @@ final class DynamicToolRegistrarTest extends TestCase
     public function testDeleteToolCallsDataHandlerService(): void
     {
         $dataHandlerService = $this->createMock(DataHandlerService::class);
+        $dataHandlerService->method('normalizeFields')->willReturnArgument(1);
         $dataHandlerService->expects(self::once())
             ->method('deleteRecord')
             ->with(self::TABLE, 5);
@@ -768,6 +781,8 @@ final class DynamicToolRegistrarTest extends TestCase
         $recordService->method('findExistingUids')->willReturn([1, 2, 3]);
 
         $dataHandlerService = $this->createMock(DataHandlerService::class);
+
+        $dataHandlerService->method('normalizeFields')->willReturnArgument(1);
         $dataHandlerService->expects(self::once())
             ->method('deleteRecords')
             ->with(self::TABLE, [1, 2, 3]);
@@ -787,6 +802,8 @@ final class DynamicToolRegistrarTest extends TestCase
         $recordService->method('findExistingUids')->willReturn([1, 3]);
 
         $dataHandlerService = $this->createMock(DataHandlerService::class);
+
+        $dataHandlerService->method('normalizeFields')->willReturnArgument(1);
         $dataHandlerService->expects(self::once())
             ->method('deleteRecords')
             ->with(self::TABLE, [1, 3]);
@@ -819,6 +836,8 @@ final class DynamicToolRegistrarTest extends TestCase
         $recordService->method('findExistingUids')->willReturn([1, 2]);
 
         $dataHandlerService = $this->createMock(DataHandlerService::class);
+
+        $dataHandlerService->method('normalizeFields')->willReturnArgument(1);
         $dataHandlerService->expects(self::once())
             ->method('updateRecords')
             ->with(self::TABLE, [1, 2], ['title' => 'Updated']);
@@ -840,6 +859,8 @@ final class DynamicToolRegistrarTest extends TestCase
         $recordService->method('findExistingUids')->willReturn([1]);
 
         $dataHandlerService = $this->createMock(DataHandlerService::class);
+
+        $dataHandlerService->method('normalizeFields')->willReturnArgument(1);
         $dataHandlerService->expects(self::once())
             ->method('updateRecords')
             ->with(self::TABLE, [1], ['title' => 'Updated']);
@@ -873,6 +894,8 @@ final class DynamicToolRegistrarTest extends TestCase
         $recordService->method('findExistingUids')->willReturn([10, 20]);
 
         $dataHandlerService = $this->createMock(DataHandlerService::class);
+
+        $dataHandlerService->method('normalizeFields')->willReturnArgument(1);
         $dataHandlerService->expects(self::once())
             ->method('moveRecords')
             ->with(self::TABLE, [10, 20], 5);
@@ -893,6 +916,8 @@ final class DynamicToolRegistrarTest extends TestCase
         $recordService->method('findExistingUids')->willReturn([10]);
 
         $dataHandlerService = $this->createMock(DataHandlerService::class);
+
+        $dataHandlerService->method('normalizeFields')->willReturnArgument(1);
         // afterUid=3 → DataHandler target = -3
         $dataHandlerService->expects(self::once())
             ->method('moveRecords')
@@ -910,6 +935,7 @@ final class DynamicToolRegistrarTest extends TestCase
     {
         $recordService = $this->createStub(RecordService::class);
         $dataHandlerService = $this->createMock(DataHandlerService::class);
+        $dataHandlerService->method('normalizeFields')->willReturnArgument(1);
         $dataHandlerService->expects(self::never())->method('moveRecords');
 
         $closure = $this->getRegisteredClosure($recordService, $dataHandlerService, 'move_batch');

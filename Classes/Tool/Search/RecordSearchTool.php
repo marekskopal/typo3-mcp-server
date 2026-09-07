@@ -25,7 +25,9 @@ readonly class RecordSearchTool
             . ' Optionally filter by pid. Use orderBy to sort results by a field name and orderDirection (ASC or DESC).'
             . ' Returns matching records with pagination.'
             . ' In a non-live workspace, results are workspace-overlaid: the response carries "hasMore"'
-            . ' instead of "total" (a SQL COUNT cannot be overlaid) — page with offset until hasMore is false.',
+            . ' instead of "total" (a SQL COUNT cannot be overlaid) — page with offset until hasMore is false.'
+            . ' Many-to-many relation fields (select/group with an MM table) are returned as lists of related UIDs'
+            . ' but cannot be used as search conditions; a condition on one is rejected with an error.',
     )]
     public function execute(
         string $tableName,
@@ -55,7 +57,9 @@ readonly class RecordSearchTool
             );
         }
 
-        $resolvedOrderBy = SearchParamResolver::resolveOrderBy($orderBy, $allowedFields);
+        // An MM field's column holds only the relation count, so ordering by it would be meaningless.
+        $orderableFields = array_values(array_diff($allowedFields, array_keys($this->tcaSchemaService->getMMFields($tableName))));
+        $resolvedOrderBy = SearchParamResolver::resolveOrderBy($orderBy, $orderableFields);
         $orderDirection = SearchParamResolver::normalizeOrderDirection($orderDirection);
 
         $result = $this->recordService->search(

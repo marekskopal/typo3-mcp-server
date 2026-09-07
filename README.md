@@ -453,6 +453,8 @@ unrestricted access to every storage.
 
 **Search operators:** `eq`, `neq`, `like` (default), `gt`, `gte`, `lt`, `lte`, `in` (comma-separated), `null`, `notNull`.
 
+**Many-to-many fields:** `table_schema` marks a `select` or `group` column that relates through an MM table with `"relation": "mm"` and `"mm": "<mm table>"`, alongside `foreignTable` (select) or `allowed` (group) and any `minitems` / `maxitems`. `record_search` returns such fields as lists of related UIDs, but they **cannot be used as search conditions** — the physical column only stores the relation count, so a condition on one is rejected with an error rather than matched against that count. See [Many-to-many relation fields](#many-to-many-relation-fields) for the read/write format.
+
 **Search examples:**
 ```json
 // Simple LIKE search
@@ -572,6 +574,16 @@ Each registered table generates 9 tools. For `tx_news_domain_model_news` registe
 
 See [Adding Support for Other Extensions](#adding-support-for-other-extensions) to register your own tables.
 
+#### Many-to-many relation fields
+
+A `select` or `group` column with an `MM` table (for example `tx_msdarts_domain_model_team.groups`, a `selectCheckBox` relating teams to groups through `tx_msdarts_team_group_mm`) is a first-class field of every generated tool and of the generic record tools. Its physical column only stores the relation *count*, so the tools never return or accept it raw:
+
+- **Read** (`<prefix>_get`, `<prefix>_list` with `selectFields`, `record_search`): the field is a list of related UIDs in MM sorting order, e.g. `"groups": [20, 21]`. Resolution goes through TYPO3's `RelationHandler`, so `MM_opposite_field`, `MM_match_fields` and the workspace overlay behave as in the backend. A `group` field that allows several tables returns `table_uid` strings (`"tt_content_12"`) instead, since a bare integer would be ambiguous. Only fields that were actually selected are resolved: the default list fields never include an MM field, so a plain `<prefix>_list` stays a single query — opt in with `selectFields`.
+- **Write** (`<prefix>_create`, `<prefix>_update`, `<prefix>_update_batch`, `record_update_batch`): pass a JSON array of UIDs (`"groups": [20, 21]`) or the comma-separated string DataHandler takes (`"groups": "20,21"`). An empty array or string clears the relation. A non-integer entry is rejected with an error naming the field before anything is written. For a `group` field allowing several tables use the `table_uid` form; bare integers are accepted when exactly one table is allowed. DataHandler writes the MM rows itself.
+- **Search**: MM fields are not usable as `record_search` / `record_count` conditions and are rejected with an error (see [Schema and Search](#schema-and-search)).
+
+The `create` / `update` tool descriptions mark these fields as `groups (uid list)`. `inline` relations, file fields (`file` / `sys_file_reference`, see [File References](#file-references)) and `category` fields are unaffected, as are `select` / `group` fields **without** an MM table, which keep their raw column value.
+
 ## Resources Reference
 
 Resources provide read-only context about the TYPO3 instance. AI clients can read these to understand the environment before taking actions.
@@ -622,7 +634,7 @@ $GLOBALS['TYPO3_CONF_VARS']['EXTCONF']['ms_mcp_server']['tables']['tx_blog_domai
 
 Unlike auto-discovery, `EXTCONF` entries are treated as trusted operator configuration and are **not** run through the table/prefix/label validation the discovery module applies — so only register tables you control.
 
-This automatically creates 9 tools (`blog_post_list`, `blog_post_get`, `blog_post_create`, `blog_post_update`, `blog_post_delete`, `blog_post_move`, plus the batch variants `blog_post_delete_batch`, `blog_post_update_batch`, `blog_post_move_batch`) with fields resolved from TCA.
+This automatically creates 9 tools (`blog_post_list`, `blog_post_get`, `blog_post_create`, `blog_post_update`, `blog_post_delete`, `blog_post_move`, plus the batch variants `blog_post_delete_batch`, `blog_post_update_batch`, `blog_post_move_batch`) with fields resolved from TCA. The resolved read and writable fields include [many-to-many relation fields](#many-to-many-relation-fields); the default list fields (`uid`, `pid`, label, disabled) do not.
 
 Optional overrides:
 

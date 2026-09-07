@@ -21,7 +21,8 @@ readonly class RecordCountTool
             . ' Pass search as a JSON object with field names as keys (same format as record_search).'
             . ' Returns only the count, not the records themselves.'
             . ' In a non-live workspace the count is of workspace-overlaid records, matching record_search;'
-            . ' an "exact": false in the response means the result set was too large to overlay in full.',
+            . ' an "exact": false in the response means the result set was too large to overlay in full.'
+            . ' Many-to-many relation fields cannot be used as search conditions and are rejected with an error.',
     )]
     public function execute(string $tableName, int $pid = -1, string $search = '',): string
     {

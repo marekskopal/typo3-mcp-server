@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace MarekSkopal\MsMcpServer\Tests\Unit\Service;
 
 use MarekSkopal\MsMcpServer\Service\DataHandlerService;
+use MarekSkopal\MsMcpServer\Service\MmFieldNormalizer;
+use MarekSkopal\MsMcpServer\Service\TcaSchemaService;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 use TYPO3\CMS\Core\Site\SiteFinder;
@@ -15,7 +17,7 @@ final class DataHandlerServiceTest extends TestCase
     public function testCreateRecordBuildsCorrectDatamap(): void
     {
         $siteFinder = $this->createStub(SiteFinder::class);
-        $service = new DataHandlerService($siteFinder);
+        $service = new DataHandlerService($siteFinder, new MmFieldNormalizer(new TcaSchemaService()));
 
         // We cannot easily mock GeneralUtility::makeInstance(DataHandler::class)
         // in a pure unit test without TYPO3 bootstrap, so we verify the service

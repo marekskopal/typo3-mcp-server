@@ -81,6 +81,7 @@ readonly class DynamicToolRegistrar
             writableFields: $tableConfig['writableFields'] ?? $this->tcaSchemaService->getWritableFields($tableName),
             languageField: $translationConfig['languageField'],
             transOrigPointerField: $translationConfig['transOrigPointerField'],
+            mmFields: array_keys($this->tcaSchemaService->getMMFields($tableName)),
         );
     }
 

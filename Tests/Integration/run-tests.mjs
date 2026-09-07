@@ -835,6 +835,181 @@ class IntegrationTestRunner {
         }
     }
 
+    /**
+     * Many-to-many relation fields on the fixture tables registered by setup-typo3.sh
+     * (Tests/Integration/Fixtures/mcp_mm_fixture): tx_mcpmmfixture_team.groups is a select MM to
+     * tx_mcpmmfixture_group, tx_mcpmmfixture_team.partners a group MM back to the team table.
+     * The physical column only stores a count; the tools must read and write UID lists.
+     */
+    async testMMRelationFields(pageUid) {
+        section('MM Relation Fields (fixture)');
+
+        const tools = ['mm_team_create', 'mm_team_get', 'mm_team_list', 'mm_team_update', 'mm_team_update_batch',
+            'mm_team_delete', 'mm_group_create', 'mm_group_delete'];
+        if (!this.availableTools.has('mm_team_create')) {
+            for (const t of tools) {
+                skip(t, 'MM fixture extension not installed or tools not registered');
+                this.skipped.push({ tool: t, reason: 'not available' });
+            }
+            return;
+        }
+
+        const pid = pageUid ?? 1;
+        const isSameList = (a, b) => Array.isArray(a) && a.length === b.length && a.every((v, i) => v === b[i]);
+
+        // Schema: the MM field is present and marked as a relation.
+        const schema = await this.testTool('table_schema', { tableName: 'tx_mcpmmfixture_team' });
+        const groupsField = schema?.fields?.find(f => f.name === 'groups');
+        const partnersField = schema?.fields?.find(f => f.name === 'partners');
+        this.check('table_schema: select MM field marked relation=mm',
+            groupsField?.relation === 'mm' && groupsField?.mm === 'tx_mcpmmfixture_team_group_mm'
+                && groupsField?.foreignTable === 'tx_mcpmmfixture_group' && groupsField?.maxitems === 10,
+            `got ${JSON.stringify(groupsField)}`);
+        this.check('table_schema: group MM field marked relation=mm with allowed',
+            partnersField?.relation === 'mm' && partnersField?.mm === 'tx_mcpmmfixture_team_partner_mm'
+                && isSameList(partnersField?.allowed, ['tx_mcpmmfixture_team']),
+            `got ${JSON.stringify(partnersField)}`);
+
+        // The generated tools advertise the MM fields as uid lists.
+        const { tools: toolList } = await this.client.listTools();
+        const updateTool = toolList.find(t => t.name === 'mm_team_update');
+        this.check('mm_team_update: description lists groups (uid list)',
+            (updateTool?.description ?? '').includes('groups (uid list)'),
+            `got "${updateTool?.description}"`);
+
+        // Two groups to relate to.
+        const groupA = await this.testTool('mm_group_create', { pid, fields: JSON.stringify({ title: 'MM Group A' }) });
+        const groupB = await this.testTool('mm_group_create', { pid, fields: JSON.stringify({ title: 'MM Group B' }) });
+        const gA = groupA?.uid;
+        const gB = groupB?.uid;
+        if (!gA || !gB) {
+            fail('mm relation setup', 'could not create fixture groups');
+            return;
+        }
+
+        // Create with a JSON array of UIDs, read back as a UID list.
+        const team = await this.testTool('mm_team_create', {
+            pid,
+            fields: JSON.stringify({ title: 'MM Team', groups: [gA, gB] }),
+        });
+        const teamUid = team?.uid;
+        this.check('mm_team_create: groups not reported as ignored',
+            teamUid && !(team.ignoredFields ?? []).includes('groups'),
+            `got ${JSON.stringify(team)}`);
+
+        if (teamUid) {
+            let got = await this.testTool('mm_team_get', { uid: teamUid });
+            this.check('mm_team_get: groups is the UID list written on create',
+                isSameList(got?.groups, [gA, gB]), `got ${JSON.stringify(got?.groups)}`);
+            this.check('mm_team_get: partners is an empty list, not a count',
+                isSameList(got?.partners, []), `got ${JSON.stringify(got?.partners)}`);
+
+            // list: only resolved when selected; default list fields carry no MM field.
+            const listed = await this.testTool('mm_team_list', { pid, selectFields: 'title,groups' });
+            const listedTeam = listed?.records?.find(r => r.uid === teamUid);
+            this.check('mm_team_list: selected MM field comes back as a UID list',
+                isSameList(listedTeam?.groups, [gA, gB]), `got ${JSON.stringify(listedTeam)}`);
+            const listedDefault = await this.callToolSafe('mm_team_list', { pid });
+            const defaultTeam = listedDefault?.records?.find(r => r.uid === teamUid);
+            this.check('mm_team_list: default fields do not include the MM field',
+                defaultTeam && !('groups' in defaultTeam), `got ${JSON.stringify(defaultTeam)}`);
+
+            // record_search returns the list too, but refuses a condition on the MM column.
+            const searched = await this.testTool('record_search', {
+                tableName: 'tx_mcpmmfixture_team', search: JSON.stringify({ title: 'MM Team' }), pid,
+            });
+            const searchedTeam = searched?.records?.find(r => r.uid === teamUid);
+            this.check('record_search: MM field resolved to a UID list',
+                isSameList(searchedTeam?.groups, [gA, gB]), `got ${JSON.stringify(searchedTeam)}`);
+            try {
+                await this.callTool('record_search', {
+                    tableName: 'tx_mcpmmfixture_team', search: JSON.stringify({ groups: { op: 'eq', value: String(gA) } }),
+                });
+                this.check('record_search: condition on MM field rejected', false, 'no error was raised');
+            } catch (e) {
+                this.check('record_search: condition on MM field rejected',
+                    e.message.includes('many-to-many'), `got "${e.message}"`);
+            }
+
+            // Update with the comma-separated string form.
+            await this.testTool('mm_team_update', { uid: teamUid, fields: JSON.stringify({ groups: String(gB) }) });
+            got = await this.callToolSafe('mm_team_get', { uid: teamUid });
+            this.check('mm_team_update: comma-separated string replaces the relation',
+                isSameList(got?.groups, [gB]), `got ${JSON.stringify(got?.groups)}`);
+
+            // Batch update (generic and generated) with an array.
+            await this.testTool('record_update_batch', {
+                tableName: 'tx_mcpmmfixture_team', uids: String(teamUid), fields: JSON.stringify({ groups: [gA] }),
+            });
+            got = await this.callToolSafe('mm_team_get', { uid: teamUid });
+            this.check('record_update_batch: MM field written from a UID array',
+                isSameList(got?.groups, [gA]), `got ${JSON.stringify(got?.groups)}`);
+
+            await this.testTool('mm_team_update_batch', {
+                uids: String(teamUid), fields: JSON.stringify({ groups: [gB, gA] }),
+            });
+            got = await this.callToolSafe('mm_team_get', { uid: teamUid });
+            this.check('mm_team_update_batch: MM field written in the given order',
+                isSameList(got?.groups, [gB, gA]), `got ${JSON.stringify(got?.groups)}`);
+
+            // Dry run validates the MM value exactly like the real write.
+            try {
+                await this.callTool('mm_team_update_batch', {
+                    uids: String(teamUid), fields: JSON.stringify({ groups: [gA, 'abc'] }), dryRun: true,
+                });
+                this.check('mm_team_update_batch: dry run rejects non-integer entry', false, 'no error was raised');
+            } catch (e) {
+                this.check('mm_team_update_batch: dry run rejects non-integer entry',
+                    e.message.includes('"abc"'), `got "${e.message}"`);
+            }
+
+            // orderBy on the MM column is refused, since it would sort by the relation count.
+            try {
+                await this.callTool('record_search', { tableName: 'tx_mcpmmfixture_team', search: '{}', orderBy: 'groups' });
+                this.check('record_search: orderBy on MM field rejected', false, 'no error was raised');
+            } catch (e) {
+                this.check('record_search: orderBy on MM field rejected',
+                    e.message.includes('Invalid orderBy field: groups'), `got "${e.message}"`);
+            }
+
+            // Invalid entry: rejected, relation untouched.
+            try {
+                await this.callTool('mm_team_update', { uid: teamUid, fields: JSON.stringify({ groups: [gA, 'abc'] }) });
+                this.check('mm_team_update: non-integer entry rejected', false, 'no error was raised');
+            } catch (e) {
+                this.check('mm_team_update: non-integer entry rejected',
+                    e.message.includes('"groups"') && e.message.includes('"abc"'), `got "${e.message}"`);
+            }
+            got = await this.callToolSafe('mm_team_get', { uid: teamUid });
+            this.check('mm_team_update: rejected write left the relation unchanged',
+                isSameList(got?.groups, [gB, gA]), `got ${JSON.stringify(got?.groups)}`);
+
+            // Clear with an empty array.
+            await this.testTool('mm_team_update', { uid: teamUid, fields: JSON.stringify({ groups: [] }) });
+            got = await this.callToolSafe('mm_team_get', { uid: teamUid });
+            this.check('mm_team_update: empty array clears the relation',
+                isSameList(got?.groups, []), `got ${JSON.stringify(got?.groups)}`);
+
+            // Group MM (partners → another team) round-trips the same way.
+            const partner = await this.callToolSafe('mm_team_create', {
+                pid, fields: JSON.stringify({ title: 'MM Partner Team', partners: [teamUid] }),
+            });
+            if (partner?.uid) {
+                const gotPartner = await this.callToolSafe('mm_team_get', { uid: partner.uid });
+                this.check('group MM field: partners round-trips as a UID list',
+                    isSameList(gotPartner?.partners, [teamUid]), `got ${JSON.stringify(gotPartner?.partners)}`);
+                await this.callToolSafe('mm_team_delete', { uid: partner.uid });
+            } else {
+                this.check('group MM field: partners round-trips as a UID list', false, 'could not create partner team');
+            }
+
+            await this.testTool('mm_team_delete', { uid: teamUid });
+        }
+
+        await this.testTool('mm_group_delete', { uid: gA });
+        await this.callToolSafe('mm_group_delete', { uid: gB });
+    }
+
     async cleanupRecords(pageUid, childUid, contentUid) {
         section('Cleanup');
         if (contentUid) await this.testTool('content_delete', { uid: contentUid });
@@ -1022,6 +1197,7 @@ class IntegrationTestRunner {
         await this.testBackendUserAndGroupOperations();
         await this.testConditionalTools();
         await this.testDynamicTools(pageUid);
+        await this.testMMRelationFields(pageUid);
         await this.testWorkspaceOperations(pageUid);
         await this.cleanupRecords(pageUid, childUid, contentUid);
 

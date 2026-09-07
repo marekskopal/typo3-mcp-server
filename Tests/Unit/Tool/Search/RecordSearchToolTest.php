@@ -356,6 +356,31 @@ final class RecordSearchToolTest extends TestCase
         $tool->execute('pages', '{"title":"Test"}', 20, 0, -1, 'nonexistent_field');
     }
 
+    /** An MM field's column holds only the relation count, so it is not in the orderable set even though it is readable. */
+    public function testExecuteRejectsOrderByOnMMField(): void
+    {
+        $previousTca = $GLOBALS['TCA'] ?? null;
+        $GLOBALS['TCA']['tx_test_team'] = [
+            'ctrl' => ['label' => 'title'],
+            'columns' => [
+                'title' => ['config' => ['type' => 'input']],
+                'groups' => ['config' => ['type' => 'select', 'foreign_table' => 'tx_test_group', 'MM' => 'tx_test_team_group_mm']],
+            ],
+        ];
+
+        try {
+            $recordService = $this->createStub(RecordService::class);
+            $tool = new RecordSearchTool($recordService, new TcaSchemaService());
+
+            $this->expectException(ToolCallException::class);
+            $this->expectExceptionMessage('Invalid orderBy field: groups. Allowed fields: uid, pid, title');
+
+            $tool->execute('tx_test_team', '{"title":"Test"}', 20, 0, -1, 'groups');
+        } finally {
+            $GLOBALS['TCA'] = $previousTca;
+        }
+    }
+
     public function testExecuteThrowsExceptionOnError(): void
     {
         $recordService = $this->createStub(RecordService::class);

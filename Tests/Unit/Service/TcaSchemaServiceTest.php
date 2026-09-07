@@ -247,16 +247,17 @@ final class TcaSchemaServiceTest extends TestCase
         self::assertContains('type', $this->service->getReadFields('tx_test'));
     }
 
-    public function testGetReadFieldsExcludesSelectWithMM(): void
+    public function testGetReadFieldsIncludesSelectWithMM(): void
     {
         $GLOBALS['TCA']['tx_test'] = [
             'ctrl' => [],
             'columns' => [
-                'categories' => ['config' => ['type' => 'select', 'MM' => 'tx_test_category_mm']],
+                'categories' => ['config' => ['type' => 'select', 'foreign_table' => 'tx_test_category', 'MM' => 'tx_test_category_mm']],
             ],
         ];
 
-        self::assertNotContains('categories', $this->service->getReadFields('tx_test'));
+        self::assertContains('categories', $this->service->getReadFields('tx_test'));
+        self::assertContains('categories', $this->service->getWritableFields('tx_test'));
     }
 
     public function testGetReadFieldsIncludesGroupWithoutMM(): void
@@ -271,16 +272,71 @@ final class TcaSchemaServiceTest extends TestCase
         self::assertContains('related', $this->service->getReadFields('tx_test'));
     }
 
-    public function testGetReadFieldsExcludesGroupWithMM(): void
+    public function testGetReadFieldsIncludesGroupWithMM(): void
     {
         $GLOBALS['TCA']['tx_test'] = [
             'ctrl' => [],
             'columns' => [
-                'related' => ['config' => ['type' => 'group', 'MM' => 'tx_test_related_mm']],
+                'related' => ['config' => ['type' => 'group', 'allowed' => 'tx_test', 'MM' => 'tx_test_related_mm']],
             ],
         ];
 
-        self::assertNotContains('related', $this->service->getReadFields('tx_test'));
+        self::assertContains('related', $this->service->getReadFields('tx_test'));
+        self::assertContains('related', $this->service->getWritableFields('tx_test'));
+    }
+
+    public function testGetWritableFieldsExcludesReadOnlyMMField(): void
+    {
+        $GLOBALS['TCA']['tx_test'] = [
+            'ctrl' => [],
+            'columns' => [
+                'related_from' => ['config' => ['type' => 'group', 'allowed' => 'tx_test', 'MM' => 'tx_test_related_mm', 'MM_opposite_field' => 'related', 'readOnly' => true]],
+            ],
+        ];
+
+        self::assertContains('related_from', $this->service->getReadFields('tx_test'));
+        self::assertNotContains('related_from', $this->service->getWritableFields('tx_test'));
+    }
+
+    /** MM fields are exactly the select/group columns with an MM table; inline and file fields keep their own handling. */
+    public function testGetMMFieldsReturnsOnlyMMSelectAndGroupColumns(): void
+    {
+        $GLOBALS['TCA']['tx_test'] = [
+            'ctrl' => ['tstamp' => 'tstamp'],
+            'columns' => [
+                'groups' => ['config' => ['type' => 'select', 'foreign_table' => 'tx_test_group', 'MM' => 'tx_test_group_mm']],
+                'related' => ['config' => ['type' => 'group', 'allowed' => 'tt_content', 'MM' => 'tx_test_related_mm']],
+                'type' => ['config' => ['type' => 'select', 'items' => []]],
+                'pages' => ['config' => ['type' => 'group', 'allowed' => 'pages']],
+                'children' => ['config' => ['type' => 'inline', 'foreign_table' => 'tx_test_child', 'foreign_field' => 'parent']],
+                'image' => ['config' => ['type' => 'file']],
+                'media' => ['config' => ['type' => 'inline', 'foreign_table' => 'sys_file_reference']],
+                'categories' => ['config' => ['type' => 'category']],
+                'tstamp' => ['config' => ['type' => 'select', 'MM' => 'tx_test_bogus_mm']],
+            ],
+        ];
+
+        $mmFields = $this->service->getMMFields('tx_test');
+
+        self::assertSame(['groups', 'related'], array_keys($mmFields));
+        self::assertSame('tx_test_group_mm', $mmFields['groups']['MM']);
+        self::assertTrue($this->service->isMMField('tx_test', 'groups'));
+        self::assertFalse($this->service->isMMField('tx_test', 'type'));
+        self::assertFalse($this->service->isMMField('tx_test', 'children'));
+        self::assertFalse($this->service->isMMField('tx_test', 'nonexistent'));
+
+        // The unrelated field kinds are left exactly as before: not readable, but file fields still discoverable.
+        $readFields = $this->service->getReadFields('tx_test');
+        self::assertNotContains('children', $readFields);
+        self::assertNotContains('image', $readFields);
+        self::assertNotContains('media', $readFields);
+        self::assertNotContains('categories', $readFields);
+        self::assertSame(['image', 'media'], $this->service->getFileFields('tx_test'));
+    }
+
+    public function testGetMMFieldsReturnsEmptyForMissingTable(): void
+    {
+        self::assertSame([], $this->service->getMMFields('nonexistent_table'));
     }
 
     public function testGetReadFieldsExcludesSystemFields(): void
@@ -742,6 +798,106 @@ final class TcaSchemaServiceTest extends TestCase
         self::assertSame('datetime', $field['type']);
         self::assertSame('date', $field['format']);
         self::assertSame('date', $field['dbType']);
+    }
+
+    public function testGetFieldsSchemaMarksMMSelectAsRelation(): void
+    {
+        $GLOBALS['TCA']['tx_test_team'] = [
+            'ctrl' => [],
+            'columns' => [
+                'groups' => [
+                    'label' => 'Groups',
+                    'config' => [
+                        'type' => 'select',
+                        'renderType' => 'selectCheckBox',
+                        'foreign_table' => 'tx_test_group',
+                        'MM' => 'tx_test_team_group_mm',
+                        'minitems' => 1,
+                        'maxitems' => 5,
+                    ],
+                ],
+            ],
+        ];
+
+        $result = $this->service->getFieldsSchema('tx_test_team');
+
+        self::assertCount(1, $result['fields']);
+        $field = $result['fields'][0];
+        self::assertSame('groups', $field['name']);
+        self::assertSame('select', $field['type']);
+        self::assertSame('selectCheckBox', $field['renderType']);
+        self::assertSame('tx_test_group', $field['foreignTable']);
+        self::assertSame('mm', $field['relation']);
+        self::assertSame('tx_test_team_group_mm', $field['mm']);
+        self::assertSame(1, $field['minitems']);
+        self::assertSame(5, $field['maxitems']);
+    }
+
+    public function testGetFieldsSchemaMarksMMGroupWithAllowedTables(): void
+    {
+        $GLOBALS['TCA']['tx_test'] = [
+            'ctrl' => [],
+            'columns' => [
+                'related' => [
+                    'config' => [
+                        'type' => 'group',
+                        'allowed' => 'tt_content, pages',
+                        'MM' => 'tx_test_related_mm',
+                        'maxitems' => 10,
+                    ],
+                ],
+            ],
+        ];
+
+        $field = $this->service->getFieldsSchema('tx_test')['fields'][0];
+
+        self::assertSame('group', $field['type']);
+        self::assertSame(['tt_content', 'pages'], $field['allowed']);
+        self::assertSame('mm', $field['relation']);
+        self::assertSame('tx_test_related_mm', $field['mm']);
+        self::assertSame(10, $field['maxitems']);
+        self::assertArrayNotHasKey('minitems', $field);
+        self::assertArrayNotHasKey('foreignTable', $field);
+    }
+
+    /** A select or group without an MM table keeps its raw-column format and must not be marked as a relation. */
+    public function testGetFieldsSchemaDoesNotMarkPlainSelectOrGroupAsRelation(): void
+    {
+        $GLOBALS['TCA']['tx_test'] = [
+            'ctrl' => [],
+            'columns' => [
+                'category' => ['config' => ['type' => 'select', 'renderType' => 'selectSingle', 'foreign_table' => 'sys_category']],
+                'pages' => ['config' => ['type' => 'group', 'allowed' => 'pages', 'maxitems' => 3]],
+            ],
+        ];
+
+        $fields = $this->service->getFieldsSchema('tx_test')['fields'];
+
+        self::assertArrayNotHasKey('relation', $fields[0]);
+        self::assertArrayNotHasKey('mm', $fields[0]);
+        self::assertSame('sys_category', $fields[0]['foreignTable']);
+        self::assertArrayNotHasKey('relation', $fields[1]);
+        self::assertSame(['pages'], $fields[1]['allowed']);
+        self::assertSame(3, $fields[1]['maxitems']);
+    }
+
+    /** Inline and file-reference columns are out of scope: not in the schema, not readable, still reported as file fields. */
+    public function testGetFieldsSchemaLeavesInlineAndFileReferenceFieldsOut(): void
+    {
+        $GLOBALS['TCA']['tx_test'] = [
+            'ctrl' => [],
+            'columns' => [
+                'title' => ['config' => ['type' => 'input']],
+                'children' => ['config' => ['type' => 'inline', 'foreign_table' => 'tx_test_child', 'foreign_field' => 'parent']],
+                'media' => ['config' => ['type' => 'inline', 'foreign_table' => 'sys_file_reference']],
+                'image' => ['config' => ['type' => 'file']],
+            ],
+        ];
+
+        $names = array_column($this->service->getFieldsSchema('tx_test')['fields'], 'name');
+
+        self::assertSame(['title'], $names);
+        self::assertSame(['media', 'image'], $this->service->getFileFields('tx_test'));
     }
 
     public function testGetFieldsSchemaReturnsLinkAllowedTypes(): void

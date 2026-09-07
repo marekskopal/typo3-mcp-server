@@ -26,8 +26,13 @@ readonly class TcaSchemaService
         'passthrough',
     ];
 
-    /** TCA types that may store simple values depending on configuration (no MM table). */
-    private const array CONDITIONAL_TYPES = [
+    /**
+     * TCA types that hold either a plain value (a comma list of UIDs or item values) or, with an
+     * `MM` table configured, a many-to-many relation. Both forms are readable and writable: the
+     * relation form is resolved to a UID list on read and normalised from one on write, see
+     * {@see MmRelationResolver} and {@see MmFieldNormalizer}.
+     */
+    private const array RELATION_TYPES = [
         'select',
         'group',
     ];
@@ -164,6 +169,56 @@ readonly class TcaSchemaService
         return $fields;
     }
 
+    /**
+     * Returns the select/group columns that hold a many-to-many relation through an `MM` table,
+     * keyed by field name with their TCA `config` array as value.
+     *
+     * Only readable, non-system columns are included, so the result is exactly the subset of
+     * {@see getReadFields()} whose physical column stores a relation count rather than a value.
+     *
+     * @return array<string, array<mixed>>
+     */
+    public function getMMFields(string $tableName): array
+    {
+        $tca = $this->getTca($tableName);
+        if ($tca === null) {
+            return [];
+        }
+
+        $columns = $tca['columns'] ?? [];
+        if (!is_array($columns)) {
+            return [];
+        }
+
+        $systemFields = $this->getSystemFields($tca);
+        $fields = [];
+
+        foreach ($columns as $fieldName => $columnConfig) {
+            if (!is_string($fieldName) || !is_array($columnConfig)) {
+                continue;
+            }
+
+            if (in_array($fieldName, $systemFields, true)) {
+                continue;
+            }
+
+            $config = $columnConfig['config'] ?? null;
+            if (!is_array($config) || !$this->isMMRelation($config)) {
+                continue;
+            }
+
+            $fields[$fieldName] = $config;
+        }
+
+        return $fields;
+    }
+
+    /** True when the field is a select/group column with an MM table, i.e. one {@see getMMFields()} reports. */
+    public function isMMField(string $tableName, string $fieldName): bool
+    {
+        return array_key_exists($fieldName, $this->getMMFields($tableName));
+    }
+
     /** @return list<string> Field names that are file reference fields (TCA type 'file' or inline with sys_file_reference). */
     public function getFileFields(string $tableName): array
     {
@@ -271,8 +326,73 @@ readonly class TcaSchemaService
 
         $this->addConstraints($schema, $config, $type);
         $this->addItems($schema, $config, $type);
+        $this->addRelation($schema, $config, $type);
 
         return $schema;
+    }
+
+    /**
+     * Relation metadata for select/group columns: the item bounds, the target table(s), and for an
+     * MM relation the `relation: mm` marker plus the MM table, so a client can tell that the field
+     * carries a list of foreign UIDs rather than the count its physical column stores.
+     *
+     * @param array<string, mixed> &$schema
+     * @param array<mixed> $config
+     */
+    private function addRelation(array &$schema, array $config, string $type): void
+    {
+        if (!in_array($type, self::RELATION_TYPES, true)) {
+            return;
+        }
+
+        $minitems = $config['minitems'] ?? null;
+        if (is_int($minitems) && $minitems > 0) {
+            $schema['minitems'] = $minitems;
+        }
+
+        $maxitems = $config['maxitems'] ?? null;
+        if (is_int($maxitems) && $maxitems > 0) {
+            $schema['maxitems'] = $maxitems;
+        }
+
+        if ($type === 'group') {
+            $allowed = $config['allowed'] ?? null;
+            if (is_string($allowed) && $allowed !== '') {
+                $schema['allowed'] = $this->parseAllowedTables($allowed);
+            }
+        }
+
+        if (!$this->isMMRelation($config)) {
+            return;
+        }
+
+        $schema['relation'] = 'mm';
+        $schema['mm'] = $config['MM'];
+
+        // addItems() only reports foreign_table for a select without static items; an MM select
+        // always relates to its foreign table, so make sure it is named.
+        $foreignTable = $config['foreign_table'] ?? null;
+        if ($type === 'select' && is_string($foreignTable) && $foreignTable !== '' && !isset($schema['foreignTable'])) {
+            $schema['foreignTable'] = $foreignTable;
+        }
+    }
+
+    /**
+     * The tables a group field may relate to. `*` means every TCA table and is reported as-is.
+     *
+     * @return list<string>
+     */
+    public function parseAllowedTables(string $allowed): array
+    {
+        $tables = [];
+        foreach (explode(',', $allowed) as $table) {
+            $table = trim($table);
+            if ($table !== '') {
+                $tables[] = $table;
+            }
+        }
+
+        return $tables;
     }
 
     /**
@@ -473,15 +593,7 @@ readonly class TcaSchemaService
             return false;
         }
 
-        if (in_array($type, self::VALUE_TYPES, true)) {
-            return true;
-        }
-
-        if (in_array($type, self::CONDITIONAL_TYPES, true)) {
-            return !$this->hasMMTable($config);
-        }
-
-        return false;
+        return in_array($type, self::VALUE_TYPES, true) || in_array($type, self::RELATION_TYPES, true);
     }
 
     /** @param array<mixed> $columnConfig */
@@ -501,9 +613,19 @@ readonly class TcaSchemaService
         return $readOnly !== true;
     }
 
-    /** @param array<mixed> $config */
-    private function hasMMTable(array $config): bool
+    /**
+     * A select or group column whose values live in an MM table. The physical column then only
+     * stores the relation count, which is why such fields need the resolver/normaliser pair.
+     *
+     * @param array<mixed> $config
+     */
+    private function isMMRelation(array $config): bool
     {
+        $type = $config['type'] ?? null;
+        if (!is_string($type) || !in_array($type, self::RELATION_TYPES, true)) {
+            return false;
+        }
+
         $mm = $config['MM'] ?? null;
 
         return is_string($mm) && $mm !== '';
