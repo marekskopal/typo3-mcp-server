@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace MarekSkopal\MsMcpServer\Tests\Unit\Service;
 
 use Doctrine\DBAL\Result;
+use MarekSkopal\MsMcpServer\Service\MmRelationResolver;
 use MarekSkopal\MsMcpServer\Service\PermissionService;
 use MarekSkopal\MsMcpServer\Service\RecordService;
+use MarekSkopal\MsMcpServer\Service\TcaSchemaService;
 use MarekSkopal\MsMcpServer\Service\WorkspaceContextService;
 use Mcp\Exception\ToolCallException;
 use PHPUnit\Framework\Attributes\CoversClass;
@@ -37,6 +39,12 @@ final class RecordServiceTest extends TestCase
         GeneralUtility::purgeInstances();
     }
 
+    /** No TCA is set up in these tests, so the resolver has no MM fields and rows pass through unchanged. */
+    private function createMmRelationResolver(): MmRelationResolver
+    {
+        return new MmRelationResolver(new TcaSchemaService(), new WorkspaceContextService());
+    }
+
     public function testFindByUidReturnsRecordWhenFound(): void
     {
         $expectedRecord = ['uid' => 1, 'title' => 'Test Page'];
@@ -53,7 +61,7 @@ final class RecordServiceTest extends TestCase
         $connectionPool = $this->createStub(ConnectionPool::class);
         $connectionPool->method('getQueryBuilderForTable')->willReturn($queryBuilder);
 
-        $service = new RecordService($connectionPool, new WorkspaceContextService(), $this->createAllowingPermissionService());
+        $service = new RecordService($connectionPool, new WorkspaceContextService(), $this->createAllowingPermissionService(), $this->createMmRelationResolver());
         $record = $service->findByUid('pages', 1, ['uid', 'title']);
 
         self::assertSame($expectedRecord, $record);
@@ -73,7 +81,7 @@ final class RecordServiceTest extends TestCase
         $connectionPool = $this->createStub(ConnectionPool::class);
         $connectionPool->method('getQueryBuilderForTable')->willReturn($queryBuilder);
 
-        $service = new RecordService($connectionPool, new WorkspaceContextService(), $this->createAllowingPermissionService());
+        $service = new RecordService($connectionPool, new WorkspaceContextService(), $this->createAllowingPermissionService(), $this->createMmRelationResolver());
         $record = $service->findByUid('pages', 999, ['uid', 'title']);
 
         self::assertNull($record);
@@ -101,7 +109,7 @@ final class RecordServiceTest extends TestCase
         $connectionPool = $this->createStub(ConnectionPool::class);
         $connectionPool->method('getQueryBuilderForTable')->willReturn($queryBuilder);
 
-        $service = new RecordService($connectionPool, new WorkspaceContextService(), $this->createAllowingPermissionService());
+        $service = new RecordService($connectionPool, new WorkspaceContextService(), $this->createAllowingPermissionService(), $this->createMmRelationResolver());
         $service->findByUid('pages', 1, ['uid', 'title']);
     }
 
@@ -119,7 +127,7 @@ final class RecordServiceTest extends TestCase
         $connectionPool = $this->createStub(ConnectionPool::class);
         $connectionPool->method('getQueryBuilderForTable')->willReturn($queryBuilder);
 
-        $service = new RecordService($connectionPool, new WorkspaceContextService(), $this->createAllowingPermissionService());
+        $service = new RecordService($connectionPool, new WorkspaceContextService(), $this->createAllowingPermissionService(), $this->createMmRelationResolver());
         $existing = $service->findExistingUids('pages', [1, 2, 3]);
 
         self::assertSame([1, 3], $existing);
@@ -129,7 +137,7 @@ final class RecordServiceTest extends TestCase
     {
         $connectionPool = $this->createStub(ConnectionPool::class);
 
-        $service = new RecordService($connectionPool, new WorkspaceContextService(), $this->createAllowingPermissionService());
+        $service = new RecordService($connectionPool, new WorkspaceContextService(), $this->createAllowingPermissionService(), $this->createMmRelationResolver());
         $existing = $service->findExistingUids('pages', []);
 
         self::assertSame([], $existing);
@@ -172,7 +180,7 @@ final class RecordServiceTest extends TestCase
                 return $callCount === 1 ? $listQueryBuilder : $countQueryBuilder;
             });
 
-        $service = new RecordService($connectionPool, new WorkspaceContextService(), $this->createAllowingPermissionService());
+        $service = new RecordService($connectionPool, new WorkspaceContextService(), $this->createAllowingPermissionService(), $this->createMmRelationResolver());
         $result = $service->findByPid('pages', 0, 20, 0, ['uid', 'title']);
 
         self::assertSame($expectedRecords, $result['records']);
@@ -215,7 +223,7 @@ final class RecordServiceTest extends TestCase
                 return $callCount === 1 ? $listQueryBuilder : $countQueryBuilder;
             });
 
-        $service = new RecordService($connectionPool, new WorkspaceContextService(), $this->createAllowingPermissionService());
+        $service = new RecordService($connectionPool, new WorkspaceContextService(), $this->createAllowingPermissionService(), $this->createMmRelationResolver());
         $result = $service->findByPid('pages', 0, 20, 0, ['uid', 'title'], 0, 'sys_language_uid');
 
         self::assertSame($expectedRecords, $result['records']);
@@ -258,7 +266,7 @@ final class RecordServiceTest extends TestCase
                 return $callCount === 1 ? $listQueryBuilder : $countQueryBuilder;
             });
 
-        $service = new RecordService($connectionPool, new WorkspaceContextService(), $this->createAllowingPermissionService());
+        $service = new RecordService($connectionPool, new WorkspaceContextService(), $this->createAllowingPermissionService(), $this->createMmRelationResolver());
         $result = $service->search('pages', ['title' => ['operator' => 'like', 'value' => 'Hello']], 20, 0, ['uid', 'title']);
 
         self::assertSame($expectedRecords, $result['records']);
@@ -297,7 +305,7 @@ final class RecordServiceTest extends TestCase
                 return $callCount === 1 ? $listQueryBuilder : $countQueryBuilder;
             });
 
-        $service = new RecordService($connectionPool, new WorkspaceContextService(), $this->createAllowingPermissionService());
+        $service = new RecordService($connectionPool, new WorkspaceContextService(), $this->createAllowingPermissionService(), $this->createMmRelationResolver());
         $result = $service->search('pages', ['title' => ['operator' => 'like', 'value' => 'Test']], 20, 0, ['uid', 'title'], 5);
 
         self::assertSame([], $result['records']);
@@ -338,7 +346,7 @@ final class RecordServiceTest extends TestCase
         $connectionPool = $this->createStub(ConnectionPool::class);
         $connectionPool->method('getQueryBuilderForTable')->willReturn($queryBuilder);
 
-        $service = new RecordService($connectionPool, new WorkspaceContextService(), $this->createAllowingPermissionService());
+        $service = new RecordService($connectionPool, new WorkspaceContextService(), $this->createAllowingPermissionService(), $this->createMmRelationResolver());
         $service->search('pages', ['title' => ['operator' => 'like', 'value' => '50%_x']], 20, 0, ['uid', 'title']);
 
         self::assertContains('%50\\%\\_x%', $captured);
@@ -378,7 +386,7 @@ final class RecordServiceTest extends TestCase
         $connectionPool = $this->createStub(ConnectionPool::class);
         $connectionPool->method('getQueryBuilderForTable')->willReturn($queryBuilder);
 
-        $service = new RecordService($connectionPool, new WorkspaceContextService(), $this->createAllowingPermissionService());
+        $service = new RecordService($connectionPool, new WorkspaceContextService(), $this->createAllowingPermissionService(), $this->createMmRelationResolver());
         $service->findByPid('pages', 1, 20, -50, ['uid', 'title']);
 
         self::assertSame([0], $capturedOffsets);
@@ -418,7 +426,7 @@ final class RecordServiceTest extends TestCase
                 return $callCount === 1 ? $listQueryBuilder : $countQueryBuilder;
             });
 
-        $service = new RecordService($connectionPool, new WorkspaceContextService(), $this->createAllowingPermissionService());
+        $service = new RecordService($connectionPool, new WorkspaceContextService(), $this->createAllowingPermissionService(), $this->createMmRelationResolver());
         $result = $service->search('pages', ['title' => ['operator' => 'eq', 'value' => 'Home']], 20, 0, ['uid', 'title']);
 
         self::assertSame($expectedRecords, $result['records']);
@@ -457,7 +465,7 @@ final class RecordServiceTest extends TestCase
                 return $callCount === 1 ? $listQueryBuilder : $countQueryBuilder;
             });
 
-        $service = new RecordService($connectionPool, new WorkspaceContextService(), $this->createAllowingPermissionService());
+        $service = new RecordService($connectionPool, new WorkspaceContextService(), $this->createAllowingPermissionService(), $this->createMmRelationResolver());
         $result = $service->search('pages', ['title' => ['operator' => 'null', 'value' => '']], 20, 0, ['uid', 'title']);
 
         self::assertSame([], $result['records']);
@@ -498,7 +506,7 @@ final class RecordServiceTest extends TestCase
                 return $callCount === 1 ? $listQueryBuilder : $countQueryBuilder;
             });
 
-        $service = new RecordService($connectionPool, new WorkspaceContextService(), $this->createAllowingPermissionService());
+        $service = new RecordService($connectionPool, new WorkspaceContextService(), $this->createAllowingPermissionService(), $this->createMmRelationResolver());
         $result = $service->search('pages', ['uid' => ['operator' => 'in', 'value' => '1,3']], 20, 0, ['uid', 'title']);
 
         self::assertSame($expectedRecords, $result['records']);
@@ -539,7 +547,7 @@ final class RecordServiceTest extends TestCase
                 return $callCount === 1 ? $listQueryBuilder : $countQueryBuilder;
             });
 
-        $service = new RecordService($connectionPool, new WorkspaceContextService(), $this->createAllowingPermissionService());
+        $service = new RecordService($connectionPool, new WorkspaceContextService(), $this->createAllowingPermissionService(), $this->createMmRelationResolver());
         $result = $service->search(
             'pages',
             ['title' => ['operator' => 'like', 'value' => '']],
@@ -587,7 +595,7 @@ final class RecordServiceTest extends TestCase
                 return $callCount === 1 ? $listQueryBuilder : $countQueryBuilder;
             });
 
-        $service = new RecordService($connectionPool, new WorkspaceContextService(), $this->createAllowingPermissionService());
+        $service = new RecordService($connectionPool, new WorkspaceContextService(), $this->createAllowingPermissionService(), $this->createMmRelationResolver());
         $result = $service->search(
             'pages',
             ['title' => ['operator' => 'like', 'value' => 'Test']],
@@ -626,7 +634,7 @@ final class RecordServiceTest extends TestCase
         $connectionPool = $this->createStub(ConnectionPool::class);
         $connectionPool->method('getQueryBuilderForTable')->willReturn($queryBuilder);
 
-        $service = new RecordService($connectionPool, new WorkspaceContextService(), $this->createAllowingPermissionService());
+        $service = new RecordService($connectionPool, new WorkspaceContextService(), $this->createAllowingPermissionService(), $this->createMmRelationResolver());
         $references = $service->findFileReferences('tt_content', 100, 'image');
 
         self::assertCount(2, $references);
@@ -652,7 +660,7 @@ final class RecordServiceTest extends TestCase
         $connectionPool = $this->createStub(ConnectionPool::class);
         $connectionPool->method('getQueryBuilderForTable')->willReturn($queryBuilder);
 
-        $service = new RecordService($connectionPool, new WorkspaceContextService(), $this->createAllowingPermissionService());
+        $service = new RecordService($connectionPool, new WorkspaceContextService(), $this->createAllowingPermissionService(), $this->createMmRelationResolver());
         $references = $service->findFileReferences('tt_content', 999, 'image');
 
         self::assertSame([], $references);
@@ -677,7 +685,7 @@ final class RecordServiceTest extends TestCase
         $connectionPool = $this->createStub(ConnectionPool::class);
         $connectionPool->method('getQueryBuilderForTable')->willReturn($queryBuilder);
 
-        $service = new RecordService($connectionPool, new WorkspaceContextService(), $this->createAllowingPermissionService());
+        $service = new RecordService($connectionPool, new WorkspaceContextService(), $this->createAllowingPermissionService(), $this->createMmRelationResolver());
         $references = $service->findFileReferences('tt_content', 100, 'image');
 
         self::assertSame([], $references);
@@ -703,7 +711,7 @@ final class RecordServiceTest extends TestCase
         $connectionPool = $this->createStub(ConnectionPool::class);
         $connectionPool->method('getQueryBuilderForTable')->willReturn($queryBuilder);
 
-        $service = new RecordService($connectionPool, new WorkspaceContextService(), $this->createAllowingPermissionService());
+        $service = new RecordService($connectionPool, new WorkspaceContextService(), $this->createAllowingPermissionService(), $this->createMmRelationResolver());
         $translations = $service->findTranslations('pages', 42, 'sys_language_uid', 'l10n_parent');
 
         self::assertCount(2, $translations);
@@ -757,7 +765,7 @@ final class RecordServiceTest extends TestCase
                 return $callCount === 1 ? $listQueryBuilder : $countQueryBuilder;
             });
 
-        $service = new RecordService($connectionPool, new WorkspaceContextService(), $this->createEditorPermissionService());
+        $service = new RecordService($connectionPool, new WorkspaceContextService(), $this->createEditorPermissionService(), $this->createMmRelationResolver());
         $service->search('pages', ['title' => ['operator' => 'eq', 'value' => 'x']], 20, 0, ['uid', 'title']);
 
         $pagePermissionRestrictions = array_filter(
@@ -824,7 +832,7 @@ final class RecordServiceTest extends TestCase
                 };
             });
 
-        $service = new RecordService($connectionPool, new WorkspaceContextService(), $this->createEditorPermissionService());
+        $service = new RecordService($connectionPool, new WorkspaceContextService(), $this->createEditorPermissionService(), $this->createMmRelationResolver());
         $service->search('tt_content', ['header' => ['operator' => 'eq', 'value' => 'x']], 20, 0, ['uid', 'header']);
 
         // The non-page table read must build a `pages` subquery and constrain the main query by it.
@@ -899,7 +907,7 @@ final class RecordServiceTest extends TestCase
                 };
             });
 
-        $service = new RecordService($connectionPool, new WorkspaceContextService(), $this->createEditorPermissionService());
+        $service = new RecordService($connectionPool, new WorkspaceContextService(), $this->createEditorPermissionService(), $this->createMmRelationResolver());
         $service->search('sys_redirect', [], 20, 0, ['uid', 'source_path']);
 
         // Root-level records (rootLevel tables like sys_redirect live at pid 0) must stay readable:
@@ -981,7 +989,7 @@ final class RecordServiceTest extends TestCase
                 return $callCount === 1 ? $mainQueryBuilder : $pagesQueryBuilder;
             });
 
-        $service = new RecordService($connectionPool, new WorkspaceContextService(), $this->createEditorPermissionService());
+        $service = new RecordService($connectionPool, new WorkspaceContextService(), $this->createEditorPermissionService(), $this->createMmRelationResolver());
         $call($service);
 
         return [$requestedTables, $andWhereCalled];
@@ -1054,7 +1062,7 @@ final class RecordServiceTest extends TestCase
         $permissionService->method('getUserAspect')->willReturn(new UserAspect());
         $permissionService->method('getWebmountPageIds')->willReturn($webmountPageIds);
 
-        $service = new RecordService($connectionPool, new WorkspaceContextService(), $permissionService);
+        $service = new RecordService($connectionPool, new WorkspaceContextService(), $permissionService, $this->createMmRelationResolver());
         $service->findByUid('pages', 7, ['uid', 'title']);
 
         return $andWhereConditions;
@@ -1087,7 +1095,7 @@ final class RecordServiceTest extends TestCase
         $connectionPool = $this->createStub(ConnectionPool::class);
         $connectionPool->method('getQueryBuilderForTable')->willReturn($queryBuilder);
 
-        $service = new RecordService($connectionPool, new WorkspaceContextService(), $this->createEditorPermissionService());
+        $service = new RecordService($connectionPool, new WorkspaceContextService(), $this->createEditorPermissionService(), $this->createMmRelationResolver());
         $count = $service->count('pages');
 
         self::assertSame(['count' => 3, 'exact' => true], $count);
@@ -1137,7 +1145,7 @@ final class RecordServiceTest extends TestCase
                 return $callCount === 1 ? $countQueryBuilder : $pagesQueryBuilder;
             });
 
-        $service = new RecordService($connectionPool, new WorkspaceContextService(), $this->createEditorPermissionService());
+        $service = new RecordService($connectionPool, new WorkspaceContextService(), $this->createEditorPermissionService(), $this->createMmRelationResolver());
         $service->count('tt_content', 5);
 
         // count() must honour the same page-permission constraint as search()/findByPid():
@@ -1153,7 +1161,7 @@ final class RecordServiceTest extends TestCase
         $permissionService = $this->createStub(PermissionService::class);
         $permissionService->method('canSelectTable')->willReturn(false);
 
-        $service = new RecordService($connectionPool, new WorkspaceContextService(), $permissionService);
+        $service = new RecordService($connectionPool, new WorkspaceContextService(), $permissionService, $this->createMmRelationResolver());
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('Access denied: you do not have read permission for table "be_users".');
@@ -1167,6 +1175,7 @@ final class RecordServiceTest extends TestCase
             $this->createStub(ConnectionPool::class),
             new WorkspaceContextService(),
             $this->createDenyingPermissionService(),
+            $this->createMmRelationResolver(),
         );
 
         $this->expectException(\RuntimeException::class);
@@ -1181,6 +1190,7 @@ final class RecordServiceTest extends TestCase
             $this->createStub(ConnectionPool::class),
             new WorkspaceContextService(),
             $this->createDenyingPermissionService(),
+            $this->createMmRelationResolver(),
         );
 
         $this->expectException(\RuntimeException::class);
@@ -1195,6 +1205,7 @@ final class RecordServiceTest extends TestCase
             $this->createStub(ConnectionPool::class),
             new WorkspaceContextService(),
             $this->createDenyingPermissionService(),
+            $this->createMmRelationResolver(),
         );
 
         $this->expectException(\RuntimeException::class);
@@ -1214,7 +1225,7 @@ final class RecordServiceTest extends TestCase
         $connectionPool = $this->createStub(ConnectionPool::class);
         $connectionPool->method('getQueryBuilderForTable')->willReturn($queryBuilder);
 
-        $service = new RecordService($connectionPool, new WorkspaceContextService(), $this->createAllowingPermissionService());
+        $service = new RecordService($connectionPool, new WorkspaceContextService(), $this->createAllowingPermissionService(), $this->createMmRelationResolver());
 
         // ToolCallException reaches the MCP client verbatim, so the message must name the operator.
         $this->expectException(ToolCallException::class);
@@ -1249,6 +1260,7 @@ final class RecordServiceTest extends TestCase
             $this->createOverlayConnectionPool($rows),
             $this->createWorkspaceContext([2, 4]),
             $this->createAllowingPermissionService(),
+            $this->createMmRelationResolver(),
         );
 
         $result = $service->search('tt_content', [], 2, 0, ['uid', 'title']);
@@ -1277,6 +1289,7 @@ final class RecordServiceTest extends TestCase
             $this->createOverlayConnectionPool($rows),
             $this->createWorkspaceContext([2, 4]),
             $this->createAllowingPermissionService(),
+            $this->createMmRelationResolver(),
         );
 
         $result = $service->search('tt_content', [], 2, 2, ['uid', 'title']);
@@ -1297,6 +1310,7 @@ final class RecordServiceTest extends TestCase
             $this->createOverlayConnectionPool($rows),
             $this->createWorkspaceContext([2]),
             $this->createAllowingPermissionService(),
+            $this->createMmRelationResolver(),
         );
 
         $result = $service->findByPid('tt_content', 10, 20, 0, ['uid', 'title']);
@@ -1319,6 +1333,7 @@ final class RecordServiceTest extends TestCase
             $this->createOverlayConnectionPool($rows),
             $this->createWorkspaceContext([2]),
             $this->createAllowingPermissionService(),
+            $this->createMmRelationResolver(),
         );
 
         self::assertSame(['count' => 2, 'exact' => true], $service->count('tt_content'));
@@ -1364,6 +1379,181 @@ final class RecordServiceTest extends TestCase
         );
 
         return $context;
+    }
+
+    /**
+     * The MM field's column only stores the relation count, so a condition on it would match on
+     * that count. The service has to refuse it before any SQL is built.
+     */
+    public function testSearchRejectsConditionOnMMField(): void
+    {
+        $GLOBALS['TCA']['tx_test_team'] = [
+            'ctrl' => [],
+            'columns' => [
+                'groups' => ['config' => ['type' => 'select', 'foreign_table' => 'tx_test_group', 'MM' => 'tx_test_team_group_mm']],
+            ],
+        ];
+
+        try {
+            $queryBuilder = $this->createQueryBuilderStub();
+            $queryBuilder->method('select')->willReturnSelf();
+            $queryBuilder->method('count')->willReturnSelf();
+            $queryBuilder->method('from')->willReturnSelf();
+            $queryBuilder->method('andWhere')->willReturnSelf();
+
+            $connectionPool = $this->createStub(ConnectionPool::class);
+            $connectionPool->method('getQueryBuilderForTable')->willReturn($queryBuilder);
+
+            $service = new RecordService($connectionPool, new WorkspaceContextService(), $this->createAllowingPermissionService(), $this->createMmRelationResolver());
+
+            $this->expectException(ToolCallException::class);
+            $this->expectExceptionCode(1725900002);
+            $this->expectExceptionMessage('Field "groups" is a many-to-many relation and cannot be used as a search condition');
+
+            $service->search('tx_test_team', ['groups' => ['operator' => 'eq', 'value' => '20']], 10, 0, ['uid', 'groups']);
+        } finally {
+            unset($GLOBALS['TCA']);
+        }
+    }
+
+    public function testCountRejectsConditionOnMMField(): void
+    {
+        $GLOBALS['TCA']['tx_test_team'] = [
+            'ctrl' => [],
+            'columns' => [
+                'groups' => ['config' => ['type' => 'group', 'allowed' => 'tx_test_group', 'MM' => 'tx_test_team_group_mm']],
+            ],
+        ];
+
+        try {
+            $queryBuilder = $this->createQueryBuilderStub();
+            $queryBuilder->method('count')->willReturnSelf();
+            $queryBuilder->method('from')->willReturnSelf();
+            $queryBuilder->method('andWhere')->willReturnSelf();
+
+            $connectionPool = $this->createStub(ConnectionPool::class);
+            $connectionPool->method('getQueryBuilderForTable')->willReturn($queryBuilder);
+
+            $service = new RecordService($connectionPool, new WorkspaceContextService(), $this->createAllowingPermissionService(), $this->createMmRelationResolver());
+
+            $this->expectException(ToolCallException::class);
+            $this->expectExceptionCode(1725900002);
+
+            $service->count('tx_test_team', null, ['groups' => ['operator' => 'in', 'value' => '20,21']]);
+        } finally {
+            unset($GLOBALS['TCA']);
+        }
+    }
+
+    /** The row that leaves findByUid is the resolver's, so an MM field arrives as a UID list rather than a count. */
+    public function testFindByUidReturnsMMFieldsResolvedToUidLists(): void
+    {
+        $rawRow = ['uid' => 5, 'title' => 'Team', 'groups' => 2];
+        $resolvedRow = ['uid' => 5, 'title' => 'Team', 'groups' => [20, 21]];
+
+        $result = $this->createStub(Result::class);
+        $result->method('fetchAssociative')->willReturn($rawRow);
+
+        $queryBuilder = $this->createQueryBuilderStub();
+        $queryBuilder->method('select')->willReturnSelf();
+        $queryBuilder->method('from')->willReturnSelf();
+        $queryBuilder->method('where')->willReturnSelf();
+        $queryBuilder->method('executeQuery')->willReturn($result);
+
+        $connectionPool = $this->createStub(ConnectionPool::class);
+        $connectionPool->method('getQueryBuilderForTable')->willReturn($queryBuilder);
+
+        $resolver = $this->createMock(MmRelationResolver::class);
+        $resolver->expects(self::once())
+            ->method('resolve')
+            ->with('tx_test_team', $rawRow, ['uid', 'title', 'groups'])
+            ->willReturn($resolvedRow);
+
+        $service = new RecordService($connectionPool, new WorkspaceContextService(), $this->createAllowingPermissionService(), $resolver);
+
+        self::assertSame($resolvedRow, $service->findByUid('tx_test_team', 5, ['uid', 'title', 'groups']));
+    }
+
+    /** An EXTCONF readFields override may omit uid; the resolver needs it, so the query must fetch it anyway. */
+    public function testFindByUidSelectsUidWhenAnMMFieldIsSelectedWithoutIt(): void
+    {
+        $GLOBALS['TCA']['tx_test_team'] = [
+            'ctrl' => [],
+            'columns' => [
+                'groups' => ['config' => ['type' => 'select', 'foreign_table' => 'tx_test_group', 'MM' => 'tx_test_team_group_mm']],
+            ],
+        ];
+
+        try {
+            $result = $this->createStub(Result::class);
+            $result->method('fetchAssociative')->willReturn(false);
+
+            $selected = null;
+            $queryBuilder = $this->createQueryBuilderStub();
+            $queryBuilder->method('select')->willReturnCallback(static function (string ...$fields) use (&$selected, $queryBuilder): QueryBuilder {
+                $selected = $fields;
+
+                return $queryBuilder;
+            });
+            $queryBuilder->method('from')->willReturnSelf();
+            $queryBuilder->method('where')->willReturnSelf();
+            $queryBuilder->method('executeQuery')->willReturn($result);
+
+            $connectionPool = $this->createStub(ConnectionPool::class);
+            $connectionPool->method('getQueryBuilderForTable')->willReturn($queryBuilder);
+
+            $service = new RecordService($connectionPool, new WorkspaceContextService(), $this->createAllowingPermissionService(), $this->createMmRelationResolver());
+            $service->findByUid('tx_test_team', 5, ['title', 'groups']);
+
+            self::assertSame(['title', 'groups', 'uid'], $selected);
+        } finally {
+            unset($GLOBALS['TCA']);
+        }
+    }
+
+    public function testFindByPidPassesThePageAndSelectedFieldsToTheResolver(): void
+    {
+        $rows = [['uid' => 1, 'groups' => 1], ['uid' => 2, 'groups' => 0]];
+        $resolved = [['uid' => 1, 'groups' => [20]], ['uid' => 2, 'groups' => []]];
+
+        $countResult = $this->createStub(Result::class);
+        $countResult->method('fetchOne')->willReturn(2);
+        $listResult = $this->createStub(Result::class);
+        $listResult->method('fetchAllAssociative')->willReturn($rows);
+
+        $countQueryBuilder = $this->createQueryBuilderStub();
+        $countQueryBuilder->method('count')->willReturnSelf();
+        $countQueryBuilder->method('from')->willReturnSelf();
+        $countQueryBuilder->method('where')->willReturnSelf();
+        $countQueryBuilder->method('executeQuery')->willReturn($countResult);
+
+        $listQueryBuilder = $this->createQueryBuilderStub();
+        $listQueryBuilder->method('select')->willReturnSelf();
+        $listQueryBuilder->method('from')->willReturnSelf();
+        $listQueryBuilder->method('where')->willReturnSelf();
+        $listQueryBuilder->method('setMaxResults')->willReturnSelf();
+        $listQueryBuilder->method('setFirstResult')->willReturnSelf();
+        $listQueryBuilder->method('orderBy')->willReturnSelf();
+        $listQueryBuilder->method('executeQuery')->willReturn($listResult);
+
+        $callCount = 0;
+        $connectionPool = $this->createStub(ConnectionPool::class);
+        $connectionPool->method('getQueryBuilderForTable')
+            ->willReturnCallback(static function () use (&$callCount, $listQueryBuilder, $countQueryBuilder): QueryBuilder {
+                return ++$callCount === 1 ? $listQueryBuilder : $countQueryBuilder;
+            });
+
+        $resolver = $this->createMock(MmRelationResolver::class);
+        $resolver->expects(self::once())
+            ->method('resolveMany')
+            ->with('tx_test_team', $rows, ['uid', 'groups'])
+            ->willReturn($resolved);
+
+        $service = new RecordService($connectionPool, new WorkspaceContextService(), $this->createAllowingPermissionService(), $resolver);
+        $result = $service->findByPid('tx_test_team', 1, 20, 0, ['uid', 'groups']);
+
+        self::assertSame($resolved, $result['records']);
+        self::assertSame(2, $result['total']);
     }
 
     private function createAllowingPermissionService(): PermissionService

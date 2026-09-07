@@ -46,7 +46,8 @@ readonly class ContentSearchTool
             $searchConditions['sys_language_uid'] = ['operator' => 'eq', 'value' => (string) $sysLanguageUid];
         }
 
-        $resolvedOrderBy = SearchParamResolver::resolveOrderBy($orderBy, $allowedFields);
+        $orderableFields = array_values(array_diff($allowedFields, array_keys($this->tcaSchemaService->getMMFields('tt_content'))));
+        $resolvedOrderBy = SearchParamResolver::resolveOrderBy($orderBy, $orderableFields);
         $orderDirection = SearchParamResolver::normalizeOrderDirection($orderDirection);
 
         return json_encode(

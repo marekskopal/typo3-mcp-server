@@ -13,8 +13,21 @@ use TYPO3\CMS\Core\Utility\GeneralUtility;
 
 readonly class DataHandlerService
 {
-    public function __construct(private SiteFinder $siteFinder)
+    public function __construct(private SiteFinder $siteFinder, private MmFieldNormalizer $mmFieldNormalizer)
     {
+    }
+
+    /**
+     * The field data exactly as the write methods hand it to DataHandler, with MM relation fields
+     * normalised to comma-separated UID strings. For dry runs: a preview has to fail where the real
+     * write would, or it reports a rejected value as "would be updated".
+     *
+     * @param array<string, mixed> $fields
+     * @return array<string, mixed>
+     */
+    public function normalizeFields(string $table, array $fields): array
+    {
+        return $this->mmFieldNormalizer->normalize($table, $fields);
     }
 
     /**
@@ -24,6 +37,7 @@ readonly class DataHandlerService
     public function createRecord(string $table, int $pid, array $fields): int
     {
         $newId = 'NEW' . bin2hex(random_bytes(8));
+        $fields = $this->mmFieldNormalizer->normalize($table, $fields);
         $fields['pid'] = $pid;
 
         $originalRequest = $table === 'pages' ? $this->ensureSiteContext($pid) : null;
@@ -52,6 +66,7 @@ readonly class DataHandlerService
     /** @param array<string, mixed> $fields */
     public function updateRecord(string $table, int $uid, array $fields): void
     {
+        $fields = $this->mmFieldNormalizer->normalize($table, $fields);
         $originalRequest = $table === 'pages' ? $this->ensureSiteContext($uid) : null;
 
         try {
@@ -147,6 +162,7 @@ readonly class DataHandlerService
      */
     public function updateRecords(string $table, array $uids, array $fields): void
     {
+        $fields = $this->mmFieldNormalizer->normalize($table, $fields);
         $datamap = [];
         foreach ($uids as $uid) {
             $datamap[$uid] = $fields;

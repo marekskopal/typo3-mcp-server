@@ -59,6 +59,9 @@ readonly class RecordUpdateBatchTool
             throw new ToolCallException('No valid writable fields provided');
         }
 
+        // Validate MM values on the dry run too, so the preview rejects what the write would.
+        $validFields = $this->dataHandlerService->normalizeFields($tableName, $validFields);
+
         if (!$dryRun) {
             $this->dataHandlerService->updateRecords($tableName, $existingUids, $validFields);
         }

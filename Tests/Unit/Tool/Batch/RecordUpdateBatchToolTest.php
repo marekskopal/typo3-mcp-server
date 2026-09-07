@@ -47,6 +47,7 @@ final class RecordUpdateBatchToolTest extends TestCase
         $recordService->method('findExistingUids')->willReturn([1, 2]);
 
         $dataHandlerService = $this->createMock(DataHandlerService::class);
+        $dataHandlerService->method('normalizeFields')->willReturnArgument(1);
         $dataHandlerService->expects(self::never())->method('updateRecords');
 
         $tool = new RecordUpdateBatchTool($dataHandlerService, new TcaSchemaService(), $recordService);
@@ -62,12 +63,40 @@ final class RecordUpdateBatchToolTest extends TestCase
         unset($GLOBALS['TCA']['pages']);
     }
 
+    /** A preview must fail exactly where the real write would, or it reports a rejected MM value as valid. */
+    public function testDryRunValidatesMMFieldValues(): void
+    {
+        $GLOBALS['TCA']['pages'] = [
+            'ctrl' => ['label' => 'title'],
+            'columns' => ['groups' => ['config' => ['type' => 'select', 'foreign_table' => 'tx_g', 'MM' => 'tx_g_mm']]],
+        ];
+
+        $recordService = $this->createStub(RecordService::class);
+        $recordService->method('findExistingUids')->willReturn([1]);
+
+        $dataHandlerService = $this->createMock(DataHandlerService::class);
+        $dataHandlerService->method('normalizeFields')->willThrowException(new ToolCallException('Field "groups" is a many-to-many relation and expects a list of UIDs'));
+        $dataHandlerService->expects(self::never())->method('updateRecords');
+
+        $tool = new RecordUpdateBatchTool($dataHandlerService, new TcaSchemaService(), $recordService);
+
+        try {
+            $this->expectException(ToolCallException::class);
+            $this->expectExceptionMessage('Field "groups" is a many-to-many relation');
+
+            $tool->execute('pages', '1', '{"groups":[20,"abc"]}', dryRun: true);
+        } finally {
+            unset($GLOBALS['TCA']['pages']);
+        }
+    }
+
     public function testExecuteUpdatesMultipleRecords(): void
     {
         $recordService = $this->createStub(RecordService::class);
         $recordService->method('findExistingUids')->willReturn([1, 2, 3]);
 
         $dataHandlerService = $this->createMock(DataHandlerService::class);
+        $dataHandlerService->method('normalizeFields')->willReturnArgument(1);
         $dataHandlerService->expects(self::once())
             ->method('updateRecords')
             ->with('pages', [1, 2, 3], ['hidden' => 1]);
@@ -89,6 +118,7 @@ final class RecordUpdateBatchToolTest extends TestCase
         $recordService->method('findExistingUids')->willReturn([1]);
 
         $dataHandlerService = $this->createMock(DataHandlerService::class);
+        $dataHandlerService->method('normalizeFields')->willReturnArgument(1);
         $dataHandlerService->expects(self::once())
             ->method('updateRecords')
             ->with('pages', [1], ['title' => 'New']);
@@ -106,6 +136,7 @@ final class RecordUpdateBatchToolTest extends TestCase
         $recordService->method('findExistingUids')->willReturn([1]);
 
         $dataHandlerService = $this->createStub(DataHandlerService::class);
+        $dataHandlerService->method('normalizeFields')->willReturnArgument(1);
 
         $tool = new RecordUpdateBatchTool($dataHandlerService, new TcaSchemaService(), $recordService);
 
@@ -121,6 +152,7 @@ final class RecordUpdateBatchToolTest extends TestCase
         $recordService->method('findExistingUids')->willReturn([1]);
 
         $dataHandlerService = $this->createMock(DataHandlerService::class);
+        $dataHandlerService->method('normalizeFields')->willReturnArgument(1);
         $dataHandlerService->expects(self::once())
             ->method('updateRecords')
             ->with('pages', [1], ['hidden' => 1]);
@@ -139,6 +171,7 @@ final class RecordUpdateBatchToolTest extends TestCase
         $recordService->method('findExistingUids')->willReturn([]);
 
         $dataHandlerService = $this->createStub(DataHandlerService::class);
+        $dataHandlerService->method('normalizeFields')->willReturnArgument(1);
 
         $tool = new RecordUpdateBatchTool($dataHandlerService, new TcaSchemaService(), $recordService);
 

@@ -85,6 +85,12 @@ EOF
 composer config repositories.mcp-server \
     "{\"type\": \"path\", \"url\": \"$EXTENSION_PATH\", \"options\": {\"symlink\": true}}"
 
+# The MM-relation fixture extension (Tests/Integration/Fixtures/mcp_mm_fixture): a team table with a
+# select MM and a group MM column, so the UID-list read/write path is covered by a table we control
+# rather than by whatever a third-party extension happens to ship.
+composer config repositories.mcp-mm-fixture \
+    "{\"type\": \"path\", \"url\": \"$EXTENSION_PATH/Tests/Integration/Fixtures/mcp_mm_fixture\", \"options\": {\"symlink\": true}}"
+
 # Install TYPO3 core + extension + optional extensions for testing
 echo ""
 echo "Installing TYPO3 packages..."
@@ -100,6 +106,7 @@ composer require \
     "typo3/cms-scheduler:$TYPO3_VERSION" \
     "typo3/cms-workspaces:$TYPO3_VERSION" \
     "marekskopal/typo3-mcp-server:@dev" \
+    "mcp-test/mm-fixture:@dev" \
     --no-interaction --no-progress
 
 # Install news extension for dynamic tool testing (may not be available for all TYPO3 versions)
@@ -130,7 +137,7 @@ vendor/bin/typo3 setup \
 # exercising a real third-party table. An entry for a table missing from TCA resolves to
 # no read fields and is skipped, so this is harmless when news failed to install above.
 echo ""
-echo "Registering tx_news_domain_model_news via EXTCONF..."
+echo "Registering tx_news_domain_model_news and the MM fixture tables via EXTCONF..."
 mkdir -p config/system
 cat > config/system/additional.php <<'PHP'
 <?php
@@ -140,6 +147,16 @@ declare(strict_types=1);
 $GLOBALS['TYPO3_CONF_VARS']['EXTCONF']['ms_mcp_server']['tables']['tx_news_domain_model_news'] = [
     'label' => 'News',
     'prefix' => 'news',
+];
+
+// MM fixture tables (Tests/Integration/Fixtures/mcp_mm_fixture), for the MM relation field tests.
+$GLOBALS['TYPO3_CONF_VARS']['EXTCONF']['ms_mcp_server']['tables']['tx_mcpmmfixture_team'] = [
+    'label' => 'MM fixture team',
+    'prefix' => 'mm_team',
+];
+$GLOBALS['TYPO3_CONF_VARS']['EXTCONF']['ms_mcp_server']['tables']['tx_mcpmmfixture_group'] = [
+    'label' => 'MM fixture group',
+    'prefix' => 'mm_group',
 ];
 PHP
 

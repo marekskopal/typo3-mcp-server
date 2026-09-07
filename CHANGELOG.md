@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+- **Many-to-many relation fields are first-class.** A `select` or `group` column with an `MM` table (e.g. `tx_msdarts_domain_model_team.groups`, a `selectCheckBox` relating teams to groups) was treated as neither readable nor writable: missing from `table_schema`, from every `*_get` / `*_list`, and silently dropped into `ignoredFields` by `*_create`, `*_update`, `*_update_batch` and `record_update_batch` — so a team could not be assigned to a group through MCP at all. Such fields now appear in the schema with `"relation": "mm"`, `"mm": "<mm table>"`, `foreignTable` / `allowed` and `minitems` / `maxitems`; are returned by the read tools and `record_search` as lists of related UIDs (`"groups": [20, 21]`, resolved through core's `RelationHandler` so `MM_opposite_field`, `MM_match_fields` and the workspace overlay behave as in the backend, reading under the version's uid in a workspace); and are accepted by every writer as a JSON array or comma-separated string, with an empty list clearing the relation and a non-integer entry rejected with an error naming the field. A `group` field allowing several tables uses the `table_uid` form in both directions. Only fields that were actually selected are resolved, and the default list fields never include one, so a plain `*_list` stays a single query. `record_search` / `record_count` reject a condition on an MM field, and the search tools reject an `orderBy` on one, instead of matching or sorting against the relation count its column stores. A dry run of `record_update_batch` / `<prefix>_update_batch` validates MM values the same way the real write does, so a preview cannot report a rejected value as valid. The generated tool descriptions mark these fields as `groups (uid list)`. `inline`, `file`, `category` and select/group fields without MM are unchanged.
+
+For PHP integrations extending the extension: `RecordService` takes a fourth constructor argument (`MmRelationResolver`) and `DataHandlerService` a second (`MmFieldNormalizer`); `TableToolConfig` gained an optional `mmFields` parameter.
+
+### Changed
+- **The integration suite installs a fixture extension.** `Tests/Integration/Fixtures/mcp_mm_fixture` (a team table with a select MM and a group MM column) is added as a path repository by `setup-typo3.sh` and registered via `EXTCONF`, so the MM round-trip through DataHandler is tested against TCA the repository controls.
+
 ## [1.2.0] - 2026-09-01
 
 **Upgrading from 1.1.0.** No database changes. Three behaviours differ from 1.1.0 — none require action, but each is visible to a client or an extending integration:

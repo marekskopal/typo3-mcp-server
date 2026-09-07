@@ -36,7 +36,7 @@ final readonly class UpdateBatchHandler extends AbstractTableToolHandler
     {
         return 'Update the same fields on multiple ' . $this->config->subject() . 's.'
             . ' Pass UIDs as comma-separated (e.g. "1,2,3") and fields as a JSON object (e.g. {"hidden":1}).'
-            . ' Available fields: ' . $this->config->writableFieldList() . '.'
+            . ' Available fields: ' . $this->config->writableFieldList() . '.' . $this->config->mmFieldHint()
             . ' Non-existent UIDs are skipped and reported in skippedUids.'
             . ' Set dryRun to true to preview the change: the response lists exactly what would be'
             . ' affected and nothing is written.';
@@ -70,6 +70,9 @@ final readonly class UpdateBatchHandler extends AbstractTableToolHandler
                 if ($validFields === []) {
                     throw new ToolCallException('No valid writable fields provided');
                 }
+
+                // Validate MM values on the dry run too, so the preview rejects what the write would.
+                $validFields = $this->dataHandlerService->normalizeFields($this->config->tableName, $validFields);
 
                 if (!$dryRun) {
                     $this->dataHandlerService->updateRecords($this->config->tableName, $existingUids, $validFields);

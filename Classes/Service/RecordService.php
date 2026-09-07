@@ -30,6 +30,7 @@ readonly class RecordService
         private ConnectionPool $connectionPool,
         private WorkspaceContextService $workspaceContext,
         private PermissionService $permissionService,
+        private MmRelationResolver $mmRelationResolver,
     ) {
     }
 
@@ -40,6 +41,7 @@ readonly class RecordService
     public function findByUid(string $table, int $uid, array $fields): ?array
     {
         $this->assertReadAccess($table);
+        $fields = $this->withUidForMMFields($table, $fields);
 
         $queryBuilder = $this->connectionPool->getQueryBuilderForTable($table);
         $queryBuilder->getRestrictions()->removeAll();
@@ -59,7 +61,12 @@ readonly class RecordService
             return null;
         }
 
-        return $this->workspaceContext->overlay($table, $row);
+        $overlaid = $this->workspaceContext->overlay($table, $row);
+        if ($overlaid === null) {
+            return null;
+        }
+
+        return $this->mmRelationResolver->resolve($table, $overlaid, $fields);
     }
 
     /**
@@ -116,6 +123,7 @@ readonly class RecordService
         ?string $languageField = null,
     ): array {
         $this->assertReadAccess($table);
+        $fields = $this->withUidForMMFields($table, $fields);
 
         $limit = min(max($limit, 1), 500);
         $offset = max($offset, 0);
@@ -155,7 +163,7 @@ readonly class RecordService
         $queryBuilder->orderBy('uid', 'ASC');
 
         if ($this->overlayApplies($table)) {
-            return $this->paginateOverlaid($queryBuilder, $table, $limit, $offset);
+            return $this->paginateOverlaid($queryBuilder, $table, $limit, $offset, $fields);
         }
 
         /** @var int|string $totalResult */
@@ -168,7 +176,7 @@ readonly class RecordService
             ->fetchAllAssociative();
 
         return [
-            'records' => $records,
+            'records' => $this->mmRelationResolver->resolveMany($table, $records, $fields),
             'total' => (int) $totalResult,
         ];
     }
@@ -193,6 +201,7 @@ readonly class RecordService
     ): array
     {
         $this->assertReadAccess($table);
+        $fields = $this->withUidForMMFields($table, $fields);
 
         $limit = min(max($limit, 1), 500);
         $offset = max($offset, 0);
@@ -223,6 +232,7 @@ readonly class RecordService
             );
         }
 
+        $this->assertNoMMConditions($table, $searchConditions);
         foreach ($searchConditions as $field => $condition) {
             $this->applyCondition($queryBuilder, $field, $condition);
             $this->applyCondition($countQueryBuilder, $field, $condition);
@@ -231,7 +241,7 @@ readonly class RecordService
         $queryBuilder->orderBy($orderBy ?? 'uid', $orderDirection);
 
         if ($this->overlayApplies($table)) {
-            return $this->paginateOverlaid($queryBuilder, $table, $limit, $offset);
+            return $this->paginateOverlaid($queryBuilder, $table, $limit, $offset, $fields);
         }
 
         /** @var int|string $totalResult */
@@ -244,9 +254,52 @@ readonly class RecordService
             ->fetchAllAssociative();
 
         return [
-            'records' => $records,
+            'records' => $this->mmRelationResolver->resolveMany($table, $records, $fields),
             'total' => (int) $totalResult,
         ];
+    }
+
+    /**
+     * The MM resolver looks relations up by the row's uid, so a selection that names an MM field but
+     * not `uid` (an EXTCONF `readFields` override can do that) must still fetch it — otherwise the
+     * relation would come back empty and read as "no relations".
+     *
+     * @param list<string> $fields
+     * @return list<string>
+     */
+    private function withUidForMMFields(string $table, array $fields): array
+    {
+        if (in_array('uid', $fields, true) || $this->mmRelationResolver->selectedMMFields($table, $fields) === []) {
+            return $fields;
+        }
+
+        $fields[] = 'uid';
+
+        return $fields;
+    }
+
+    /**
+     * A many-to-many field's physical column holds only the relation count, so a condition on it
+     * would silently match on that count instead of on the related records. Refuse it up front.
+     *
+     * @param array<string, array{operator: string, value: string}> $searchConditions
+     */
+    private function assertNoMMConditions(string $table, array $searchConditions): void
+    {
+        foreach (array_keys($searchConditions) as $field) {
+            if (!$this->mmRelationResolver->isMMField($table, $field)) {
+                continue;
+            }
+
+            throw new ToolCallException(
+                sprintf(
+                    'Field "%s" is a many-to-many relation and cannot be used as a search condition:'
+                        . ' its column stores only the relation count. Read the field on the records instead.',
+                    $field,
+                ),
+                1725900002,
+            );
+        }
     }
 
     /**
@@ -412,6 +465,7 @@ readonly class RecordService
             );
         }
 
+        $this->assertNoMMConditions($table, $searchConditions);
         foreach ($searchConditions as $field => $condition) {
             $this->applyCondition($queryBuilder, $field, $condition);
         }
@@ -448,15 +502,16 @@ readonly class RecordService
      * Fetch, overlay, then slice — and report `hasMore` rather than a total, because knowing the
      * exact total would mean overlaying every matching row.
      *
+     * @param list<string> $fields the selected fields, so MM relations among them are resolved on the page
      * @return array{records: list<array<string, mixed>>, hasMore: bool, workspaceOverlay: string}
      */
-    private function paginateOverlaid(QueryBuilder $queryBuilder, string $table, int $limit, int $offset): array
+    private function paginateOverlaid(QueryBuilder $queryBuilder, string $table, int $limit, int $offset, array $fields): array
     {
         // One past the page, so a full page can be told apart from the last one.
         $scan = $this->scanOverlaid($queryBuilder, $table, $offset + $limit + 1);
 
         return [
-            'records' => array_slice($scan['records'], $offset, $limit),
+            'records' => $this->mmRelationResolver->resolveMany($table, array_slice($scan['records'], $offset, $limit), $fields),
             'hasMore' => count($scan['records']) > $offset + $limit,
             'workspaceOverlay' => sprintf(
                 'Records are overlaid for workspace %d. An exact total is not available here'

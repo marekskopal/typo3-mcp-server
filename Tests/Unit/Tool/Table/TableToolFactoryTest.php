@@ -36,6 +36,42 @@ final class TableToolFactoryTest extends TestCase
         self::assertFalse($config->isTranslatable());
     }
 
+    /** MM relation fields are marked in the field list, and the create/update/get/list text explains the marker. */
+    public function testConfigMarksMMFieldsAsUidLists(): void
+    {
+        $config = new TableToolConfig(
+            tableName: 'tx_demo_team',
+            label: 'Team',
+            prefix: 'team',
+            listFields: ['uid', 'pid', 'title'],
+            readFields: ['uid', 'pid', 'title', 'groups'],
+            writableFields: ['title', 'groups'],
+            mmFields: ['groups'],
+        );
+
+        self::assertSame('title, groups (uid list)', $config->writableFieldList());
+        self::assertStringContainsString('pass a JSON array of UIDs', $config->mmFieldHint());
+        self::assertStringContainsString('(groups)', $config->mmReadHint());
+
+        $factory = $this->factory();
+        self::assertStringContainsString('groups (uid list)', $factory->update($config)->description());
+        self::assertStringContainsString('an empty list clears the relation', $factory->create($config)->description());
+        self::assertStringContainsString('an empty list clears the relation', $factory->updateBatch($config)->description());
+        self::assertStringContainsString('returned as lists of related UIDs', $factory->get($config)->description());
+        self::assertStringContainsString('returned as lists of related UIDs', $factory->list($config)->description());
+    }
+
+    /** Without MM fields the descriptions read exactly as before. */
+    public function testConfigWithoutMMFieldsAddsNoHints(): void
+    {
+        $config = $this->config();
+
+        self::assertSame('', $config->mmFieldHint());
+        self::assertSame('', $config->mmReadHint());
+        self::assertStringEndsWith('Available fields: title, body.', $this->factory()->update($config)->description());
+        self::assertSame('Get a single Thing record by its uid.', $this->factory()->get($config)->description());
+    }
+
     /** The scheduler's rows are tasks, and a lowercase label still capitalises for a message. */
     public function testConfigNounAndSentenceStart(): void
     {
@@ -81,6 +117,7 @@ final class TableToolFactoryTest extends TestCase
     public function testHandlerIsInvokableWithoutARegistrar(): void
     {
         $dataHandlerService = $this->createMock(DataHandlerService::class);
+        $dataHandlerService->method('normalizeFields')->willReturnArgument(1);
         $dataHandlerService->expects(self::once())
             ->method('updateRecord')
             ->with('tx_demo_thing', 7, ['title' => 'New']);
@@ -128,6 +165,7 @@ final class TableToolFactoryTest extends TestCase
         $recordService->method('findExistingUids')->willReturn([1, 3]);
 
         $dataHandlerService = $this->createMock(DataHandlerService::class);
+        $dataHandlerService->method('normalizeFields')->willReturnArgument(1);
         $dataHandlerService->expects(self::never())->method('deleteRecords');
 
         $handler = $this->factory($dataHandlerService, recordService: $recordService)
@@ -145,6 +183,7 @@ final class TableToolFactoryTest extends TestCase
         $recordService->method('findByUid')->willReturn(['uid' => 4]);
 
         $dataHandlerService = $this->createMock(DataHandlerService::class);
+        $dataHandlerService->method('normalizeFields')->willReturnArgument(1);
         $dataHandlerService->expects(self::never())->method('deleteRecord');
 
         $result = $this->factory($dataHandlerService, recordService: $recordService)
@@ -196,9 +235,18 @@ final class TableToolFactoryTest extends TestCase
     ): TableToolFactory {
         return new TableToolFactory(
             $recordService ?? $this->createStub(RecordService::class),
-            $dataHandlerService ?? $this->createStub(DataHandlerService::class),
+            $dataHandlerService ?? $this->createPassThroughDataHandlerService(),
             $auditLogger ?? $this->createStub(AuditLogger::class),
             new NullLogger(),
         );
+    }
+
+    /** A DataHandlerService whose normalizeFields() hands the data back unchanged, as the real one does without MM fields. */
+    private function createPassThroughDataHandlerService(): DataHandlerService
+    {
+        $dataHandlerService = $this->createStub(DataHandlerService::class);
+        $dataHandlerService->method('normalizeFields')->willReturnArgument(1);
+
+        return $dataHandlerService;
     }
 }

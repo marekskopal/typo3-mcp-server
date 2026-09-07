@@ -34,7 +34,7 @@ final readonly class GetHandler extends AbstractTableToolHandler
 
     public function description(): string
     {
-        return 'Get a single ' . $this->config->subject() . ' by its uid.';
+        return 'Get a single ' . $this->config->subject() . ' by its uid.' . $this->config->mmReadHint();
     }
 
     public function __invoke(int $uid): string

@@ -20,6 +20,8 @@ use MarekSkopal\MsMcpServer\Service\CacheService;
 use MarekSkopal\MsMcpServer\Service\DataHandlerService;
 use MarekSkopal\MsMcpServer\Service\FileService;
 use MarekSkopal\MsMcpServer\Service\StoragePermissionService;
+use MarekSkopal\MsMcpServer\Service\MmFieldNormalizer;
+use MarekSkopal\MsMcpServer\Service\MmRelationResolver;
 use MarekSkopal\MsMcpServer\Service\PermissionService;
 use MarekSkopal\MsMcpServer\Service\RecordService;
 use MarekSkopal\MsMcpServer\Service\SiteLanguageService;
@@ -110,11 +112,16 @@ final class McpServerFactoryTest extends TestCase
         $connectionPool = $this->createStub(ConnectionPool::class);
         $storageRepository = $this->createStub(StorageRepository::class);
         $siteFinder = $this->createStub(SiteFinder::class);
-        $recordService = new RecordService($connectionPool, new WorkspaceContextService(), $this->createStub(PermissionService::class));
-        $dataHandlerService = new DataHandlerService($this->createStub(SiteFinder::class));
+        $tcaSchemaService = new TcaSchemaService();
+        $recordService = new RecordService(
+            $connectionPool,
+            new WorkspaceContextService(),
+            $this->createStub(PermissionService::class),
+            new MmRelationResolver($tcaSchemaService, new WorkspaceContextService()),
+        );
+        $dataHandlerService = new DataHandlerService($this->createStub(SiteFinder::class), new MmFieldNormalizer($tcaSchemaService));
         $fileService = new FileService($storageRepository, $connectionPool, new StoragePermissionService());
         $logger = new NullLogger();
-        $tcaSchemaService = new TcaSchemaService();
         $siteLanguageService = new SiteLanguageService($siteFinder);
         $cacheService = new CacheService($this->createStub(CacheManager::class));
         $backendLayoutService = new BackendLayoutService($this->createStub(BackendLayoutView::class));

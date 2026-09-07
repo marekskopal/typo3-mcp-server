@@ -41,7 +41,8 @@ readonly class PagesSearchTool
             return json_encode(['error' => 'No valid search conditions provided'], JSON_THROW_ON_ERROR);
         }
 
-        $resolvedOrderBy = SearchParamResolver::resolveOrderBy($orderBy, $allowedFields);
+        $orderableFields = array_values(array_diff($allowedFields, array_keys($this->tcaSchemaService->getMMFields('pages'))));
+        $resolvedOrderBy = SearchParamResolver::resolveOrderBy($orderBy, $orderableFields);
         $orderDirection = SearchParamResolver::normalizeOrderDirection($orderDirection);
 
         return json_encode(

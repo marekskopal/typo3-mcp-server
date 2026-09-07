@@ -36,7 +36,7 @@ final readonly class TranslatableListHandler extends AbstractTableToolHandler
     {
         return 'List ' . $this->config->subject() . 's by parent page ID with pagination.'
             . ' Use sysLanguageUid to filter by language (0 = default, -1 = all).'
-            . ' Use selectFields (comma-separated) to choose which fields to return.';
+            . ' Use selectFields (comma-separated) to choose which fields to return.' . $this->config->mmReadHint();
     }
 
     public function __invoke(int $pid = 0, int $limit = 20, int $offset = 0, int $sysLanguageUid = -1, string $selectFields = '',): string
