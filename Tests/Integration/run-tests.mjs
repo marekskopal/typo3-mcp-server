@@ -204,6 +204,19 @@ class IntegrationTestRunner {
             const copied = await this.testTool('pages_copy', { uid: childUid, targetPid: pageUid });
             const copiedUid = copied?.newUid ?? copied?.uid;
             if (copiedUid) {
+                // Title, slug and hidden together on a page copied moments before: a copy is created
+                // hidden with a "(copy N)" title and a "-N" slug, so this is the natural next call —
+                // and the slug change fires EXT:redirects' DataHandler hook after the row was written.
+                // Over HTTP that hook needs the backend user's session (see BackendUserBootstrap).
+                const renamed = { title: 'Výsledky 2025/2026', slug: '/o-lize/vysledky-2025/2026', hidden: 0 };
+                const updated = await this.testTool('pages_update', { uid: copiedUid, fields: JSON.stringify(renamed) });
+                this.check('pages_update: title+slug+hidden on a fresh copy reports all three as updated',
+                    JSON.stringify(updated?.updated) === JSON.stringify(['title', 'slug', 'hidden']), `got ${JSON.stringify(updated)}`);
+                const reread = await this.callToolSafe('pages_get', { uid: copiedUid });
+                this.check('pages_update: title+slug+hidden on a fresh copy are stored',
+                    reread?.title === renamed.title && reread?.slug === renamed.slug && Number(reread?.hidden) === 0,
+                    `got ${JSON.stringify({ title: reread?.title, slug: reread?.slug, hidden: reread?.hidden })}`);
+
                 await this.testTool('pages_move', { uid: copiedUid, afterUid: childUid });
                 // Clean up copy
                 await this.callToolSafe('pages_delete', { uid: copiedUid });
@@ -258,6 +271,50 @@ class IntegrationTestRunner {
             search: JSON.stringify({ title: { like: 'Integration' } }),
         });
         await this.testTool('record_count', { tableName: 'pages' });
+
+        // A LIKE condition on a text column must match the substring — and nothing else. The
+        // operator-keyed shorthand used to degrade into LIKE '%%' and return every page whose
+        // TSconfig was non-NULL (asl-brno, 2026-09-07).
+        if (pageUid) {
+            const marker = 'mcpIntegrationTsMarker';
+            await this.callToolSafe('pages_update', { uid: pageUid, fields: JSON.stringify({ TSconfig: `${marker}.enabled = 1` }) });
+            await this.callToolSafe('pages_update', { uid: 1, fields: JSON.stringify({ TSconfig: 'TCEMAIN.clearCacheCmd = all' }) });
+
+            const hit = await this.testTool('record_search', {
+                tableName: 'pages', search: JSON.stringify({ TSconfig: { like: marker } }), limit: 100,
+            });
+            this.check('record_search: like on TSconfig returns only pages containing the term',
+                hit?.total === 1 && hit?.records?.length === 1 && hit.records[0].uid === pageUid
+                    && String(hit.records[0].TSconfig).includes(marker),
+                `got total=${hit?.total} uids=${JSON.stringify(hit?.records?.map(r => r.uid))}`);
+
+            const miss = await this.testTool('record_search', {
+                tableName: 'pages', search: JSON.stringify({ TSconfig: { like: 'zzz-no-page-has-this' } }), limit: 100,
+            });
+            this.check('record_search: like on TSconfig with no match returns total 0',
+                miss?.total === 0 && miss?.records?.length === 0, `got total=${miss?.total}`);
+
+            const count = await this.testTool('record_count', {
+                tableName: 'pages', search: JSON.stringify({ TSconfig: { like: 'zzz-no-page-has-this' } }),
+            });
+            this.check('record_count: like on TSconfig with no match counts 0', count?.count === 0, `got ${JSON.stringify(count)}`);
+
+            try {
+                await this.callTool('record_search', { tableName: 'pages', search: JSON.stringify({ TSconfig: { contains: marker } }) });
+                this.check('record_search: unrecognised condition shape is rejected', false, 'no error was raised');
+            } catch (e) {
+                this.check('record_search: unrecognised condition shape is rejected',
+                    /unrecognised shape/.test(e.message), e.message);
+            }
+
+            await this.callToolSafe('pages_update', { uid: 1, fields: JSON.stringify({ TSconfig: '' }) });
+        }
+
+        // Plain text searches the table's label field, as pages_search / content_search do.
+        const plain = await this.testTool('record_search', { tableName: 'pages', search: 'Integration Test' });
+        this.check('record_search: plain-text term matches the label field',
+            (plain?.total ?? 0) >= 1 && plain.records.every(r => String(r.title).includes('Integration Test')),
+            `got ${JSON.stringify(plain?.records?.map(r => r.title))}`);
         await this.testTool('pages_search', { search: 'Root' });
         await this.testTool('content_search', { pageId: pageUid ?? 1, search: 'Integration' });
     }
@@ -918,6 +975,13 @@ class IntegrationTestRunner {
             const searched = await this.testTool('record_search', {
                 tableName: 'tx_mcpmmfixture_team', search: JSON.stringify({ title: 'MM Team' }), pid,
             });
+            // On a dynamic table a plain-text term used to be rejected as invalid JSON; it now
+            // LIKE-matches the label field (TCA ctrl.label = title).
+            const plainSearched = await this.testTool('record_search', {
+                tableName: 'tx_mcpmmfixture_team', search: 'MM Team', pid,
+            });
+            this.check('record_search: plain-text term on a dynamic table searches its label field',
+                plainSearched?.records?.some(r => r.uid === teamUid), `got ${JSON.stringify(plainSearched)}`);
             const searchedTeam = searched?.records?.find(r => r.uid === teamUid);
             this.check('record_search: MM field resolved to a UID list',
                 isSameList(searchedTeam?.groups, [gA, gB]), `got ${JSON.stringify(searchedTeam)}`);

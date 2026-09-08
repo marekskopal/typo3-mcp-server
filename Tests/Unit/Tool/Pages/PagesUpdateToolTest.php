@@ -118,4 +118,24 @@ final class PagesUpdateToolTest extends TestCase
 
         $tool->execute(1, json_encode(['title' => 'Test'], JSON_THROW_ON_ERROR));
     }
+
+    public function testExecuteUpdatesTitleSlugAndHiddenTogether(): void
+    {
+        // The asl-brno field set that produced "An internal error occurred": title, slug and
+        // hidden on a page copied moments before. The tool must hand all three to DataHandler
+        // untouched and report them as updated.
+        $fields = ['title' => 'Výsledky 2025/2026', 'slug' => '/o-lize/vysledky-2025/2026', 'hidden' => 0];
+
+        $dataHandlerService = $this->createMock(DataHandlerService::class);
+        $dataHandlerService->expects(self::once())
+            ->method('updateRecord')
+            ->with('pages', 68, $fields);
+
+        $tool = new PagesUpdateTool($dataHandlerService, new TcaSchemaService());
+        $result = $tool->execute(68, json_encode($fields, JSON_THROW_ON_ERROR));
+
+        self::assertInstanceOf(RecordUpdatedResult::class, $result);
+        self::assertSame(['title', 'slug', 'hidden'], $result->updated);
+        self::assertSame([], $result->ignoredFields);
+    }
 }
