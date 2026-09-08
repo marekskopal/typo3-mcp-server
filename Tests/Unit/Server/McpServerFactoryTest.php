@@ -119,7 +119,7 @@ final class McpServerFactoryTest extends TestCase
             $this->createStub(PermissionService::class),
             new MmRelationResolver($tcaSchemaService, new WorkspaceContextService()),
         );
-        $dataHandlerService = new DataHandlerService($this->createStub(SiteFinder::class), new MmFieldNormalizer($tcaSchemaService));
+        $dataHandlerService = new DataHandlerService($this->createStub(SiteFinder::class), new MmFieldNormalizer($tcaSchemaService), new NullLogger());
         $fileService = new FileService($storageRepository, $connectionPool, new StoragePermissionService());
         $logger = new NullLogger();
         $siteLanguageService = new SiteLanguageService($siteFinder);

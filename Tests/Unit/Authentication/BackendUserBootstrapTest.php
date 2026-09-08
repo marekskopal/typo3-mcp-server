@@ -8,11 +8,15 @@ use Doctrine\DBAL\Result;
 use MarekSkopal\MsMcpServer\Authentication\BackendUserBootstrap;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
+use TYPO3\CMS\Core\Authentication\BackendUserAuthentication;
 use TYPO3\CMS\Core\Database\ConnectionPool;
 use TYPO3\CMS\Core\Database\Query\Expression\ExpressionBuilder;
 use TYPO3\CMS\Core\Database\Query\QueryBuilder;
 use TYPO3\CMS\Core\Database\Query\Restriction\QueryRestrictionContainerInterface;
 use TYPO3\CMS\Core\Localization\LanguageServiceFactory;
+use TYPO3\CMS\Core\Session\Backend\DatabaseSessionBackend;
+use TYPO3\CMS\Core\Session\UserSession;
+use TYPO3\CMS\Core\Utility\GeneralUtility;
 
 #[CoversClass(BackendUserBootstrap::class)]
 final class BackendUserBootstrapTest extends TestCase
@@ -126,5 +130,44 @@ final class BackendUserBootstrapTest extends TestCase
         $connectionPool->method('getQueryBuilderForTable')->willReturn($queryBuilder);
 
         return $connectionPool;
+    }
+
+    /**
+     * TYPO3's redirects extension reacts to a slug change from a DataHandler hook that ends in
+     * BackendUtility::setUpdateSignal() → BackendUserAuthentication::getModuleData(…, 'ses'),
+     * which hashes the current session id. Outside CLI, a user without a session made that
+     * throw *after* the row was written (asl-brno, pages_update with title+slug+hidden).
+     */
+    public function testInitializeSessionGivesTheUserASessionSoSessionScopedModuleDataWorks(): void
+    {
+        $GLOBALS['TYPO3_CONF_VARS']['SYS']['encryptionKey'] = str_repeat('a', 96);
+        $GLOBALS['TYPO3_CONF_VARS']['SYS']['session']['BE'] = [
+            'backend' => DatabaseSessionBackend::class,
+            'options' => ['table' => 'be_sessions'],
+        ];
+        $GLOBALS['TYPO3_CONF_VARS']['BE']['sessionTimeout'] = 28800;
+        $GLOBALS['TYPO3_CONF_VARS']['BE']['lockIP'] = 0;
+        $GLOBALS['TYPO3_CONF_VARS']['BE']['lockIPv6'] = 0;
+        $GLOBALS['TYPO3_CONF_VARS']['BE']['lifetime'] = 0;
+
+        try {
+            $backendUser = new BackendUserAuthentication();
+            $bootstrap = new BackendUserBootstrap(
+                $this->createStub(ConnectionPool::class),
+                $this->createStub(LanguageServiceFactory::class),
+            );
+
+            $bootstrap->initializeSession($backendUser);
+
+            self::assertInstanceOf(UserSession::class, $backendUser->getSession());
+            self::assertNotSame('', $backendUser->getSession()->getIdentifier());
+            // What setUpdateSignal() does: read session-scoped module data, then push it back.
+            self::assertNull($backendUser->getModuleData('BackendUtility::getUpdateSignal', 'ses'));
+            $backendUser->pushModuleData('BackendUtility::getUpdateSignal', ['x' => 1], true);
+            self::assertSame(['x' => 1], $backendUser->getModuleData('BackendUtility::getUpdateSignal', 'ses'));
+        } finally {
+            GeneralUtility::purgeInstances();
+            unset($GLOBALS['TYPO3_CONF_VARS']);
+        }
     }
 }

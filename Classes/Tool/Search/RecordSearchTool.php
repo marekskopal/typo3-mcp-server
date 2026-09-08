@@ -17,10 +17,13 @@ readonly class RecordSearchTool
 
     #[McpTool(
         name: 'record_search',
-        description: 'Search records in any table by field conditions. Pass search as a JSON object with field names as keys.'
-            . ' Values can be a plain string for LIKE matching (e.g. {"title":"hello"}) or an object with "op" and "value"'
-            . ' for advanced operators (e.g. {"uid":{"op":"gt","value":"10"}, "title":{"op":"eq","value":"Home"}}).'
-            . ' Supported operators: eq, neq, like, gt, gte, lt, lte, in (comma-separated), null, notNull.'
+        description: 'Search records in any table. Pass search either as a plain-text term, which is LIKE-matched'
+            . ' against the table\'s label field (TCA ctrl.label, e.g. title), or as a JSON object with field names as keys.'
+            . ' A field value can be a plain string for LIKE matching (e.g. {"title":"hello"}), an operator-keyed object'
+            . ' (e.g. {"TSconfig":{"like":"tx_news"},"uid":{"gt":"10"}}), the long form {"op":"eq","value":"Home"},'
+            . ' a list for IN ({"uid":[1,2]}), true/false (compared against 1/0) or null (IS NULL).'
+            . ' Supported operators: eq, neq, like, gt, gte, lt, lte, in (comma-separated or list), null, notNull.'
+            . ' A condition of any other shape is rejected with an error rather than silently dropped.'
             . ' Pass an empty string or "{}" for no field filter (useful to list everything in a pid).'
             . ' Optionally filter by pid. Use orderBy to sort results by a field name and orderDirection (ASC or DESC).'
             . ' Returns matching records with pagination.'
@@ -46,7 +49,7 @@ readonly class RecordSearchTool
 
         // Filter search fields to only allow readable fields and parse conditions
         $allowedFields = array_merge(['uid', 'pid'], $readFields);
-        $parsed = SearchParamResolver::parseSearch($search, $allowedFields);
+        $parsed = SearchParamResolver::parseSearch($search, $allowedFields, $this->tcaSchemaService->getLabelField($tableName));
         $validSearch = $parsed['conditions'];
         $ignoredFields = $parsed['ignoredFields'];
 

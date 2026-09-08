@@ -108,7 +108,7 @@ final class RecordCountToolTest extends TestCase
         $this->expectException(ToolCallException::class);
         $this->expectExceptionMessage('search must be a JSON object, but is not valid JSON');
 
-        $tool->execute('pages', -1, 'not-json');
+        $tool->execute('pages', -1, '{not-json');
     }
 
     public function testExecuteReportsIgnoredFields(): void
@@ -140,5 +140,19 @@ final class RecordCountToolTest extends TestCase
         $result = json_decode($tool->execute('pages', -1, ''), true, 512, JSON_THROW_ON_ERROR);
 
         self::assertSame(100, $result['count']);
+    }
+
+    public function testPlainTextTermCountsOnTheLabelField(): void
+    {
+        $recordService = $this->createMock(RecordService::class);
+        $recordService->expects(self::once())
+            ->method('count')
+            ->with('pages', null, ['title' => ['operator' => 'like', 'value' => 'Brio']])
+            ->willReturn(['count' => 2, 'exact' => true]);
+
+        $tool = new RecordCountTool($recordService, new TcaSchemaService());
+        $result = json_decode($tool->execute('pages', -1, 'Brio'), true, 512, JSON_THROW_ON_ERROR);
+
+        self::assertSame(2, $result['count']);
     }
 }

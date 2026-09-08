@@ -121,7 +121,7 @@ final class RecordSearchToolTest extends TestCase
         $this->expectException(ToolCallException::class);
         $this->expectExceptionMessage('search must be a JSON object, but is not valid JSON');
 
-        $tool->execute('pages', 'not-json');
+        $tool->execute('pages', '{not-json');
     }
 
     /**
@@ -135,9 +135,9 @@ final class RecordSearchToolTest extends TestCase
         $tool = new RecordSearchTool($recordService, new TcaSchemaService());
 
         $this->expectException(ToolCallException::class);
-        $this->expectExceptionMessage('search must be a JSON object, got a number.');
+        $this->expectExceptionMessage('search must be a JSON object, got an array.');
 
-        $tool->execute('pages', '5');
+        $tool->execute('pages', '[5]');
     }
 
     public function testExecuteReturnsErrorWhenNoValidSearchFields(): void
@@ -392,5 +392,54 @@ final class RecordSearchToolTest extends TestCase
         $this->expectExceptionMessage('Database error');
 
         $tool->execute('pages', '{"title":"test"}');
+    }
+
+    public function testPlainTextTermSearchesTheLabelField(): void
+    {
+        // TMS report: record_search "Brio" on a dynamic table answered "search must be a JSON
+        // object" — the plain-text fallback that pages_search/content_search have was missing here.
+        $recordService = $this->createMock(RecordService::class);
+        $recordService->expects(self::once())
+            ->method('search')
+            ->with('pages', ['title' => ['operator' => 'like', 'value' => 'Brio']], 20, 0, self::anything(), null)
+            ->willReturn(['records' => [], 'total' => 0]);
+
+        $tool = new RecordSearchTool($recordService, new TcaSchemaService());
+        $result = json_decode($tool->execute('pages', 'Brio'), true, 512, JSON_THROW_ON_ERROR);
+
+        self::assertSame(0, $result['total']);
+    }
+
+    public function testPlainTextTermOnTableWithoutLabelFieldIsRejectedWithGuidance(): void
+    {
+        $GLOBALS['TCA']['tx_nolabel'] = [
+            'ctrl' => [],
+            'columns' => ['code' => ['config' => ['type' => 'input']]],
+        ];
+
+        $tool = new RecordSearchTool($this->createStub(RecordService::class), new TcaSchemaService());
+
+        try {
+            $tool->execute('tx_nolabel', 'Brio');
+            self::fail('Expected a ToolCallException');
+        } catch (ToolCallException $e) {
+            self::assertStringContainsString('search must be a JSON object', $e->getMessage());
+            self::assertStringContainsString('{"code":{"like":"Brio"}}', $e->getMessage());
+            self::assertStringContainsString('no label field', $e->getMessage());
+        } finally {
+            unset($GLOBALS['TCA']['tx_nolabel']);
+        }
+    }
+
+    public function testOperatorKeyedShorthandReachesTheServiceAsThatOperator(): void
+    {
+        $recordService = $this->createMock(RecordService::class);
+        $recordService->expects(self::once())
+            ->method('search')
+            ->with('pages', ['title' => ['operator' => 'like', 'value' => 'msasl']], 100, 0, self::anything(), null)
+            ->willReturn(['records' => [], 'total' => 0]);
+
+        $tool = new RecordSearchTool($recordService, new TcaSchemaService());
+        $tool->execute('pages', '{"title":{"like":"msasl"}}', 100);
     }
 }

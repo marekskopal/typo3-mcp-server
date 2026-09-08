@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace MarekSkopal\MsMcpServer\Service;
 
+use Mcp\Exception\ToolCallException;
 use Psr\Http\Message\ServerRequestInterface;
+use Psr\Log\LoggerInterface;
 use TYPO3\CMS\Core\Authentication\BackendUserAuthentication;
 use TYPO3\CMS\Core\DataHandling\DataHandler;
 use TYPO3\CMS\Core\Exception\SiteNotFoundException;
@@ -13,8 +15,11 @@ use TYPO3\CMS\Core\Utility\GeneralUtility;
 
 readonly class DataHandlerService
 {
-    public function __construct(private SiteFinder $siteFinder, private MmFieldNormalizer $mmFieldNormalizer)
-    {
+    public function __construct(
+        private SiteFinder $siteFinder,
+        private MmFieldNormalizer $mmFieldNormalizer,
+        private LoggerInterface $logger,
+    ) {
     }
 
     /**
@@ -45,9 +50,7 @@ readonly class DataHandlerService
         try {
             $dataHandler = GeneralUtility::makeInstance(DataHandler::class);
             $dataHandler->start([$table => [$newId => $fields]], []);
-            $dataHandler->process_datamap();
-
-            $this->checkErrors($dataHandler);
+            $this->processDatamap($dataHandler, sprintf('creating a %s record on pid %d', $table, $pid), $table, null);
 
             /** @var int|string|null $uid */
             $uid = $dataHandler->substNEWwithIDs[$newId] ?? null;
@@ -72,9 +75,7 @@ readonly class DataHandlerService
         try {
             $dataHandler = GeneralUtility::makeInstance(DataHandler::class);
             $dataHandler->start([$table => [$uid => $fields]], []);
-            $dataHandler->process_datamap();
-
-            $this->checkErrors($dataHandler);
+            $this->processDatamap($dataHandler, sprintf('updating %s:%d', $table, $uid), $table, $uid);
         } finally {
             if ($originalRequest !== null) {
                 $GLOBALS['TYPO3_REQUEST'] = $originalRequest;
@@ -91,9 +92,7 @@ readonly class DataHandlerService
     {
         $dataHandler = GeneralUtility::makeInstance(DataHandler::class);
         $dataHandler->start([], [$table => [$uid => ['move' => $target]]]);
-        $dataHandler->process_cmdmap();
-
-        $this->checkErrors($dataHandler);
+        $this->processCmdmap($dataHandler, sprintf('moving %s:%d', $table, $uid), $table, $uid);
     }
 
     /**
@@ -118,9 +117,7 @@ readonly class DataHandlerService
 
             $dataHandler = GeneralUtility::makeInstance(DataHandler::class);
             $dataHandler->start([], [$table => [$uid => ['copy' => $target]]]);
-            $dataHandler->process_cmdmap();
-
-            $this->checkErrors($dataHandler);
+            $this->processCmdmap($dataHandler, sprintf('copying %s:%d', $table, $uid), $table, $uid);
 
             // @phpstan-ignore property.internal
             $newUid = $dataHandler->copyMappingArray[$table][$uid] ?? null;
@@ -151,9 +148,7 @@ readonly class DataHandlerService
 
         $dataHandler = GeneralUtility::makeInstance(DataHandler::class);
         $dataHandler->start([], [$table => $cmdmap]);
-        $dataHandler->process_cmdmap();
-
-        $this->checkErrors($dataHandler);
+        $this->processCmdmap($dataHandler, sprintf('deleting %d %s records', count($uids), $table), $table, null);
     }
 
     /**
@@ -170,9 +165,7 @@ readonly class DataHandlerService
 
         $dataHandler = GeneralUtility::makeInstance(DataHandler::class);
         $dataHandler->start([$table => $datamap], []);
-        $dataHandler->process_datamap();
-
-        $this->checkErrors($dataHandler);
+        $this->processDatamap($dataHandler, sprintf('updating %d %s records', count($uids), $table), $table, null);
     }
 
     /** @param list<int> $uids */
@@ -185,18 +178,14 @@ readonly class DataHandlerService
 
         $dataHandler = GeneralUtility::makeInstance(DataHandler::class);
         $dataHandler->start([], [$table => $cmdmap]);
-        $dataHandler->process_cmdmap();
-
-        $this->checkErrors($dataHandler);
+        $this->processCmdmap($dataHandler, sprintf('moving %d %s records', count($uids), $table), $table, null);
     }
 
     public function deleteRecord(string $table, int $uid): void
     {
         $dataHandler = GeneralUtility::makeInstance(DataHandler::class);
         $dataHandler->start([], [$table => [$uid => ['delete' => 1]]]);
-        $dataHandler->process_cmdmap();
-
-        $this->checkErrors($dataHandler);
+        $this->processCmdmap($dataHandler, sprintf('deleting %s:%d', $table, $uid), $table, $uid);
     }
 
     /**
@@ -208,9 +197,12 @@ readonly class DataHandlerService
     {
         $dataHandler = GeneralUtility::makeInstance(DataHandler::class);
         $dataHandler->start([], $cmdmap);
-        $dataHandler->process_cmdmap();
-
-        $this->checkErrors($dataHandler);
+        $this->processCmdmap(
+            $dataHandler,
+            'executing a command map on ' . implode(', ', array_keys($cmdmap)),
+            (string) (array_key_first($cmdmap) ?? ''),
+            null,
+        );
     }
 
     /**
@@ -225,9 +217,12 @@ readonly class DataHandlerService
         try {
             $dataHandler = GeneralUtility::makeInstance(DataHandler::class);
             $dataHandler->start([], [$table => [$uid => ['localize' => $targetLanguageId]]]);
-            $dataHandler->process_cmdmap();
-
-            $this->checkErrors($dataHandler);
+            $this->processCmdmap(
+                $dataHandler,
+                sprintf('localizing %s:%d into language %d', $table, $uid, $targetLanguageId),
+                $table,
+                $uid,
+            );
 
             // @phpstan-ignore property.internal
             $newUid = $dataHandler->copyMappingArray[$table][$uid] ?? null;
@@ -272,9 +267,12 @@ readonly class DataHandlerService
 
         $dataHandler = GeneralUtility::makeInstance(DataHandler::class);
         $dataHandler->start($datamap, []);
-        $dataHandler->process_datamap();
-
-        $this->checkErrors($dataHandler);
+        $this->processDatamap(
+            $dataHandler,
+            sprintf('attaching %d file references to %s:%d', count($fileUids), $table, $recordUid),
+            $table,
+            $recordUid,
+        );
 
         $referenceUids = [];
         foreach ($newIds as $newId) {
@@ -307,13 +305,60 @@ readonly class DataHandlerService
         return $originalRequest;
     }
 
-    private function checkErrors(DataHandler $dataHandler): void
+    private function processDatamap(DataHandler $dataHandler, string $subject, string $table, ?int $uid): void
     {
+        $this->run(static function () use ($dataHandler): void {
+            $dataHandler->process_datamap();
+        }, $dataHandler, $subject, $table, $uid);
+    }
+
+    private function processCmdmap(DataHandler $dataHandler, string $subject, string $table, ?int $uid): void
+    {
+        $this->run(static function () use ($dataHandler): void {
+            $dataHandler->process_cmdmap();
+        }, $dataHandler, $subject, $table, $uid);
+    }
+
+    /**
+     * Runs DataHandler and turns both of its failure modes into a client-visible error.
+     *
+     * DataHandler itself does not throw: it collects refusals ("Attempt to modify record … without
+     * permission", an invalid value) in `errorLog`, which are TYPO3's own editor-facing messages
+     * and safe to relay. A hook can throw, though — and the hooks that matter run *after* the row
+     * was written (EXT:redirects reacts to a slug change from `processDatamap_afterDatabaseOperations`).
+     * Reported as a generic internal error, the client cannot tell that its change went through.
+     * The raw message stays in the log (a DBAL exception embeds SQL and parameters); the client
+     * gets the exception class, the code, what was being done and the fact that it may have landed.
+     *
+     * @param callable(): void $process
+     */
+    private function run(callable $process, DataHandler $dataHandler, string $subject, string $table, ?int $uid): void
+    {
+        try {
+            $process();
+        } catch (ToolCallException $e) {
+            throw $e;
+        } catch (\Throwable $e) {
+            $this->logger->error('TYPO3 DataHandler threw while ' . $subject, ['exception' => $e, 'table' => $table, 'uid' => $uid]);
+
+            throw new ToolCallException(
+                sprintf(
+                    'TYPO3 DataHandler threw %s (code %d) while %s. Hooks run after the row is written, so the change'
+                        . ' may already have been applied — read the record back to verify. The exception is in the TYPO3 log.',
+                    $e::class,
+                    (int) $e->getCode(),
+                    $subject,
+                ),
+                1725700010,
+                $e,
+            );
+        }
+
         // @phpstan-ignore property.internal
         $errorLog = $dataHandler->errorLog;
         if ($errorLog !== []) {
-            throw new \RuntimeException(
-                'DataHandler errors: ' . implode('; ', $errorLog),
+            throw new ToolCallException(
+                sprintf('TYPO3 DataHandler reported errors while %s: %s', $subject, implode('; ', $errorLog)),
                 1712000021,
             );
         }

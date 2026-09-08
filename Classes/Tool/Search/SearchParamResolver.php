@@ -6,6 +6,7 @@ namespace MarekSkopal\MsMcpServer\Tool\Search;
 
 use MarekSkopal\MsMcpServer\Tool\Helper\JsonObjectParser;
 use Mcp\Exception\ToolCallException;
+use const JSON_THROW_ON_ERROR;
 
 /**
  * Shared parameter handling for the search tools.
@@ -54,17 +55,21 @@ class SearchParamResolver
      *
      * A value that opens with `{` or `[` is meant to be JSON, so a parse failure is reported
      * rather than degraded into a LIKE on the literal string. Anything else is a plain-text term
-     * for $fallbackField; tools whose `search` is JSON-only pass null and always take the JSON
-     * path, matching what they did before.
+     * for $fallbackField.
      *
      * @param list<string> $allowedFields
-     * @param string|null $fallbackField field to LIKE-match a plain-text term on, or null when the
-     *                                   parameter accepts JSON only
+     * @param string|null $fallbackField field to LIKE-match a plain-text term on (the tools pass the
+     *                                   table's label field), or null when there is none — a
+     *                                   plain-text term is then rejected with a hint
      * @return array{conditions: array<string, array{operator: string, value: string}>, ignoredFields: list<string>}
      */
     public static function parseSearch(string $search, array $allowedFields, ?string $fallbackField = null): array
     {
         $trimmed = trim($search);
+        if ($trimmed === '') {
+            return ['conditions' => [], 'ignoredFields' => []];
+        }
+
         $looksLikeJson = str_starts_with($trimmed, '{') || str_starts_with($trimmed, '[');
 
         if ($fallbackField !== null && !$looksLikeJson) {
@@ -74,8 +79,20 @@ class SearchParamResolver
             ];
         }
 
-        if ($trimmed === '') {
-            return ['conditions' => [], 'ignoredFields' => []];
+        if (!$looksLikeJson) {
+            // No label field to match a bare term against: say what would work instead of
+            // reporting a JSON syntax error for input that was never meant to be JSON.
+            throw new ToolCallException(
+                sprintf(
+                    'search must be a JSON object such as %s: this table declares no label field (TCA ctrl.label),'
+                        . ' so a plain-text term has no column to match against.',
+                    json_encode(
+                        [self::exampleField($allowedFields) => ['like' => mb_substr($trimmed, 0, 40)]],
+                        JSON_THROW_ON_ERROR,
+                    ),
+                ),
+                1725700002,
+            );
         }
 
         $data = JsonObjectParser::parse($search, 'search');
@@ -84,5 +101,17 @@ class SearchParamResolver
             'conditions' => SearchConditionParser::fromArray($data, $allowedFields),
             'ignoredFields' => array_values(array_diff(array_map('strval', array_keys($data)), $allowedFields)),
         ];
+    }
+
+    /** @param list<string> $allowedFields */
+    private static function exampleField(array $allowedFields): string
+    {
+        foreach ($allowedFields as $field) {
+            if ($field !== 'uid' && $field !== 'pid') {
+                return $field;
+            }
+        }
+
+        return 'uid';
     }
 }

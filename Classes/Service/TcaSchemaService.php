@@ -57,6 +57,27 @@ readonly class TcaSchemaService
         ];
     }
 
+    /**
+     * The table's label field (TCA `ctrl.label`), which the search tools LIKE-match a plain-text
+     * `search` term against. Null when the table is unknown or declares none.
+     */
+    public function getLabelField(string $tableName): ?string
+    {
+        $tca = $this->getTca($tableName);
+        if ($tca === null) {
+            return null;
+        }
+
+        $ctrl = $tca['ctrl'] ?? [];
+        if (!is_array($ctrl)) {
+            return null;
+        }
+
+        $labelField = $ctrl['label'] ?? null;
+
+        return is_string($labelField) && $labelField !== '' ? $labelField : null;
+    }
+
     /** @return list<string> Fields suitable for list views (uid, pid, label fields, enablecolumns.disabled). */
     public function getListFields(string $tableName): array
     {

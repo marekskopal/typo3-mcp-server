@@ -56,6 +56,7 @@ readonly class BackendUserBootstrap
         }
 
         $backendUser = new BackendUserAuthentication();
+        $this->initializeSession($backendUser);
         // @phpstan-ignore property.internal
         $backendUser->user = $userRow;
         // @phpstan-ignore method.internal
@@ -71,5 +72,21 @@ readonly class BackendUserBootstrap
         $GLOBALS['LANG'] = $this->languageServiceFactory->createFromUserPreferences($backendUser);
 
         return $backendUser;
+    }
+
+    /**
+     * Gives the user an anonymous session that is never persisted.
+     *
+     * Core code reached from DataHandler assumes `$GLOBALS['BE_USER']` carries a session: the
+     * redirects extension reacts to a page slug change with `BackendUtility::setUpdateSignal()`,
+     * which hashes the session id in `getModuleData(…, 'ses')` / `pushModuleData()`. Core skips
+     * that on CLI, but the HTTP endpoint is not CLI — so without a session, `pages_update` with a
+     * new slug wrote the row and then died in the hook with "Call to a member function
+     * getIdentifier() on null", reported to the client as an internal error.
+     */
+    public function initializeSession(BackendUserAuthentication $backendUser): void
+    {
+        // @phpstan-ignore method.internal
+        $backendUser->initializeUserSessionManager();
     }
 }

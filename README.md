@@ -82,6 +82,8 @@ The base path is configurable via the `mcpBasePath` extension setting if `/mcp` 
 
 ## AI Client Configuration
 
+> **Clients cache the tool list.** An MCP client fetches the tools and their descriptions once, when it connects. After upgrading the extension, enabling a table in the **Extension Tables** module or changing `EXTCONF`, restart the client (or disconnect and reconnect the server) so it sees the new tools and field lists — until then it works from the old descriptions and may, for example, not offer a field that `table_schema` already reports.
+
 ### Claude Desktop
 
 Add to your Claude Desktop config file:
@@ -376,6 +378,8 @@ The **System > MCP Server** backend module provides:
 
 ## Tools Reference
 
+**Write errors.** A write that TYPO3's DataHandler refuses — no permission, an invalid value — is reported with DataHandler's own message (`TYPO3 DataHandler reported errors while updating pages:68: …`). If a DataHandler *hook* throws (an extension reacting to the change, such as EXT:redirects on a slug change), the tool reports the exception class and code and that the change **may already have been applied**, since hooks run after the row is written; read the record back to verify. The raw exception message goes to the TYPO3 log only, because it can embed SQL or file paths.
+
 ### Pages
 
 | Tool | Description |
@@ -451,16 +455,35 @@ unrestricted access to every storage.
 | `record_search` | Search records in any table with field conditions, operators, and sorting. |
 | `record_count` | Count records in any table without fetching them. Supports pid and search condition filtering. |
 
-**Search operators:** `eq`, `neq`, `like` (default), `gt`, `gte`, `lt`, `lte`, `in` (comma-separated), `null`, `notNull`.
+**The `search` parameter** is either a plain-text term — LIKE-matched against the table's label field (TCA `ctrl.label`, usually `title`; a table without one rejects plain text and answers with the JSON shape to use instead) — or a JSON object with field names as keys. Each field's value takes one of these shapes:
+
+| Shape | Example | Meaning |
+|-------|---------|---------|
+| plain string or number | `{"title": "hello"}` | `LIKE '%hello%'` |
+| operator-keyed object | `{"TSconfig": {"like": "tx_news"}}` | the named operator |
+| long form | `{"uid": {"op": "gt", "value": "10"}}` | the named operator |
+| list | `{"uid": [1, 2]}` | `IN (1, 2)` |
+| `true` / `false` | `{"hidden": true}` | `= 1` / `= 0` |
+| `null` | `{"l10n_source": null}` | `IS NULL` |
+
+**Search operators:** `eq`, `neq`, `like` (default), `gt`, `gte`, `lt`, `lte`, `in` (comma-separated string or list), `null`, `notNull`.
+
+A condition of any other shape — `{"TSconfig": {"contains": "x"}}`, an unknown operator, a nested object as the operand — is rejected with an error that names the field and the accepted shapes, rather than being dropped. A condition on a field the user cannot read is dropped and reported in `ignoredFields`. Both tools accept exactly the same `search`.
 
 **Many-to-many fields:** `table_schema` marks a `select` or `group` column that relates through an MM table with `"relation": "mm"` and `"mm": "<mm table>"`, alongside `foreignTable` (select) or `allowed` (group) and any `minitems` / `maxitems`. `record_search` returns such fields as lists of related UIDs, but they **cannot be used as search conditions** — the physical column only stores the relation count, so a condition on one is rejected with an error rather than matched against that count. See [Many-to-many relation fields](#many-to-many-relation-fields) for the read/write format.
 
 **Search examples:**
 ```json
-// Simple LIKE search
+// Plain-text term on the label field
+"Brio"
+
+// Simple LIKE search on a named field
 {"title": "hello"}
 
-// Advanced operators
+// Operator-keyed shorthand: pages whose TSconfig mentions tx_news
+{"TSconfig": {"like": "tx_news"}}
+
+// Long form, several conditions
 {"uid": {"op": "gt", "value": "10"}, "title": {"op": "eq", "value": "Home"}}
 
 // Combined with sorting

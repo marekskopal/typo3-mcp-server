@@ -921,4 +921,19 @@ final class TcaSchemaServiceTest extends TestCase
         self::assertSame('link', $field['type']);
         self::assertSame(['url', 'email', 'page'], $field['allowedTypes']);
     }
+
+    public function testGetLabelFieldReturnsCtrlLabel(): void
+    {
+        $GLOBALS['TCA']['tx_test'] = ['ctrl' => ['label' => 'title'], 'columns' => []];
+
+        self::assertSame('title', $this->service->getLabelField('tx_test'));
+    }
+
+    public function testGetLabelFieldReturnsNullWithoutLabelOrTable(): void
+    {
+        $GLOBALS['TCA']['tx_test'] = ['ctrl' => ['label' => ''], 'columns' => []];
+
+        self::assertNull($this->service->getLabelField('tx_test'));
+        self::assertNull($this->service->getLabelField('nonexistent_table'));
+    }
 }
