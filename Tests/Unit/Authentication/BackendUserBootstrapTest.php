@@ -149,6 +149,8 @@ final class BackendUserBootstrapTest extends TestCase
         $GLOBALS['TYPO3_CONF_VARS']['BE']['lockIP'] = 0;
         $GLOBALS['TYPO3_CONF_VARS']['BE']['lockIPv6'] = 0;
         $GLOBALS['TYPO3_CONF_VARS']['BE']['lifetime'] = 0;
+        // TYPO3 v13 stamps an anonymous session with EXEC_TIME (v14 asks a clock); bootstrap sets it.
+        $GLOBALS['EXEC_TIME'] = time();
 
         try {
             $backendUser = new BackendUserAuthentication();
@@ -167,7 +169,7 @@ final class BackendUserBootstrapTest extends TestCase
             self::assertSame(['x' => 1], $backendUser->getModuleData('BackendUtility::getUpdateSignal', 'ses'));
         } finally {
             GeneralUtility::purgeInstances();
-            unset($GLOBALS['TYPO3_CONF_VARS']);
+            unset($GLOBALS['TYPO3_CONF_VARS'], $GLOBALS['EXEC_TIME']);
         }
     }
 }
