@@ -4,9 +4,9 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [1.3.1] - 2026-09-08
 
-**Upgrading.** No database changes and no new settings. `DataHandlerService` takes a third constructor argument (`Psr\Log\LoggerInterface`), so flush the TYPO3 caches after deploying (the DI container is cached). Two behaviours are visible to a client: a `search` condition of an unrecognised shape is now an error instead of a match-everything filter, and a refused or failed write reports DataHandler's message instead of "An internal error occurred".
+**Upgrading from 1.3.0.** No database changes and no new settings. `DataHandlerService` takes a third constructor argument (`Psr\Log\LoggerInterface`), so flush the TYPO3 caches after deploying (the DI container is cached). Two behaviours are visible to a client: a `search` condition of an unrecognised shape is now an error instead of a match-everything filter, and a refused or failed write reports DataHandler's message instead of "An internal error occurred".
 
 ### Fixed
 - **`record_search` / `record_count` matched every row for an operator-keyed condition.** `{"TSconfig":{"like":"msasl"}}` — the shape a client reaches for first — was not the documented `{"op":"like","value":"msasl"}` long form, and `SearchConditionParser` degraded any unrecognised object into `LIKE '%%'`, which matches every non-NULL value. On asl-brno the call returned all 24 pages with any TSconfig, before and after the term had been removed from every one of them, with nothing in the response saying the condition had been dropped. The operator-keyed shorthand is now accepted (`{"like": …}`, `{"gt": …}`, `{"in": [1,2]}` …), as are a list (IN), `true`/`false` (= 1 / = 0) and `null` (IS NULL); anything else is rejected with an error naming the field and the accepted shapes. The integration suite, which itself used the shorthand and so had been passing vacuously, now asserts that a LIKE on `pages.TSconfig` returns only matching pages and `total: 0` when nothing matches.
