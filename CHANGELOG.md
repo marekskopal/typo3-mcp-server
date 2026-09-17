@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Fixed
+- **Static analysis never ran against TYPO3 v13.** The `phpstan` CI job matrixed on PHP version only and ran a plain `composer install`, which always resolves to the highest allowed TYPO3 — so half of the supported matrix (v13.4.34+) was unanalysed, while the `tests` job had been covering both branches all along. The job now mirrors the test matrix, and the ten errors that had accumulated behind the gap are fixed: `BackendLayoutView::getBackendLayoutForPage()` returns `?BackendLayout` on v13 and a null would have been dereferenced into a fatal, so `BackendLayoutResource` now reports "No backend layout could be resolved for page N." instead; `DataHandler::$errorLog` is typed `list<non-empty-string>` on v14 but untyped on v13, so its entries are normalized before being relayed. `PasswordHasBeenResetEvent` genuinely does not exist on v13 (the listener is documented as v14-only and is never dispatched there), which `phpstan.neon` now states in two `ignoreErrors` entries scoped to that one file.
+
 ## [1.3.1] - 2026-09-08
 
 **Upgrading from 1.3.0.** No database changes and no new settings. `DataHandlerService` takes a third constructor argument (`Psr\Log\LoggerInterface`), so flush the TYPO3 caches after deploying (the DI container is cached). Two behaviours are visible to a client: a `search` condition of an unrecognised shape is now an error instead of a match-everything filter, and a refused or failed write reports DataHandler's message instead of "An internal error occurred".

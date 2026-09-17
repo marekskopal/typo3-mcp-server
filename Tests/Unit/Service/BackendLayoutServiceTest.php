@@ -9,8 +9,11 @@ use MarekSkopal\MsMcpServer\Resource\Result\BackendLayoutColumnResult;
 use MarekSkopal\MsMcpServer\Resource\Result\BackendLayoutResult;
 use MarekSkopal\MsMcpServer\Resource\Result\BackendLayoutStructureResult;
 use MarekSkopal\MsMcpServer\Service\BackendLayoutService;
+use Mcp\Exception\ResourceReadException;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
+use ReflectionMethod;
+use ReflectionNamedType;
 use TYPO3\CMS\Backend\View\BackendLayout\BackendLayout;
 use TYPO3\CMS\Backend\View\BackendLayoutView;
 
@@ -187,5 +190,25 @@ final class BackendLayoutServiceTest extends TestCase
 
         self::assertSame(1, $result->structure->rows[0][0]->colspan);
         self::assertSame(1, $result->structure->rows[0][0]->rowspan);
+    }
+
+    public function testNullBackendLayoutIsReportedInsteadOfFatallyDereferenced(): void
+    {
+        // getBackendLayoutForPage() is nullable on v13 only; on v14 it always returns a layout, so
+        // the stub could not produce this state there at all.
+        $returnType = (new ReflectionMethod(BackendLayoutView::class, 'getBackendLayoutForPage'))->getReturnType();
+        if (!$returnType instanceof ReflectionNamedType || !$returnType->allowsNull()) {
+            self::markTestSkipped('BackendLayoutView::getBackendLayoutForPage() is not nullable in this TYPO3 version.');
+        }
+
+        $backendLayoutView = $this->createStub(BackendLayoutView::class);
+        $backendLayoutView->method('getBackendLayoutForPage')->willReturn(null);
+
+        $service = new BackendLayoutService($backendLayoutView);
+
+        $this->expectException(ResourceReadException::class);
+        $this->expectExceptionMessage('No backend layout could be resolved for page 7.');
+
+        $service->getBackendLayoutForPage(7);
     }
 }

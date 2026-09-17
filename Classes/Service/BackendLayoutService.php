@@ -8,6 +8,7 @@ use MarekSkopal\MsMcpServer\Resource\Result\BackendLayoutCellResult;
 use MarekSkopal\MsMcpServer\Resource\Result\BackendLayoutColumnResult;
 use MarekSkopal\MsMcpServer\Resource\Result\BackendLayoutResult;
 use MarekSkopal\MsMcpServer\Resource\Result\BackendLayoutStructureResult;
+use Mcp\Exception\ResourceReadException;
 use TYPO3\CMS\Backend\View\BackendLayout\BackendLayout;
 use TYPO3\CMS\Backend\View\BackendLayoutView;
 
@@ -19,7 +20,7 @@ readonly class BackendLayoutService
 
     public function getBackendLayoutForPage(int $pageId): BackendLayoutResult
     {
-        $backendLayout = $this->backendLayoutView->getBackendLayoutForPage($pageId);
+        $backendLayout = $this->requireBackendLayout($this->backendLayoutView->getBackendLayoutForPage($pageId), $pageId);
 
         $columns = $this->buildColumns($backendLayout);
         $structure = $this->buildStructure($backendLayout);
@@ -31,6 +32,20 @@ readonly class BackendLayoutService
             columns: $columns,
             structure: $structure,
         );
+    }
+
+    /**
+     * BackendLayoutView::getBackendLayoutForPage() returns ?BackendLayout on v13 and BackendLayout on v14,
+     * so the null arrives only on v13 — when even the 'default' data provider yields nothing for the page.
+     * Taking it as a nullable parameter keeps the check honest on v13 without turning into dead code on v14.
+     */
+    private function requireBackendLayout(?BackendLayout $backendLayout, int $pageId): BackendLayout
+    {
+        if ($backendLayout === null) {
+            throw new ResourceReadException('No backend layout could be resolved for page ' . $pageId . '.');
+        }
+
+        return $backendLayout;
     }
 
     /** @return list<BackendLayoutColumnResult> */

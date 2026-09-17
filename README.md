@@ -729,6 +729,17 @@ vendor/bin/phpcbf
 vendor/bin/phpunit
 ```
 
+A plain `composer install` resolves to the highest supported TYPO3, so the commands above only ever
+see v14. CI runs PHPStan and PHPUnit against both supported branches; to reproduce the v13 leg
+locally, pin the branch first and restore afterwards:
+
+```bash
+composer require --no-update typo3/cms-core:^13.4.34 && composer update
+vendor/bin/phpstan analyse && vendor/bin/phpunit
+
+git checkout composer.json && composer update
+```
+
 ## License
 
 GPL-2.0-or-later

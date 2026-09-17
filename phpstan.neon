@@ -17,6 +17,18 @@ parameters:
     reportAnyTypeWideningInVarTag: true
 
     ignoreErrors:
+        # PasswordHasBeenResetEvent exists only in TYPO3 v14. The listener is documented as v14-only and is
+        # never dispatched on v13, where registration by class-name string is harmless — but PHPStan cannot
+        # resolve the type there. reportUnmatched keeps these inert (not "unmatched") on the v14 legs.
+        -
+            identifier: class.notFound
+            path: Classes/EventListener/PasswordResetTokenRevocationListener.php
+            reportUnmatched: false
+        -
+            identifier: argument.type
+            message: '#\$beUserUid of method .*revokeByBackendUser\(\) expects int, mixed given#'
+            path: Classes/EventListener/PasswordResetTokenRevocationListener.php
+            reportUnmatched: false
         -
             identifier: parameter.internalClass
             message: '#BackendLayoutView#'
