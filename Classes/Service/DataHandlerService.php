@@ -358,9 +358,26 @@ readonly class DataHandlerService
         $errorLog = $dataHandler->errorLog;
         if ($errorLog !== []) {
             throw new ToolCallException(
-                sprintf('TYPO3 DataHandler reported errors while %s: %s', $subject, implode('; ', $errorLog)),
+                sprintf('TYPO3 DataHandler reported errors while %s: %s', $subject, $this->formatErrorLog($errorLog)),
                 1712000021,
             );
         }
+    }
+
+    /**
+     * DataHandler::$errorLog is declared list<non-empty-string> on v14 but only array on v13, so on v13 the
+     * entries arrive as mixed. Declaring the parameter mixed-valued normalizes them on both versions without
+     * the check becoming dead code on v14. Core only ever appends strings; the fallback is a last resort.
+     *
+     * @param array<mixed> $errorLog
+     */
+    private function formatErrorLog(array $errorLog): string
+    {
+        $messages = array_map(
+            static fn (mixed $message): string => is_string($message) ? $message : get_debug_type($message),
+            $errorLog,
+        );
+
+        return implode('; ', $messages);
     }
 }

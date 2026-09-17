@@ -151,11 +151,11 @@ readonly class MyTool
 - Supports TYPO3 v13.4.34+ and v14.3.6+ — the floor is a security floor (TYPO3-CORE-SA-2026-021), not just a compatibility one, so do not lower it without checking `composer audit`
 - Tool descriptions use `#[McpTool]` attributes from MCP SDK — tools are auto-discovered via DI tags
 - Error handling is centralized in `ErrorHandlingProxy` — tools do NOT need try/catch or `LoggerInterface`
-- CI runs PHPStan, PHPCS, and PHPUnit via GitHub Actions on PHP 8.3/8.4 with TYPO3 v13/v14 matrix
+- CI runs PHPStan, PHPCS, and PHPUnit via GitHub Actions on PHP 8.3/8.4 with TYPO3 v13/v14 matrix. **PHPStan and PHPUnit both matrix on TYPO3**, because a plain `composer install` always resolves to the highest supported version, so static analysis had only ever seen v14 (TMS-47). Where the two branches differ in a signature (`BackendLayoutView::getBackendLayoutForPage()` is nullable on v13 only, `DataHandler::$errorLog` is typed on v14 only), take the looser shape as a private method's parameter type: the check is honest on v13 and is not dead code on v14, which neither a `?->`/`??` nor an inline cast achieves. `PasswordHasBeenResetEvent` cannot be expressed that way (the class is simply absent on v13), so `phpstan.neon` carries two `ignoreErrors` entries scoped to that one file with `reportUnmatched: false`, which makes them inert rather than "unmatched" on the v14 legs
 
 ## Testing
 
-953 unit tests covering:
+954 unit tests covering:
 - All static MCP tools + batch tools (Pages/Content/File/Schema/Search/Translation/Cache/Permission/BackendUser/BackendGroup/Batch CRUD)
 - Dynamic tool registration and execution (DynamicToolRegistrar), including merged EXTCONF + discovered tables
 - OAuth classes (AuthorizationService incl. revocation, ClientRepository, PkceVerifier, OAuthTokenPair, RateLimitService)

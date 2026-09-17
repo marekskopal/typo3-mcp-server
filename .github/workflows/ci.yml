@@ -8,17 +8,27 @@ on:
 
 jobs:
   phpstan:
-    name: PHPStan
+    name: PHPStan (PHP ${{ matrix.php }}, TYPO3 ${{ matrix.typo3 }})
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
-        php: ['8.3', '8.4']
+        include:
+          - php: '8.3'
+            typo3: '^13.4.34'
+          - php: '8.4'
+            typo3: '^13.4.34'
+          - php: '8.3'
+            typo3: '^14.3.6'
+          - php: '8.4'
+            typo3: '^14.3.6'
     steps:
       - uses: actions/checkout@v4
       - uses: shivammathur/setup-php@v2
         with:
           php-version: ${{ matrix.php }}
           coverage: none
+      - run: composer require --no-update typo3/cms-core:${{ matrix.typo3 }}
       - run: composer install --no-progress
       - run: vendor/bin/phpstan analyse
 
