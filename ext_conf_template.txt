@@ -1,6 +1,9 @@
 # cat=basic/enable; type=string; label=MCP base path: Base URL path for the MCP endpoint and OAuth sub-paths (e.g. /mcp, /typo3-mcp). Must start with /. Defaults to /mcp.
 mcpBasePath = /mcp
 
+# cat=basic/enable; type=boolean; label=Allow dynamic client registration: Let MCP clients register themselves through /mcp/oauth/register (RFC 7591) without an administrator creating them in the backend module. Anyone can then register a client under any name; the consent screen marks such clients as self-registered and shows where the authorization will be sent. Disable this if every client is provisioned in the backend module.
+dynamicClientRegistrationEnabled = 1
+
 # cat=token/enable; type=int+; label=Access token lifetime (seconds)
 accessTokenLifetime = 3600
 

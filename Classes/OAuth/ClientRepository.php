@@ -16,6 +16,9 @@ readonly class ClientRepository
 
     private const int MAX_REDIRECT_URI_LENGTH = 2000;
 
+    /** Width of the `client_name` column. */
+    public const int MAX_CLIENT_NAME_LENGTH = 255;
+
     public function __construct(private ConnectionPool $connectionPool)
     {
     }
@@ -70,13 +73,29 @@ readonly class ClientRepository
         return str_contains($scheme, '.');
     }
 
-    /** @return array{uid: int, client_id: string, client_name: string, redirect_uris: string, be_user: int}|null */
+    /**
+     * Reduces an attacker-controlled client name to what the consent screen can show honestly.
+     *
+     * Control and format characters go (a bidi override reverses the displayed name, zero-width
+     * joiners hide in it), runs of whitespace collapse so padding cannot push the rest of the
+     * screen out of view, and the result is capped at the column width. Returns '' when nothing
+     * displayable is left; the caller substitutes a default.
+     */
+    public static function normalizeClientName(string $clientName): string
+    {
+        $stripped = (string) preg_replace('/[\p{Cc}\p{Cf}\p{Co}\p{Cn}]+/u', '', $clientName);
+        $collapsed = trim((string) preg_replace('/\s+/u', ' ', $stripped));
+
+        return mb_substr($collapsed, 0, self::MAX_CLIENT_NAME_LENGTH);
+    }
+
+    /** @return array{uid: int, client_id: string, client_name: string, redirect_uris: string, be_user: int, dynamically_registered: int}|null */
     public function findByClientId(string $clientId): ?array
     {
         $queryBuilder = $this->connectionPool->getQueryBuilderForTable(self::TABLE);
-        /** @var array{uid: int, client_id: string, client_name: string, redirect_uris: string, be_user: int}|false $row */
+        /** @var array{uid: int, client_id: string, client_name: string, redirect_uris: string, be_user: int, dynamically_registered: int}|false $row */
         $row = $queryBuilder
-            ->select('uid', 'client_id', 'client_name', 'redirect_uris', 'be_user')
+            ->select('uid', 'client_id', 'client_name', 'redirect_uris', 'be_user', 'dynamically_registered')
             ->from(self::TABLE)
             ->where(
                 $queryBuilder->expr()->eq('client_id', $queryBuilder->createNamedParameter($clientId)),
@@ -124,6 +143,20 @@ readonly class ClientRepository
         $boundUserUid = is_numeric($boundUser) ? (int) $boundUser : 0;
 
         return $boundUserUid > 0 && $boundUserUid !== $beUserUid;
+    }
+
+    /**
+     * True for a client that registered itself through RFC 7591 rather than being created by an
+     * administrator in the backend module. The consent screen says so, because a self-registered
+     * client's name is whatever the registrant typed.
+     *
+     * @param array<string, mixed> $client a row as returned by findByClientId()
+     */
+    public function isSelfRegistered(array $client): bool
+    {
+        $flag = $client['dynamically_registered'] ?? 0;
+
+        return is_numeric($flag) && (int) $flag === 1;
     }
 
     /**

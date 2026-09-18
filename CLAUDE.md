@@ -48,6 +48,7 @@ vendor/bin/typo3 mcp:server --user=admin
 - `OAuth/PkceVerifier` — S256 PKCE verification
 - `OAuth/OAuthTokenPair` — DTO for access/refresh token pairs
 - `OAuth/AuthorizeParamsValidator` — Shared OAuth authorize-param validation (used by `OAuthMiddleware` on both GET and POST)
+- `OAuth/DynamicRegistrationPolicy` — Reads the `dynamicClientRegistrationEnabled` setting; when off, `OAuthMiddleware` answers `/mcp/oauth/register` with 403 and drops `registration_endpoint` from the RFC 8414 metadata. The consent screen always shows the redirect target host and flags `dynamically_registered` clients as unverified; `ClientRepository::normalizeClientName()` strips control/format characters from registrant-supplied names
 - `OAuth/OAuthContinuationCookie` — HMAC-signed cookie that carries the relative authorize URL across the `/typo3/login` round-trip; signed with `$GLOBALS['TYPO3_CONF_VARS']['SYS']['encryptionKey']`, 600s TTL, `HttpOnly; SameSite=Lax; Secure` when on HTTPS
 - `Authentication/BackendUserBootstrap` — Bootstraps a `BackendUserAuthentication` from a be_users record and gives it an anonymous, never-persisted session (`initializeSession()`). Core code reached from DataHandler hooks assumes one: EXT:redirects reacts to a slug change with `BackendUtility::setUpdateSignal()`, which hashes the session id in `getModuleData(…, 'ses')`. Core skips that on CLI only, so over HTTP a `pages_update` with a new slug wrote the row and then died in the hook.
 - `Server/McpServerFactory` — Builds the MCP Server instance; tools/resources/prompts are auto-discovered via DI tags, no hardcoded registration needed. Wires `DatabaseSessionStore` so MCP sessions survive container restarts.
@@ -115,7 +116,7 @@ vendor/bin/typo3 mcp:server --user=admin
 - `Configuration/RequestMiddlewares.php` — Registers OAuthMiddleware and McpServerMiddleware in frontend stack
 - `Configuration/Backend/Modules.php` — Backend module registration (OAuth client + extension table routes)
 - `Configuration/TCA/tx_msmcpserver_oauth_client.php` — TCA for OAuth client table
-- `ext_conf_template.txt` — Extension settings for the endpoint base path (mcpBasePath, default `/mcp`, read through `McpPathProvider`), token lifetimes (accessTokenLifetime, refreshTokenLifetime, refreshTokenMaxLifetime — the absolute cap past which a refresh chain cannot slide further, codeLifetime), session lifetime (sessionLifetime, sliding TTL in seconds, default 86400), audit log level (auditLogLevel), and rate limiting (rateLimitEnabled, per-endpoint limits and windows)
+- `ext_conf_template.txt` — Extension settings for the endpoint base path (mcpBasePath, default `/mcp`, read through `McpPathProvider`), dynamic client registration (dynamicClientRegistrationEnabled, default 1, read through `DynamicRegistrationPolicy`), token lifetimes (accessTokenLifetime, refreshTokenLifetime, refreshTokenMaxLifetime — the absolute cap past which a refresh chain cannot slide further, codeLifetime), session lifetime (sessionLifetime, sliding TTL in seconds, default 86400), audit log level (auditLogLevel), and rate limiting (rateLimitEnabled, per-endpoint limits and windows)
 
 **SDK Workarounds:**
 - Tool classes must be `public: true` in Services.yaml because the SDK's `ReferenceHandler` calls `container->has()` which returns false for private TYPO3 services.
