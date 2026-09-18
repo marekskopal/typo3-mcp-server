@@ -267,7 +267,7 @@ The stdio transport does not require OAuth — the user is specified via the `--
 ### OAuth Features
 
 - **Authorization Code flow with PKCE** — standard OAuth 2.1 for MCP clients
-- **Authentication via the real TYPO3 backend login** — the `/mcp/oauth/authorize` endpoint redirects unauthenticated users to `/typo3/login` and only renders a single-click consent screen once `BE_USER` is established; MFA, `starttime`/`endtime`, per-user lockout, and `sys_log` failed-login entries come from the standard backend pipeline
+- **Authentication via the real TYPO3 backend login** — the `/mcp/oauth/authorize` endpoint redirects unauthenticated users to `/typo3/login` and only renders a single-click consent screen once `BE_USER` is established; MFA, `starttime`/`endtime`, per-user lockout, and `sys_log` failed-login entries come from the standard backend pipeline. Both of TYPO3's MFA gates apply to the consent screen: a session that still owes its MFA challenge, or a user whom the `requireMfa` policy obliges to set MFA up first, is sent back through the backend login instead of being offered the Authorize button
 - **Dynamic Client Registration** ([RFC 7591](https://datatracker.ietf.org/doc/html/rfc7591)) — clients can self-register
 - **Token Revocation** ([RFC 7009](https://datatracker.ietf.org/doc/html/rfc7009)) — revoke access and refresh tokens
 - **Protected Resource Metadata** ([RFC 9728](https://datatracker.ietf.org/doc/html/rfc9728)) — auto-discovery of auth requirements

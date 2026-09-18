@@ -18,6 +18,7 @@ use Psr\Http\Server\MiddlewareInterface;
 use Psr\Http\Server\RequestHandlerInterface;
 use Psr\Log\LoggerInterface;
 use TYPO3\CMS\Core\Authentication\BackendUserAuthentication;
+use TYPO3\CMS\Core\Authentication\Mfa\MfaRequiredException;
 use TYPO3\CMS\Core\Http\NormalizedParams;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
 use const ENT_QUOTES;
@@ -219,7 +220,8 @@ readonly class OAuthMiddleware implements MiddlewareInterface
         if ($beUserUid === null) {
             return $this->createJsonResponse(401, [
                 'error' => 'login_required',
-                'error_description' => 'Backend session expired. Please restart the authorization flow.',
+                'error_description' => 'Backend session expired or not fully authenticated (MFA pending).'
+                    . ' Please restart the authorization flow.',
             ]);
         }
 
@@ -399,22 +401,70 @@ readonly class OAuthMiddleware implements MiddlewareInterface
     /**
      * Bootstraps a `BackendUserAuthentication` from the request's cookies (TYPO3's
      * `be_typo_user` cookie is scoped to the site path, so it reaches the frontend
-     * stack on standard installs). Returns the authenticated uid or null.
+     * stack on standard installs). Returns the uid of a *fully* authenticated user, or
+     * null: no session, a session that still owes its MFA challenge, or a user who is
+     * required to set MFA up and has not (see isMfaSetupPending()). The backend applies
+     * both MFA gates before it serves a single module; a consent screen that mints a
+     * long-lived bearer token must not be reachable with less.
      */
     private function resolveAuthenticatedBackendUserUid(ServerRequestInterface $request): ?int
     {
         $beUser = $this->resolveBackendUser($request);
-        $uid = $beUser->getUserId();
+        if ($beUser === null) {
+            return null;
+        }
 
-        return $uid !== null && $uid > 0 ? $uid : null;
+        $uid = $beUser->getUserId();
+        if ($uid === null || $uid <= 0) {
+            return null;
+        }
+
+        if ($this->isMfaSetupPending($beUser)) {
+            $this->logger->info('OAuth authorize refused: backend user must set up MFA first', ['be_user' => $uid]);
+
+            return null;
+        }
+
+        return $uid;
+    }
+
+    /**
+     * Mirrors the `setup_mfa` redirect in core's `BackendUserAuthenticator`: the `requireMfa`
+     * policy (global or via user TSconfig `auth.mfa.required`) is enforced only in the backend
+     * middleware stack, and this endpoint runs in the frontend stack. Without this check a user
+     * who has passed the password but never set a provider up could authorize an MCP client and
+     * hold a token for months while the backend itself refuses them every module.
+     */
+    private function isMfaSetupPending(BackendUserAuthentication $beUser): bool
+    {
+        if ((bool) ($beUser->getSessionData('mfa') ?? false)) {
+            return false;
+        }
+
+        // Core skips the requirement in switch-user mode; so do we.
+        // @phpstan-ignore method.internal
+        if ($beUser->getOriginalUserIdWhenInSwitchUserMode() !== null) {
+            return false;
+        }
+
+        // @phpstan-ignore method.internal
+        return $beUser->isMfaSetupRequired();
     }
 
     private function resolveBackendUsername(ServerRequestInterface $request): string
     {
-        return $this->resolveBackendUser($request)->getUserName() ?? '';
+        return $this->resolveBackendUser($request)?->getUserName() ?? '';
     }
 
-    private function resolveBackendUser(ServerRequestInterface $request): BackendUserAuthentication
+    /**
+     * Returns null when the session's first factor passed but its MFA challenge has not.
+     * `start()` throws `MfaRequiredException` for that state; core's backend middleware turns it
+     * into a redirect to the MFA form, and treating it as "not authenticated" here sends the user
+     * through that same form via the backend login. The half-authenticated object is deliberately
+     * not cached in `$GLOBALS['BE_USER']`: it carries a user record that nothing downstream may
+     * mistake for an authenticated one.
+     */
+    private function resolveBackendUser(ServerRequestInterface $request): ?BackendUserAuthentication
     {
         $beUser = $GLOBALS['BE_USER'] ?? null;
         if ($beUser instanceof BackendUserAuthentication) {
@@ -422,7 +472,15 @@ readonly class OAuthMiddleware implements MiddlewareInterface
         }
 
         $beUser = GeneralUtility::makeInstance(BackendUserAuthentication::class);
-        $beUser->start($request);
+
+        try {
+            $beUser->start($request);
+        } catch (MfaRequiredException) {
+            $this->logger->info('OAuth authorize refused: backend session has not passed its MFA challenge');
+
+            return null;
+        }
+
         $GLOBALS['BE_USER'] = $beUser;
 
         return $beUser;
