@@ -620,15 +620,15 @@ The `create` / `update` tool descriptions mark these fields as `groups (uid list
 
 ## Resources Reference
 
-Resources provide read-only context about the TYPO3 instance. AI clients can read these to understand the environment before taking actions.
+Resources provide read-only context about the TYPO3 instance. AI clients can read these to understand the environment before taking actions. The schema resources honour the backend user's `tables_select` grant, exactly as the `table_schema` tool does.
 
 | Resource | URI | Description |
 |----------|-----|-------------|
 | System Info | `typo3://system/info` | TYPO3 version, PHP version, application context, OS |
 | Site Configuration | `typo3://sites` | All sites with root pages, base URLs, and languages |
-| TCA Tables | `typo3://schema/tables` | All available database tables with labels |
+| TCA Tables | `typo3://schema/tables` | Database tables with labels, limited to those the user may read (`tables_select`) |
 | Backend User | `typo3://user/me` | Current user's UID, username, admin status, groups |
-| Table Schema | `typo3://schema/tables/{tableName}` | Full field schema for a specific table |
+| Table Schema | `typo3://schema/tables/{tableName}` | Full field schema for a specific table; refused for a table outside the user's `tables_select` grant |
 | Backend Layout | `typo3://pages/{pageId}/backend-layout` | Page's backend layout with column positions and grid structure |
 
 ## Prompts Reference

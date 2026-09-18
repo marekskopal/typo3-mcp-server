@@ -170,9 +170,9 @@ final class McpServerFactoryTest extends TestCase
         $resources = [
             new SystemInfoResource($typo3Version),
             new SiteConfigurationResource($siteFinder),
-            new TcaTablesResource(),
+            new TcaTablesResource($this->createStub(PermissionService::class)),
             new BackendUserResource(),
-            new TcaTableSchemaResource($tcaSchemaService),
+            new TcaTableSchemaResource($tcaSchemaService, $this->createStub(PermissionService::class)),
             new BackendLayoutResource($backendLayoutService),
         ];
 
