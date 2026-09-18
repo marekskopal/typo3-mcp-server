@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace MarekSkopal\MsMcpServer\Service;
 
+use TYPO3\CMS\Core\Authentication\BackendUserAuthentication;
+
 readonly class TcaSchemaService
 {
     /** TCA types that store simple scalar values readable/writable via DataHandler. */
@@ -94,7 +96,7 @@ readonly class TcaSchemaService
         $fields = ['uid', 'pid'];
 
         $labelField = $ctrl['label'] ?? null;
-        if (is_string($labelField) && $labelField !== '') {
+        if (is_string($labelField) && $labelField !== '' && $this->isAccessibleColumn($tca, $tableName, $labelField)) {
             $fields[] = $labelField;
         }
 
@@ -102,7 +104,7 @@ readonly class TcaSchemaService
         if (is_string($labelAlt) && $labelAlt !== '') {
             foreach (explode(',', $labelAlt) as $altField) {
                 $altField = trim($altField);
-                if ($altField !== '') {
+                if ($altField !== '' && $this->isAccessibleColumn($tca, $tableName, $altField)) {
                     $fields[] = $altField;
                 }
             }
@@ -111,7 +113,9 @@ readonly class TcaSchemaService
         $enableColumns = $ctrl['enablecolumns'] ?? [];
         if (is_array($enableColumns)) {
             $disabled = $enableColumns['disabled'] ?? null;
-            if (is_string($disabled) && $disabled !== '') {
+            // `hidden` carries `exclude => true` in most TCA, so a user without the grant does not
+            // get this column in core's list module either.
+            if (is_string($disabled) && $disabled !== '' && $this->isAccessibleColumn($tca, $tableName, $disabled)) {
                 $fields[] = $disabled;
             }
         }
@@ -149,6 +153,10 @@ readonly class TcaSchemaService
                 continue;
             }
 
+            if (!$this->isAccessibleField($tableName, $fieldName, $columnConfig)) {
+                continue;
+            }
+
             if ($this->isReadableField($columnConfig)) {
                 $fields[] = $fieldName;
             }
@@ -179,6 +187,10 @@ readonly class TcaSchemaService
             }
 
             if (in_array($fieldName, $systemFields, true)) {
+                continue;
+            }
+
+            if (!$this->isAccessibleField($tableName, $fieldName, $columnConfig)) {
                 continue;
             }
 
@@ -220,6 +232,10 @@ readonly class TcaSchemaService
             }
 
             if (in_array($fieldName, $systemFields, true)) {
+                continue;
+            }
+
+            if (!$this->isAccessibleField($tableName, $fieldName, $columnConfig)) {
                 continue;
             }
 
@@ -294,6 +310,10 @@ readonly class TcaSchemaService
             }
 
             if (in_array($fieldName, $systemFields, true)) {
+                continue;
+            }
+
+            if (!$this->isAccessibleField($tableName, $fieldName, $columnConfig)) {
                 continue;
             }
 
@@ -599,6 +619,48 @@ readonly class TcaSchemaService
         }
 
         return false;
+    }
+
+    /**
+     * Whether the current backend user may see a column that TCA marks `exclude`.
+     *
+     * TYPO3 gates such columns on the `non_exclude_fields` grant, and not only for editing:
+     * `DatabaseRecordList` builds its columns from `BackendUtility::getAllowedFieldsForTable()`,
+     * which applies exactly this check, so a user without the grant is not shown the column in the
+     * list module at all. This read surface returned every column of a value or relation type
+     * regardless — `pages.TSconfig`, `tt_content.pi_flexform`, most `starttime` / `endtime` /
+     * `fe_group`, and typically `hidden`.
+     *
+     * The backend user is read from `$GLOBALS['BE_USER']`, as this class already reads
+     * `$GLOBALS['TCA']` and as {@see PermissionService} does for the same user. With no
+     * authenticated user the answer is no, so a context without one cannot be the way to see more.
+     *
+     * @param array<mixed> $columnConfig
+     */
+    private function isAccessibleField(string $tableName, string $fieldName, array $columnConfig): bool
+    {
+        if (($columnConfig['exclude'] ?? false) !== true) {
+            return true;
+        }
+
+        $backendUser = $GLOBALS['BE_USER'] ?? null;
+
+        return $backendUser instanceof BackendUserAuthentication
+            && $backendUser->check('non_exclude_fields', $tableName . ':' . $fieldName);
+    }
+
+    /**
+     * Same question for a field named in `ctrl` (label, label_alt, the disabled column), where the
+     * column configuration has to be looked up first.
+     *
+     * @param array<mixed> $tca
+     */
+    private function isAccessibleColumn(array $tca, string $tableName, string $fieldName): bool
+    {
+        $columns = $tca['columns'] ?? [];
+        $columnConfig = is_array($columns) ? ($columns[$fieldName] ?? []) : [];
+
+        return $this->isAccessibleField($tableName, $fieldName, is_array($columnConfig) ? $columnConfig : []);
     }
 
     /** @param array<mixed> $columnConfig */
