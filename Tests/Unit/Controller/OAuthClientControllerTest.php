@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace MarekSkopal\MsMcpServer\Tests\Unit\Controller;
 
 use MarekSkopal\MsMcpServer\Controller\OAuthClientController;
+use MarekSkopal\MsMcpServer\OAuth\ClientRepository;
 use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Http\Message\ResponseFactoryInterface;
 use Psr\Http\Message\ResponseInterface;
@@ -18,6 +20,7 @@ use TYPO3\CMS\Core\Database\Query\Expression\ExpressionBuilder;
 use TYPO3\CMS\Core\Database\Query\QueryBuilder;
 use TYPO3\CMS\Core\Database\Query\Restriction\QueryRestrictionContainerInterface;
 use TYPO3\CMS\Core\Messaging\FlashMessage;
+use TYPO3\CMS\Core\Type\ContextualFeedbackSeverity;
 use TYPO3\CMS\Core\Messaging\FlashMessageQueue;
 use TYPO3\CMS\Core\Messaging\FlashMessageService;
 
@@ -341,6 +344,82 @@ final class OAuthClientControllerTest extends TestCase
         self::assertSame(303, $this->getResponseStatusCode($response));
     }
 
+    /** @return iterable<string, array{0: string}> */
+    public static function invalidRedirectUriProvider(): iterable
+    {
+        yield 'plain http to a remote host' => ['http://remote.example/cb'];
+        yield 'fragment defeats exact matching' => ['https://client.example/cb#/x'];
+        yield 'private-use scheme without a dot' => ['myapp:/oauth'];
+        yield 'not a URI at all' => ['just-some-text'];
+    }
+
+    /**
+     * RFC 7591 self-registration has always been held to these rules; the module was not, so an
+     * administrator could store a redirect URI that weakens the exact-match guarantee.
+     */
+    #[DataProvider('invalidRedirectUriProvider')]
+    public function testCreateActionRejectsInvalidRedirectUri(string $uri): void
+    {
+        $request = $this->createStub(ServerRequestInterface::class);
+        $request->method('getParsedBody')->willReturn([
+            'client_name' => 'Test Client',
+            'redirect_uris' => $uri,
+            'be_user' => 0,
+        ]);
+
+        $connection = $this->createMock(Connection::class);
+        $connection->expects(self::never())->method('insert');
+
+        $flashMessageQueue = $this->createMock(FlashMessageQueue::class);
+        $flashMessageQueue->expects(self::once())
+            ->method('enqueue')
+            ->with(self::callback(static function (FlashMessage $message): bool {
+                self::assertSame(ContextualFeedbackSeverity::ERROR, $message->getSeverity());
+                self::assertStringContainsString('redirect_uri', $message->getMessage());
+
+                return true;
+            }));
+
+        $controller = $this->createController(connection: $connection, flashMessageQueue: $flashMessageQueue);
+
+        self::assertSame(303, $this->getResponseStatusCode($controller->createAction($request)));
+    }
+
+    public function testCreateActionAcceptsLoopbackAndPrivateSchemeRedirectUris(): void
+    {
+        $request = $this->createStub(ServerRequestInterface::class);
+        $request->method('getParsedBody')->willReturn([
+            'client_name' => 'Desktop Client',
+            'redirect_uris' => "http://127.0.0.1:1234/cb\ncom.example.app:/oauth",
+            'be_user' => 0,
+        ]);
+
+        $connection = $this->createMock(Connection::class);
+        $connection->expects(self::once())->method('insert');
+
+        $controller = $this->createController(connection: $connection);
+
+        self::assertSame(303, $this->getResponseStatusCode($controller->createAction($request)));
+    }
+
+    public function testUpdateActionRejectsInvalidRedirectUri(): void
+    {
+        $request = $this->createStub(ServerRequestInterface::class);
+        $request->method('getParsedBody')->willReturn([
+            'uid' => 1,
+            'client_name' => 'Test Client',
+            'redirect_uris' => 'http://remote.example/cb',
+            'be_user' => 0,
+        ]);
+
+        $connection = $this->createMock(Connection::class);
+        $connection->expects(self::never())->method('update');
+
+        $controller = $this->createController(connection: $connection);
+
+        self::assertSame(303, $this->getResponseStatusCode($controller->updateAction($request)));
+    }
+
     private function createController(
         ?ConnectionPool $connectionPool = null,
         ?Connection $connection = null,
@@ -371,6 +450,9 @@ final class OAuthClientControllerTest extends TestCase
         return new OAuthClientController(
             $this->createStub(ModuleTemplateFactory::class),
             $resolvedConnectionPool,
+            // A real repository: validateRedirectUrisForRegistration() is pure validation and this
+            // is the point — the module must hold clients to the same rules as self-registration.
+            new ClientRepository($this->createStub(ConnectionPool::class)),
             $flashMessageService,
             $resolvedUriBuilder,
             $responseFactory,

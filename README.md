@@ -381,7 +381,7 @@ Returns `429 Too Many Requests` with `Retry-After` header when exceeded.
 The **System > MCP Server** backend module provides:
 
 - Register and manage OAuth clients
-- Edit client settings (name, redirect URIs, linked backend user)
+- Edit client settings (name, redirect URIs, linked backend user). Redirect URIs are held to the same rules as self-registration: HTTPS, an `http` loopback address, or a reverse-domain private-use scheme, with no fragment
 - **Restrict a client to one backend user.** With a backend user selected, the consent screen refuses every other signed-in account (`403`, with a link back to the application carrying `error=access_denied`), the code exchange refuses a code minted for another account, and a refresh for a grant that no longer matches is refused and revokes its whole token family — so re-assigning a client cuts off the account it used to serve. "Any user" (the default) keeps the client open to every backend user.
 - View active tokens per client with status (active/refreshable/expired)
 - Revoke individual tokens
