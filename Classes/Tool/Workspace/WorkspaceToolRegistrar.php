@@ -7,6 +7,7 @@ namespace MarekSkopal\MsMcpServer\Tool\Workspace;
 use Doctrine\DBAL\ParameterType;
 use MarekSkopal\MsMcpServer\Logging\AuditLogger;
 use MarekSkopal\MsMcpServer\Service\DataHandlerService;
+use MarekSkopal\MsMcpServer\Service\PermissionService;
 use MarekSkopal\MsMcpServer\Service\RecordService;
 use MarekSkopal\MsMcpServer\Tool\Helper\RegistrarToolRunner;
 use MarekSkopal\MsMcpServer\Tool\Result\ErrorResult;
@@ -39,6 +40,7 @@ readonly class WorkspaceToolRegistrar
         private RecordService $recordService,
         private DataHandlerService $dataHandlerService,
         private ConnectionPool $connectionPool,
+        private PermissionService $permissionService,
         private LoggerInterface $logger,
         private AuditLogger $auditLogger,
     ) {
@@ -213,16 +215,25 @@ readonly class WorkspaceToolRegistrar
     private function registerChangesListTool(Builder $builder): void
     {
         $connectionPool = $this->connectionPool;
+        $permissionService = $this->permissionService;
         $logger = $this->logger;
         $auditLogger = $this->auditLogger;
 
         $builder->addTool(
-            handler: static function (string $table = '', int $limit = 100) use ($connectionPool, $logger, $auditLogger): string {
+            handler: static function (
+                string $table = '',
+                int $limit = 100,
+            ) use (
+                $connectionPool,
+                $permissionService,
+                $logger,
+                $auditLogger
+            ): string {
                 return RegistrarToolRunner::run(
                     'workspace_changes_list',
                     $auditLogger,
                     $logger,
-                    static function () use ($connectionPool, $table, $limit): string {
+                    static function () use ($connectionPool, $permissionService, $table, $limit): string {
                         $beUser = self::requireBackendUser();
                         $workspaceId = (int) $beUser->workspace;
 
@@ -230,7 +241,12 @@ readonly class WorkspaceToolRegistrar
                             return json_encode(['workspaceId' => 0, 'tables' => []], JSON_THROW_ON_ERROR);
                         }
 
-                        $tables = self::workspaceAwareTables();
+                        // Without the grant check this listed uid, pid and stage of every
+                        // workspace-aware table, including those the caller cannot read.
+                        $tables = array_values(array_filter(
+                            self::workspaceAwareTables(),
+                            static fn (string $tableName): bool => $permissionService->canSelectTable($tableName),
+                        ));
                         if ($table !== '') {
                             $tables = in_array($table, $tables, true) ? [$table] : [];
                         }
@@ -302,6 +318,7 @@ readonly class WorkspaceToolRegistrar
     {
         $dataHandlerService = $this->dataHandlerService;
         $connectionPool = $this->connectionPool;
+        $permissionService = $this->permissionService;
         $logger = $this->logger;
         $auditLogger = $this->auditLogger;
 
@@ -312,18 +329,21 @@ readonly class WorkspaceToolRegistrar
             ) use (
                 $dataHandlerService,
                 $connectionPool,
+                $permissionService,
                 $logger,
                 $auditLogger
             ): RecordUpdatedResult|ErrorResult {
                 return RegistrarToolRunner::run('workspace_publish', $auditLogger, $logger, static function () use (
                     $dataHandlerService,
                     $connectionPool,
+                    $permissionService,
                     $table,
                     $workspaceVersionUid,
                 ): RecordUpdatedResult|ErrorResult {
-                    $row = self::loadVersionRow($connectionPool, $table, $workspaceVersionUid);
+                    $workspaceId = (int) self::requireBackendUser()->workspace;
+                    $row = self::loadVersionRow($connectionPool, $permissionService, $table, $workspaceVersionUid, $workspaceId);
                     if ($row === null) {
-                        return new ErrorResult('Workspace version not found', ['table' => $table, 'uid' => $workspaceVersionUid]);
+                        return self::versionNotFound($table, $workspaceVersionUid, $workspaceId);
                     }
 
                     /** @var int|string $rawOid */
@@ -356,6 +376,7 @@ readonly class WorkspaceToolRegistrar
     {
         $dataHandlerService = $this->dataHandlerService;
         $connectionPool = $this->connectionPool;
+        $permissionService = $this->permissionService;
         $logger = $this->logger;
         $auditLogger = $this->auditLogger;
 
@@ -366,18 +387,21 @@ readonly class WorkspaceToolRegistrar
             ) use (
                 $dataHandlerService,
                 $connectionPool,
+                $permissionService,
                 $logger,
                 $auditLogger
             ): RecordDeletedResult|ErrorResult {
                 return RegistrarToolRunner::run('workspace_discard', $auditLogger, $logger, static function () use (
                     $dataHandlerService,
                     $connectionPool,
+                    $permissionService,
                     $table,
                     $workspaceVersionUid,
                 ): RecordDeletedResult|ErrorResult {
-                    $row = self::loadVersionRow($connectionPool, $table, $workspaceVersionUid);
+                    $workspaceId = (int) self::requireBackendUser()->workspace;
+                    $row = self::loadVersionRow($connectionPool, $permissionService, $table, $workspaceVersionUid, $workspaceId);
                     if ($row === null) {
-                        return new ErrorResult('Workspace version not found', ['table' => $table, 'uid' => $workspaceVersionUid]);
+                        return self::versionNotFound($table, $workspaceVersionUid, $workspaceId);
                     }
 
                     // 'clearWSID' is supported in TYPO3 v13.4 and v14 (the v14 'discard' alias maps to it).
@@ -402,6 +426,7 @@ readonly class WorkspaceToolRegistrar
     {
         $dataHandlerService = $this->dataHandlerService;
         $connectionPool = $this->connectionPool;
+        $permissionService = $this->permissionService;
         $logger = $this->logger;
         $auditLogger = $this->auditLogger;
 
@@ -413,12 +438,14 @@ readonly class WorkspaceToolRegistrar
             ) use (
                 $dataHandlerService,
                 $connectionPool,
+                $permissionService,
                 $logger,
                 $auditLogger
             ): RecordUpdatedResult|ErrorResult {
                 return RegistrarToolRunner::run('workspace_stage_set', $auditLogger, $logger, static function () use (
                     $dataHandlerService,
                     $connectionPool,
+                    $permissionService,
                     $table,
                     $workspaceVersionUid,
                     $stage,
@@ -429,9 +456,10 @@ readonly class WorkspaceToolRegistrar
                         return new ErrorResult('Stage not accessible to current user', ['stage' => $stage]);
                     }
 
-                    $row = self::loadVersionRow($connectionPool, $table, $workspaceVersionUid);
+                    $workspaceId = (int) self::requireBackendUser()->workspace;
+                    $row = self::loadVersionRow($connectionPool, $permissionService, $table, $workspaceVersionUid, $workspaceId);
                     if ($row === null) {
-                        return new ErrorResult('Workspace version not found', ['table' => $table, 'uid' => $workspaceVersionUid]);
+                        return self::versionNotFound($table, $workspaceVersionUid, $workspaceId);
                     }
 
                     $dataHandlerService->updateRecord($table, $workspaceVersionUid, ['t3ver_stage' => $stage]);
@@ -470,20 +498,67 @@ readonly class WorkspaceToolRegistrar
         return $tables;
     }
 
-    /** @return array<string, mixed>|null */
-    private static function loadVersionRow(ConnectionPool $connectionPool, string $table, int $uid): ?array
-    {
+    /**
+     * The workspace version with $uid, or null when it does not exist, belongs to another
+     * workspace, lives in a table the caller may not read, or in one that is not workspace-aware.
+     *
+     * Every refusal returns the same null and the callers report one message, so these tools
+     * cannot be used to probe which uids exist in a table outside the caller's `tables_select`
+     * grant — the table name is a free-form parameter, and the query ran with all restrictions
+     * removed and no permission check at all.
+     *
+     * @return array<string, mixed>|null
+     */
+    private static function loadVersionRow(
+        ConnectionPool $connectionPool,
+        PermissionService $permissionService,
+        string $table,
+        int $uid,
+        int $workspaceId,
+    ): ?array {
+        // A table without t3ver_* columns would otherwise reach the query and fail as an opaque
+        // internal error; one outside the grant would answer "found" for a uid the caller may not
+        // see. Neither says anything the caller is entitled to.
+        if (!in_array($table, self::workspaceAwareTables(), true) || !$permissionService->canSelectTable($table)) {
+            return null;
+        }
+
         $queryBuilder = $connectionPool->getQueryBuilderForTable($table);
         $queryBuilder->getRestrictions()->removeAll();
 
         $row = $queryBuilder
             ->select('uid', 'pid', 't3ver_oid', 't3ver_state', 't3ver_stage', 't3ver_wsid')
             ->from($table)
-            ->where($queryBuilder->expr()->eq('uid', $queryBuilder->createNamedParameter($uid, ParameterType::INTEGER)))
+            ->where(
+                $queryBuilder->expr()->eq('uid', $queryBuilder->createNamedParameter($uid, ParameterType::INTEGER)),
+                // A version belongs to exactly one workspace. Acting on one from a different
+                // workspace than the caller's is not a flow the backend offers — the workspace
+                // module always works inside the selected workspace — and permitting it here would
+                // let a member of one workspace publish or discard another's work.
+                $queryBuilder->expr()->eq(
+                    't3ver_wsid',
+                    $queryBuilder->createNamedParameter($workspaceId, ParameterType::INTEGER),
+                ),
+            )
             ->executeQuery()
             ->fetchAssociative();
 
         return $row !== false ? $row : null;
+    }
+
+    /**
+     * One message for every reason a version could not be loaded, so the tools stay silent about
+     * which of them applied. It names `workspace_switch` because "not found" is most often the
+     * caller standing in the wrong workspace, and an agent has to be able to correct itself.
+     */
+    private static function versionNotFound(string $table, int $uid, int $workspaceId): ErrorResult
+    {
+        return new ErrorResult(
+            'Workspace version not found in workspace ' . $workspaceId
+                . '. Check the uid against workspace_changes_list, and use workspace_switch if the version belongs'
+                . ' to another workspace.',
+            ['table' => $table, 'uid' => $uid, 'workspaceId' => $workspaceId],
+        );
     }
 
     private static function stateLabel(int $state): string
