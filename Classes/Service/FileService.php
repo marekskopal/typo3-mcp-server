@@ -187,6 +187,17 @@ readonly class FileService
             }
         }
 
+        // Resolve and authorize the destination *before* fetching anything. getStorage() refuses a
+        // storage the user cannot reach, getFolder() a path outside their filemounts, and
+        // checkFolderActionPermission() honours their `file_permissions`. Downloading first meant a
+        // user with no file access at all could still make the server pull up to 100 MB from any
+        // public URL on every call and only then be told no.
+        $storage = $this->getStorage($storageUid);
+        $folder = $storage->getFolder($directoryPath);
+        if (!$storage->checkFolderActionPermission('add', $folder)) {
+            throw new \RuntimeException('You do not have permission to add files to: ' . $directoryPath, 1712002021);
+        }
+
         $tempFile = tempnam(sys_get_temp_dir(), 'mcp_url_upload_');
         if ($tempFile === false) {
             throw new \RuntimeException('Failed to create temporary file', 1712002003);
@@ -195,8 +206,6 @@ readonly class FileService
         try {
             $this->downloadToFile($url, $tempFile);
 
-            $storage = $this->getStorage($storageUid);
-            $folder = $storage->getFolder($directoryPath);
             $file = $storage->addFile($tempFile, $folder, $fileName);
         } finally {
             if (file_exists($tempFile)) {

@@ -431,7 +431,7 @@ The **System > MCP Server** backend module provides:
 | `file_search` | Search files by name pattern and/or extension across storage. |
 | `file_get_info` | Get file metadata: UID, name, size, MIME type, public URL. |
 | `file_upload` | Upload a file from text content or base64-encoded binary data. |
-| `file_upload_from_url` | Download a file from URL and store it (max 100 MB). |
+| `file_upload_from_url` | Download a file from URL and store it (max 100 MB). The target storage and folder are resolved and authorized before anything is fetched. |
 | `file_copy` | Copy a file to a directory. |
 | `file_delete` | Delete a file by identifier. |
 | `file_move` | Move a file to a different directory. |
