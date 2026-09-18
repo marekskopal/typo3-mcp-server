@@ -411,7 +411,7 @@ final class AuthorizationServiceTest extends TestCase
         $service = new AuthorizationService(
             $connectionPool,
             new PkceVerifier(),
-            new ClientRepository($this->createStub(ConnectionPool::class)),
+            $this->clientRepositoryFindingClient(),
             $this->createStub(ExtensionConfiguration::class),
         );
 
@@ -450,7 +450,7 @@ final class AuthorizationServiceTest extends TestCase
         $service = new AuthorizationService(
             $connectionPool,
             new PkceVerifier(),
-            new ClientRepository($this->createStub(ConnectionPool::class)),
+            $this->clientRepositoryFindingClient(),
             $this->createStub(ExtensionConfiguration::class),
         );
 
@@ -500,7 +500,11 @@ final class AuthorizationServiceTest extends TestCase
         self::assertTrue(true);
     }
 
-    private function clientRepositoryFindingClient(): ClientRepository
+    /**
+     * A client stub with the real `restrictsToAnotherUser()` semantics, so the tests exercise the
+     * service's decision rather than a canned boolean.
+     */
+    private function clientRepositoryFindingClient(int $boundToBeUser = 42): ClientRepository
     {
         $clientRepository = $this->createStub(ClientRepository::class);
         $clientRepository->method('findByClientId')->willReturn([
@@ -508,8 +512,11 @@ final class AuthorizationServiceTest extends TestCase
             'client_id' => 'client-123',
             'client_name' => 'Test Client',
             'redirect_uris' => '["https://app/cb"]',
-            'be_user' => 42,
+            'be_user' => $boundToBeUser,
         ]);
+        $clientRepository->method('restrictsToAnotherUser')->willReturnCallback(
+            static fn (array $client, int $beUserUid): bool => (int) $client['be_user'] > 0 && (int) $client['be_user'] !== $beUserUid,
+        );
 
         return $clientRepository;
     }

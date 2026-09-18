@@ -168,6 +168,19 @@ readonly class OAuthMiddleware implements MiddlewareInterface
         $client = $this->clientRepository->findByClientId($clientId);
         $clientName = $client !== null ? (string) $client['client_name'] : 'Unknown';
 
+        // A client an administrator has bound to one backend user must not even offer the consent
+        // button to anyone else — refusing here, rather than only on the POST, tells the signed-in
+        // user why instead of leaving them with a button that fails.
+        if ($client !== null && $this->clientRepository->restrictsToAnotherUser($client, $beUserUid)) {
+            return $this->responseFactory->createResponse(403)
+                ->withHeader('Content-Type', 'text/html; charset=utf-8')
+                ->withHeader('X-Frame-Options', 'DENY')
+                ->withHeader('Content-Security-Policy', "frame-ancestors 'none'")
+                ->withHeader('Cache-Control', 'no-store')
+                ->withHeader('X-Content-Type-Options', 'nosniff')
+                ->withBody($this->streamFactory->createStream($this->renderAccessDeniedPage($clientName, $username, $params)));
+        }
+
         $csrfToken = bin2hex(random_bytes(32));
         $html = $this->renderConsentForm($clientName, $username, $params, $csrfToken);
 
@@ -226,6 +239,17 @@ readonly class OAuthMiddleware implements MiddlewareInterface
         ]);
         if ($validationError !== null) {
             return $this->createJsonResponse(400, ['error' => 'invalid_request', 'error_description' => $validationError]);
+        }
+
+        // The GET already refused a restricted client for the wrong user, but the POST is what mints
+        // the code, so the binding is re-checked here — against a forged form as much as against a
+        // client re-assigned between the two requests.
+        $client = $this->clientRepository->findByClientId($clientId);
+        if ($client !== null && $this->clientRepository->restrictsToAnotherUser($client, $beUserUid)) {
+            return $this->createJsonResponse(403, [
+                'error' => 'access_denied',
+                'error_description' => 'This client is restricted to a different backend user.',
+            ])->withHeader('Set-Cookie', $this->buildCsrfCookie($request, '', 0));
         }
 
         try {
@@ -475,6 +499,7 @@ readonly class OAuthMiddleware implements MiddlewareInterface
 
         $formAction = htmlspecialchars($this->pathProvider->getAuthorizePath(), ENT_QUOTES, 'UTF-8');
         $cancelHref = $this->buildCancelHref($params);
+        $styles = $this->pageStyles();
 
         return <<<HTML
             <!DOCTYPE html>
@@ -483,20 +508,7 @@ readonly class OAuthMiddleware implements MiddlewareInterface
                 <meta charset="UTF-8">
                 <meta name="viewport" content="width=device-width, initial-scale=1.0">
                 <title>TYPO3 MCP Server - Authorization</title>
-                <style>
-                    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #1a1a2e; color: #eee; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
-                    .card { background: #16213e; border-radius: 8px; padding: 32px; width: 100%; max-width: 420px; box-shadow: 0 4px 24px rgba(0,0,0,0.3); }
-                    h1 { font-size: 20px; margin: 0 0 8px; }
-                    p { color: #aaa; font-size: 14px; margin: 0 0 16px; }
-                    .who { background: #0f3460; padding: 12px 14px; border-radius: 4px; font-size: 13px; margin: 0 0 20px; color: #ccc; }
-                    .who strong { color: #fff; }
-                    .actions { display: flex; gap: 10px; }
-                    button.primary { flex: 1; padding: 12px; background: #e94560; border: none; border-radius: 4px; color: #fff; font-size: 15px; cursor: pointer; font-weight: 600; }
-                    button.primary:hover { background: #c73a52; }
-                    a.cancel { flex: 1; padding: 12px; background: transparent; border: 1px solid #555; border-radius: 4px; color: #ccc; font-size: 15px; text-align: center; text-decoration: none; line-height: 1.2; }
-                    a.cancel:hover { border-color: #888; color: #fff; }
-                    .client-name { color: #e94560; font-weight: 600; }
-                </style>
+                <style>{$styles}</style>
             </head>
             <body>
                 <div class="card">
@@ -515,6 +527,62 @@ readonly class OAuthMiddleware implements MiddlewareInterface
             </body>
             </html>
             HTML;
+    }
+
+    /**
+     * The page shown instead of the consent form when the client is bound to a different backend
+     * user. It names the signed-in account so the user can tell whether to switch accounts or ask
+     * an administrator, and offers the RFC 6749 `access_denied` return to the client.
+     *
+     * @param array<string, mixed> $params
+     */
+    private function renderAccessDeniedPage(string $clientName, string $username, array $params): string
+    {
+        $clientNameEscaped = htmlspecialchars($clientName, ENT_QUOTES, 'UTF-8');
+        $usernameEscaped = htmlspecialchars($username !== '' ? $username : 'TYPO3 backend user', ENT_QUOTES, 'UTF-8');
+        $returnHref = $this->buildCancelHref($params);
+        $styles = $this->pageStyles();
+
+        return <<<HTML
+            <!DOCTYPE html>
+            <html lang="en">
+            <head>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <title>TYPO3 MCP Server - Access denied</title>
+                <style>{$styles}</style>
+            </head>
+            <body>
+                <div class="card">
+                    <h1>Access denied</h1>
+                    <p><span class="client-name">{$clientNameEscaped}</span> is restricted to a different TYPO3 backend user.</p>
+                    <div class="who">Signed in as <strong>{$usernameEscaped}</strong>.</div>
+                    <p>Sign in to the TYPO3 backend as the account this client is registered for, or ask an administrator to change the client's backend user.</p>
+                    <div class="actions">
+                        <a class="cancel" href="{$returnHref}">Return to application</a>
+                    </div>
+                </div>
+            </body>
+            </html>
+            HTML;
+    }
+
+    private function pageStyles(): string
+    {
+        return <<<'CSS'
+            body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #1a1a2e; color: #eee; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
+            .card { background: #16213e; border-radius: 8px; padding: 32px; width: 100%; max-width: 420px; box-shadow: 0 4px 24px rgba(0,0,0,0.3); }
+            h1 { font-size: 20px; margin: 0 0 8px; }
+            p { color: #aaa; font-size: 14px; margin: 0 0 16px; }
+            .who { background: #0f3460; padding: 12px 14px; border-radius: 4px; font-size: 13px; margin: 0 0 20px; color: #ccc; }
+            .who strong { color: #fff; }
+            .actions { display: flex; gap: 10px; }
+            button.primary { flex: 1; padding: 12px; background: #e94560; border: none; border-radius: 4px; color: #fff; font-size: 15px; cursor: pointer; font-weight: 600; }
+            button.primary:hover { background: #c73a52; }
+            a.cancel { flex: 1; padding: 12px; background: transparent; border: 1px solid #555; border-radius: 4px; color: #ccc; font-size: 15px; text-align: center; text-decoration: none; line-height: 1.2; }
+            a.cancel:hover { border-color: #888; color: #fff; }
+            .client-name { color: #e94560; font-weight: 600; }
+            CSS;
     }
 
     /**

@@ -109,6 +109,24 @@ readonly class ClientRepository
     }
 
     /**
+     * Whether the client is bound to a backend user other than $beUserUid.
+     *
+     * An administrator can restrict a client to one account in the backend module ("Backend User
+     * (optional, restricts authorization to this user)"); the row's `be_user` then names that
+     * account and `0` means any user. Every place that turns a client into a grant — the consent
+     * screen, the code exchange and the refresh — has to ask this, or the setting is decorative.
+     *
+     * @param array<string, mixed> $client a row as returned by findByClientId()
+     */
+    public function restrictsToAnotherUser(array $client, int $beUserUid): bool
+    {
+        $boundUser = $client['be_user'] ?? 0;
+        $boundUserUid = is_numeric($boundUser) ? (int) $boundUser : 0;
+
+        return $boundUserUid > 0 && $boundUserUid !== $beUserUid;
+    }
+
+    /**
      * @param list<string> $redirectUris
      * @return array{client_id: string, client_name: string, redirect_uris: list<string>}
      */
