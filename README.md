@@ -268,7 +268,7 @@ The stdio transport does not require OAuth — the user is specified via the `--
 
 - **Authorization Code flow with PKCE** — standard OAuth 2.1 for MCP clients
 - **Authentication via the real TYPO3 backend login** — the `/mcp/oauth/authorize` endpoint redirects unauthenticated users to `/typo3/login` and only renders a single-click consent screen once `BE_USER` is established; MFA, `starttime`/`endtime`, per-user lockout, and `sys_log` failed-login entries come from the standard backend pipeline. Both of TYPO3's MFA gates apply to the consent screen: a session that still owes its MFA challenge, or a user whom the `requireMfa` policy obliges to set MFA up first, is sent back through the backend login instead of being offered the Authorize button
-- **Dynamic Client Registration** ([RFC 7591](https://datatracker.ietf.org/doc/html/rfc7591)) — clients can self-register
+- **Dynamic Client Registration** ([RFC 7591](https://datatracker.ietf.org/doc/html/rfc7591)) — clients can self-register. Because anyone can then register a client under any name, the consent screen always names the host the authorization will be sent to and marks a self-registered client as not verified by an administrator; installations that provision every client in the backend module can switch the endpoint off with `dynamicClientRegistrationEnabled = 0` (see [Client Registration](#client-registration))
 - **Token Revocation** ([RFC 7009](https://datatracker.ietf.org/doc/html/rfc7009)) — revoke access and refresh tokens
 - **Protected Resource Metadata** ([RFC 9728](https://datatracker.ietf.org/doc/html/rfc9728)) — auto-discovery of auth requirements
 
@@ -312,6 +312,14 @@ And with `mcpBasePath = /api/mcp`:
 | MCP server | `/api/mcp` |
 | Authorization server metadata | `/.well-known/oauth-authorization-server/api/mcp` |
 | Protected resource metadata | `/.well-known/oauth-protected-resource/api/mcp` |
+
+### Client Registration
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `dynamicClientRegistrationEnabled` | `1` | Offer unauthenticated RFC 7591 registration at `/mcp/oauth/register`. With `0` the endpoint answers `403` and the RFC 8414 metadata no longer advertises a `registration_endpoint`, so clients ask for a `client_id` created in the backend module instead |
+
+Whatever the setting, the consent screen tells the user where the authorization code will go (the redirect URI's host, or the whole URI for a private-use scheme such as `com.example.app:/oauth`) and, for a client that registered itself, that no administrator has verified it. Client names supplied at registration are stripped of control and format characters (bidi overrides, zero-width joiners), whitespace-collapsed and capped at 255 characters before they are stored, so a name cannot disguise the client on that screen.
 
 ### Token Lifetimes
 

@@ -8,6 +8,7 @@ use MarekSkopal\MsMcpServer\Middleware\OAuthMiddleware;
 use MarekSkopal\MsMcpServer\OAuth\AuthorizationService;
 use MarekSkopal\MsMcpServer\OAuth\AuthorizeParamsValidator;
 use MarekSkopal\MsMcpServer\OAuth\ClientRepository;
+use MarekSkopal\MsMcpServer\OAuth\DynamicRegistrationPolicy;
 use MarekSkopal\MsMcpServer\OAuth\OAuthContinuationCookie;
 use MarekSkopal\MsMcpServer\OAuth\RateLimitService;
 use MarekSkopal\MsMcpServer\Service\McpPathProvider;
@@ -87,6 +88,158 @@ final class OAuthMiddlewareTest extends TestCase
         self::assertSame('https://example.com/mcp/oauth/authorize', $decoded['authorization_endpoint'] ?? null);
         self::assertSame('https://example.com/mcp/oauth/token', $decoded['token_endpoint'] ?? null);
         self::assertSame(['S256'], $decoded['code_challenge_methods_supported'] ?? null);
+        self::assertSame('https://example.com/mcp/oauth/register', $decoded['registration_endpoint'] ?? null);
+    }
+
+    /**
+     * With self-registration switched off the metadata must not advertise it, or a client would
+     * try, get a 403, and have no hint that it needs a pre-provisioned client_id instead.
+     */
+    public function testMetadataOmitsRegistrationEndpointWhenDynamicRegistrationDisabled(): void
+    {
+        $request = $this->createRequest('/.well-known/oauth-authorization-server/mcp', 'GET');
+
+        $middleware = $this->createMiddlewareWithCapture(registrationEnabled: false);
+        $middleware->process($request, $this->createStub(RequestHandlerInterface::class));
+
+        $decoded = $this->decodeCapturedBody();
+        self::assertArrayNotHasKey('registration_endpoint', $decoded);
+        self::assertSame('https://example.com/mcp/oauth/token', $decoded['token_endpoint'] ?? null);
+    }
+
+    public function testRegisterEndpointReturns403WhenDynamicRegistrationDisabled(): void
+    {
+        $stream = $this->createStub(StreamInterface::class);
+        $stream->method('__toString')->willReturn(
+            json_encode(['client_name' => 'App', 'redirect_uris' => ['https://app/cb']], JSON_THROW_ON_ERROR),
+        );
+
+        $request = $this->createRequest('/mcp/oauth/register', 'POST');
+        $request->method('getHeaderLine')->willReturn('application/json');
+        $request->method('getBody')->willReturn($stream);
+
+        $clientRepository = $this->createMock(ClientRepository::class);
+        $clientRepository->expects(self::never())->method('registerClient');
+
+        $middleware = $this->createMiddlewareWithCapture(clientRepository: $clientRepository, registrationEnabled: false);
+        $middleware->process($request, $this->createStub(RequestHandlerInterface::class));
+
+        self::assertSame(403, $this->capturedStatusCode);
+        self::assertSame('access_denied', $this->decodeCapturedBody()['error'] ?? null);
+    }
+
+    /**
+     * The name is what the consent screen shows, so a bidi override or zero-width padding in it
+     * would let a registrant disguise the client. It is normalised before it is stored.
+     */
+    public function testRegisterEndpointNormalizesClientName(): void
+    {
+        $stream = $this->createStub(StreamInterface::class);
+        $stream->method('__toString')->willReturn(
+            json_encode(
+                ['client_name' => "\u{202E}Claude \t\n  Desktop\u{200B} ", 'redirect_uris' => ['https://app/cb']],
+                JSON_THROW_ON_ERROR,
+            ),
+        );
+
+        $request = $this->createRequest('/mcp/oauth/register', 'POST');
+        $request->method('getHeaderLine')->willReturn('application/json');
+        $request->method('getBody')->willReturn($stream);
+
+        $capturedName = null;
+        $clientRepository = $this->createStub(ClientRepository::class);
+        $clientRepository->method('validateRedirectUrisForRegistration')->willReturn(null);
+        $clientRepository->method('registerClient')
+            ->willReturnCallback(function (string $name) use (&$capturedName): array {
+                $capturedName = $name;
+
+                return ['client_id' => 'c1', 'client_name' => $name, 'redirect_uris' => ['https://app/cb']];
+            });
+
+        $middleware = $this->createMiddlewareWithCapture(clientRepository: $clientRepository);
+        $middleware->process($request, $this->createStub(RequestHandlerInterface::class));
+
+        self::assertSame('Claude Desktop', $capturedName);
+    }
+
+    public function testAuthorizeGetConsentNamesRedirectTargetWithoutWarningForAdminCreatedClient(): void
+    {
+        $beUser = $this->createStub(BackendUserAuthentication::class);
+        $beUser->method('getUserId')->willReturn(42);
+        $beUser->method('getUserName')->willReturn('editor');
+        $GLOBALS['BE_USER'] = $beUser;
+
+        $request = $this->createRequest('/mcp/oauth/authorize', 'GET');
+        $request->method('getQueryParams')->willReturn([
+            'response_type' => 'code',
+            'client_id' => 'client-abc',
+            'redirect_uri' => 'https://client.example:8443/deep/callback?x=1',
+            'code_challenge' => 'challenge-value',
+            'code_challenge_method' => 'S256',
+        ]);
+
+        $clientRepository = $this->createStub(ClientRepository::class);
+        $clientRepository->method('findByClientId')->willReturn([
+            'uid' => 1,
+            'client_id' => 'client-abc',
+            'client_name' => 'Admin Client',
+            'redirect_uris' => '["https://client.example:8443/deep/callback?x=1"]',
+            'be_user' => 0,
+            'dynamically_registered' => 0,
+        ]);
+        $clientRepository->method('validateRedirectUri')->willReturn(true);
+        $clientRepository->method('isSelfRegistered')->willReturn(false);
+
+        $middleware = $this->createMiddlewareWithCapture(clientRepository: $clientRepository);
+        $middleware->process($request, $this->createStub(RequestHandlerInterface::class));
+
+        $body = $this->capturedBodies[0] ?? '';
+        // The displayed target is host[:port] only — the full URI still travels in the hidden field.
+        self::assertStringContainsString('The authorization will be sent to <strong>client.example:8443</strong>', $body);
+        self::assertStringContainsString('name="redirect_uri" value="https://client.example:8443/deep/callback?x=1"', $body);
+        self::assertStringNotContainsString('registered itself', $body);
+    }
+
+    /**
+     * A self-registered client's name is whatever the registrant typed, so the consent screen has
+     * to say the client was never vetted by an administrator.
+     */
+    public function testAuthorizeGetConsentWarnsForSelfRegisteredClient(): void
+    {
+        $beUser = $this->createStub(BackendUserAuthentication::class);
+        $beUser->method('getUserId')->willReturn(42);
+        $beUser->method('getUserName')->willReturn('editor');
+        $GLOBALS['BE_USER'] = $beUser;
+
+        $request = $this->createRequest('/mcp/oauth/authorize', 'GET');
+        $request->method('getQueryParams')->willReturn([
+            'response_type' => 'code',
+            'client_id' => 'client-abc',
+            'redirect_uri' => 'com.example.app:/oauth',
+            'code_challenge' => 'challenge-value',
+            'code_challenge_method' => 'S256',
+        ]);
+
+        $clientRepository = $this->createStub(ClientRepository::class);
+        $clientRepository->method('findByClientId')->willReturn([
+            'uid' => 1,
+            'client_id' => 'client-abc',
+            'client_name' => 'Claude Desktop',
+            'redirect_uris' => '["com.example.app:/oauth"]',
+            'be_user' => 0,
+            'dynamically_registered' => 1,
+        ]);
+        $clientRepository->method('validateRedirectUri')->willReturn(true);
+        $clientRepository->method('isSelfRegistered')->willReturn(true);
+
+        $middleware = $this->createMiddlewareWithCapture(clientRepository: $clientRepository);
+        $middleware->process($request, $this->createStub(RequestHandlerInterface::class));
+
+        $body = $this->capturedBodies[0] ?? '';
+        self::assertStringContainsString('This client registered itself', $body);
+        self::assertStringContainsString('not been verified by an administrator', $body);
+        self::assertStringContainsString('<strong>com.example.app:/oauth</strong>', $body);
+        self::assertStringContainsString('Authorize Access', $body);
     }
 
     public function testResourceMetadataEndpointReturnsResourceConfig(): void
@@ -1112,6 +1265,7 @@ final class OAuthMiddlewareTest extends TestCase
             new OAuthContinuationCookie(),
             $this->createPathProvider($basePath),
             $this->createStub(RateLimitService::class),
+            $this->registrationPolicy(enabled: true),
             $this->createStub(ResponseFactoryInterface::class),
             $this->createStub(StreamFactoryInterface::class),
             new NullLogger(),
@@ -1123,6 +1277,7 @@ final class OAuthMiddlewareTest extends TestCase
         ?ClientRepository $clientRepository = null,
         ?AuthorizationService $authorizationService = null,
         string $basePath = '/mcp',
+        bool $registrationEnabled = true,
     ): OAuthMiddleware {
         $stream = $this->createStub(StreamInterface::class);
 
@@ -1163,6 +1318,7 @@ final class OAuthMiddlewareTest extends TestCase
             new OAuthContinuationCookie(),
             $this->createPathProvider($basePath),
             $rateLimitService ?? $this->createStub(RateLimitService::class),
+            $this->registrationPolicy($registrationEnabled),
             $responseFactory,
             $streamFactory,
             new NullLogger(),
@@ -1178,6 +1334,14 @@ final class OAuthMiddlewareTest extends TestCase
         self::assertIsInt($equals);
 
         return substr($pair, $equals + 1);
+    }
+
+    private function registrationPolicy(bool $enabled): DynamicRegistrationPolicy
+    {
+        $policy = $this->createStub(DynamicRegistrationPolicy::class);
+        $policy->method('isEnabled')->willReturn($enabled);
+
+        return $policy;
     }
 
     private function createPathProvider(string $basePath): McpPathProvider

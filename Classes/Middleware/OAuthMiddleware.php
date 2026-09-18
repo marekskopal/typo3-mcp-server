@@ -7,6 +7,7 @@ namespace MarekSkopal\MsMcpServer\Middleware;
 use MarekSkopal\MsMcpServer\OAuth\AuthorizationService;
 use MarekSkopal\MsMcpServer\OAuth\AuthorizeParamsValidator;
 use MarekSkopal\MsMcpServer\OAuth\ClientRepository;
+use MarekSkopal\MsMcpServer\OAuth\DynamicRegistrationPolicy;
 use MarekSkopal\MsMcpServer\OAuth\OAuthContinuationCookie;
 use MarekSkopal\MsMcpServer\OAuth\RateLimitService;
 use MarekSkopal\MsMcpServer\Service\McpPathProvider;
@@ -48,6 +49,7 @@ readonly class OAuthMiddleware implements MiddlewareInterface
         private OAuthContinuationCookie $continuationCookie,
         private McpPathProvider $pathProvider,
         private RateLimitService $rateLimitService,
+        private DynamicRegistrationPolicy $registrationPolicy,
         private ResponseFactoryInterface $responseFactory,
         private StreamFactoryInterface $streamFactory,
         private LoggerInterface $logger,
@@ -121,6 +123,12 @@ readonly class OAuthMiddleware implements MiddlewareInterface
             'token_endpoint_auth_methods_supported' => ['none'],
         ];
 
+        // A client that cannot self-register must not be told it can: without the endpoint in the
+        // document it falls back to asking for a pre-provisioned client_id.
+        if (!$this->registrationPolicy->isEnabled()) {
+            unset($metadata['registration_endpoint']);
+        }
+
         return $this->createJsonResponse(200, $metadata);
     }
 
@@ -182,8 +190,10 @@ readonly class OAuthMiddleware implements MiddlewareInterface
                 ->withBody($this->streamFactory->createStream($this->renderAccessDeniedPage($clientName, $username, $params)));
         }
 
+        $selfRegistered = $client !== null && $this->clientRepository->isSelfRegistered($client);
+
         $csrfToken = bin2hex(random_bytes(32));
-        $html = $this->renderConsentForm($clientName, $username, $params, $csrfToken);
+        $html = $this->renderConsentForm($clientName, $username, $params, $csrfToken, $selfRegistered);
 
         return $this->responseFactory->createResponse(200)
             ->withHeader('Content-Type', 'text/html; charset=utf-8')
@@ -317,6 +327,14 @@ readonly class OAuthMiddleware implements MiddlewareInterface
 
     private function handleRegister(ServerRequestInterface $request): ResponseInterface
     {
+        if (!$this->registrationPolicy->isEnabled()) {
+            return $this->createJsonResponse(403, [
+                'error' => 'access_denied',
+                'error_description' => 'Dynamic client registration is disabled on this server.'
+                    . ' Ask an administrator to register the client in the TYPO3 backend module.',
+            ]);
+        }
+
         $contentType = $request->getHeaderLine('Content-Type');
         if (!str_contains($contentType, 'application/json')) {
             return $this->createJsonResponse(
@@ -341,11 +359,12 @@ readonly class OAuthMiddleware implements MiddlewareInterface
             );
         }
 
-        $clientName = is_string($body['client_name'] ?? null) ? $body['client_name'] : 'MCP Client';
-        // The client_name column is varchar(255); cap the attacker-controlled value so a long name
-        // cannot trigger a database error (500) instead of a clean registration.
-        if (mb_strlen($clientName) > 255) {
-            $clientName = mb_substr($clientName, 0, 255);
+        // The name is attacker-controlled and is what the consent screen shows the user, so it is
+        // stripped of control/format characters, whitespace-collapsed and capped to the column
+        // width before it is stored (see ClientRepository::normalizeClientName()).
+        $clientName = ClientRepository::normalizeClientName(is_string($body['client_name'] ?? null) ? $body['client_name'] : '');
+        if ($clientName === '') {
+            $clientName = 'MCP Client';
         }
 
         $redirectUris = [];
@@ -542,11 +561,29 @@ readonly class OAuthMiddleware implements MiddlewareInterface
             ->withHeader('Set-Cookie', $this->continuationCookie->clear($secure));
     }
 
-    /** @param array<string, mixed> $params */
-    private function renderConsentForm(string $clientName, string $username, array $params, string $csrfToken): string
-    {
+    /**
+     * The consent screen has to carry what the user needs to decide, not just a name the client
+     * chose for itself: where the authorization code — and with it the token — will be sent, and
+     * whether an administrator ever vetted this client or it merely registered itself.
+     *
+     * @param array<string, mixed> $params
+     */
+    private function renderConsentForm(
+        string $clientName,
+        string $username,
+        array $params,
+        string $csrfToken,
+        bool $selfRegistered,
+    ): string {
         $clientNameEscaped = htmlspecialchars($clientName, ENT_QUOTES, 'UTF-8');
         $usernameEscaped = htmlspecialchars($username !== '' ? $username : 'TYPO3 backend user', ENT_QUOTES, 'UTF-8');
+        $redirectUri = is_string($params['redirect_uri'] ?? null) ? $params['redirect_uri'] : '';
+        $redirectTargetEscaped = htmlspecialchars($this->describeRedirectTarget($redirectUri), ENT_QUOTES, 'UTF-8');
+        $provenance = $selfRegistered
+            ? '<div class="warning"><strong>This client registered itself</strong> and has not been verified by an'
+                . ' administrator. Only continue if you started this connection yourself and the address below is'
+                . ' the application you expect.</div>'
+            : '';
 
         $hiddenFields = '';
         foreach (['client_id', 'redirect_uri', 'code_challenge', 'code_challenge_method', 'state'] as $field) {
@@ -572,7 +609,8 @@ readonly class OAuthMiddleware implements MiddlewareInterface
                 <div class="card">
                     <h1>Authorize MCP Access</h1>
                     <p><span class="client-name">{$clientNameEscaped}</span> is requesting access to your TYPO3 backend account.</p>
-                    <div class="who">Signed in as <strong>{$usernameEscaped}</strong>.</div>
+                    {$provenance}
+                    <div class="who">Signed in as <strong>{$usernameEscaped}</strong>.<br>The authorization will be sent to <strong>{$redirectTargetEscaped}</strong>.</div>
                     <form method="post" action="{$formAction}">
                         {$hiddenFields}
                         <input type="hidden" name="csrf_token" value="{$csrfToken}" />
@@ -640,7 +678,34 @@ readonly class OAuthMiddleware implements MiddlewareInterface
             a.cancel { flex: 1; padding: 12px; background: transparent; border: 1px solid #555; border-radius: 4px; color: #ccc; font-size: 15px; text-align: center; text-decoration: none; line-height: 1.2; }
             a.cancel:hover { border-color: #888; color: #fff; }
             .client-name { color: #e94560; font-weight: 600; }
+            .warning { background: #4a1f1f; border-left: 4px solid #e94560; padding: 12px 14px; border-radius: 4px; font-size: 13px; margin: 0 0 20px; color: #f3d6d6; }
+            .warning strong { color: #fff; }
             CSS;
+    }
+
+    /**
+     * What to show the user as the destination of the authorization: `host[:port]` for an
+     * http(s) redirect URI (the path is the client's business, the host is what identifies who
+     * receives the code), the whole URI for a private-use scheme such as `com.example.app:/cb`,
+     * where the scheme *is* the identity.
+     */
+    private function describeRedirectTarget(string $redirectUri): string
+    {
+        $parsed = parse_url($redirectUri);
+        if ($parsed === false || !isset($parsed['scheme'], $parsed['host'])) {
+            return $redirectUri;
+        }
+
+        if (!in_array(strtolower($parsed['scheme']), ['http', 'https'], true)) {
+            return $redirectUri;
+        }
+
+        $target = $parsed['host'];
+        if (isset($parsed['port'])) {
+            $target .= ':' . $parsed['port'];
+        }
+
+        return $target;
     }
 
     /**

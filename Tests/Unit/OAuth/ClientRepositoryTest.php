@@ -55,6 +55,41 @@ final class ClientRepositoryTest extends TestCase
         self::assertSame($expected, $repository->restrictsToAnotherUser($client, $beUserUid));
     }
 
+    /** @return iterable<string, array{0: string, 1: string}> */
+    public static function normalizeClientNameProvider(): iterable
+    {
+        yield 'plain name untouched' => ['Claude Desktop', 'Claude Desktop'];
+        yield 'bidi override and zero-width space stripped' => ["\u{202E}Claude\u{200B} Desktop", 'Claude Desktop'];
+        yield 'control characters stripped' => ["Claude\x00\x1F Desktop", 'Claude Desktop'];
+        yield 'whitespace collapsed and trimmed' => ["  Claude \t\n  Desktop  ", 'Claude Desktop'];
+        yield 'nothing displayable left' => ["\u{200B}\u{200D}   ", ''];
+        yield 'capped at the column width' => [str_repeat('a', 300), str_repeat('a', 255)];
+        yield 'invalid UTF-8 rejected to empty' => ["\xC3\x28", ''];
+    }
+
+    #[DataProvider('normalizeClientNameProvider')]
+    public function testNormalizeClientName(string $input, string $expected): void
+    {
+        self::assertSame($expected, ClientRepository::normalizeClientName($input));
+    }
+
+    /** @return iterable<string, array{0: array<string, mixed>, 1: bool}> */
+    public static function isSelfRegisteredProvider(): iterable
+    {
+        yield 'registered through RFC 7591' => [['dynamically_registered' => 1], true];
+        yield 'DB returns a string' => [['dynamically_registered' => '1'], true];
+        yield 'created by an administrator' => [['dynamically_registered' => 0], false];
+        yield 'legacy row without the column' => [[], false];
+    }
+
+    #[DataProvider('isSelfRegisteredProvider')]
+    public function testIsSelfRegistered(array $client, bool $expected): void
+    {
+        $repository = new ClientRepository($this->createStub(ConnectionPool::class));
+
+        self::assertSame($expected, $repository->isSelfRegistered($client));
+    }
+
     public function testFindByClientIdReturnsNullWhenNotFound(): void
     {
         $connectionPool = $this->createConnectionPoolWithQueryResult(false);
