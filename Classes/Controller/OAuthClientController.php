@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace MarekSkopal\MsMcpServer\Controller;
 
 use Doctrine\DBAL\ParameterType;
+use MarekSkopal\MsMcpServer\OAuth\ClientRepository;
 use Psr\Http\Message\ResponseFactoryInterface;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
@@ -27,6 +28,7 @@ readonly class OAuthClientController
     public function __construct(
         private ModuleTemplateFactory $moduleTemplateFactory,
         private ConnectionPool $connectionPool,
+        private ClientRepository $clientRepository,
         private FlashMessageService $flashMessageService,
         private UriBuilder $uriBuilder,
         private ResponseFactoryInterface $responseFactory,
@@ -80,6 +82,14 @@ readonly class OAuthClientController
         }
 
         $uriList = array_values(array_filter(array_map('trim', explode("\n", $redirectUris))));
+
+        $redirectUriError = $this->validateRedirectUris($uriList);
+        if ($redirectUriError !== null) {
+            $this->addFlashMessage($redirectUriError, ContextualFeedbackSeverity::ERROR);
+
+            return $this->redirect();
+        }
+
         $clientId = bin2hex(random_bytes(16));
 
         $now = time();
@@ -207,6 +217,13 @@ readonly class OAuthClientController
 
         $uriList = array_values(array_filter(array_map('trim', explode("\n", $redirectUris))));
 
+        $redirectUriError = $this->validateRedirectUris($uriList);
+        if ($redirectUriError !== null) {
+            $this->addFlashMessage($redirectUriError, ContextualFeedbackSeverity::ERROR);
+
+            return $this->redirect();
+        }
+
         $connection = $this->connectionPool->getConnectionForTable(self::TABLE);
         $connection->update(self::TABLE, [
             'client_name' => $clientName,
@@ -288,6 +305,19 @@ readonly class OAuthClientController
         }
 
         return $this->redirect();
+    }
+
+    /**
+     * The same rules RFC 7591 self-registration is held to. They were applied only there, so a
+     * client created here could carry `http://` to a remote host or a URI with a fragment — both
+     * of which weaken the exact-match guarantee the redirect matcher rests on. One policy is
+     * cheaper to keep correct than two.
+     *
+     * @param list<string> $uriList
+     */
+    private function validateRedirectUris(array $uriList): ?string
+    {
+        return $this->clientRepository->validateRedirectUrisForRegistration($uriList);
     }
 
     private function addFlashMessage(string $message, ContextualFeedbackSeverity $severity): void
