@@ -624,7 +624,7 @@ Resources provide read-only context about the TYPO3 instance. AI clients can rea
 
 | Resource | URI | Description |
 |----------|-----|-------------|
-| System Info | `typo3://system/info` | TYPO3 version, PHP version, application context, OS |
+| System Info | `typo3://system/info` | TYPO3 version, PHP version, OS; application context and project path for administrators only (`null` otherwise) |
 | Site Configuration | `typo3://sites` | All sites with root pages, base URLs, and languages |
 | TCA Tables | `typo3://schema/tables` | Database tables with labels, limited to those the user may read (`tables_select`) |
 | Backend User | `typo3://user/me` | Current user's UID, username, admin status, groups |
