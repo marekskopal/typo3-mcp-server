@@ -114,6 +114,18 @@ readonly class AuthorizationService
             throw new \RuntimeException('Redirect URI mismatch', 1712100014);
         }
 
+        // The consent screen checked the client's backend-user binding when it minted the code, but
+        // an administrator can delete the client or re-assign it to another account inside the code's
+        // lifetime. Re-check here so the exchange cannot outrun that decision.
+        $client = $this->clientRepository->findByClientId($clientId);
+        if ($client === null) {
+            throw new \RuntimeException('Client no longer exists', 1712100017);
+        }
+
+        if ($this->clientRepository->restrictsToAnotherUser($client, (int) $row['be_user'])) {
+            throw new \RuntimeException('Client is restricted to another backend user', 1712100018);
+        }
+
         if (!$this->pkceVerifier->verify($codeVerifier, $row['code_challenge'])) {
             throw new \RuntimeException('PKCE verification failed', 1712100015);
         }
@@ -179,13 +191,23 @@ readonly class AuthorizationService
             throw new \RuntimeException('Client ID mismatch', 1712100023);
         }
 
-        if ($this->clientRepository->findByClientId($clientId) === null) {
+        $client = $this->clientRepository->findByClientId($clientId);
+        if ($client === null) {
             // The client was deleted or disabled after this grant was issued. Deleting a client
             // already revokes its tokens, but this also covers hidden/disabled clients and any row
             // that slipped through — stop honouring the refresh token and tear down the family.
             $this->revokeFamily($row['token_family']);
 
             throw new \RuntimeException('Client no longer exists', 1712100024);
+        }
+
+        if ($this->clientRepository->restrictsToAnotherUser($client, (int) $row['be_user'])) {
+            // The client has since been restricted to a different backend user. The grant was valid
+            // when issued, but the administrator's decision has to win: refuse the rotation and revoke
+            // the family, so re-assigning a client actually cuts off the account it used to serve.
+            $this->revokeFamily($row['token_family']);
+
+            throw new \RuntimeException('Client is restricted to another backend user', 1712100026);
         }
 
         $familyExpires = (int) $row['family_expires'];

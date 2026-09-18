@@ -149,6 +149,7 @@ final class OAuthMiddlewareTest extends TestCase
             'client_id' => 'client-abc',
             'client_name' => 'Test Client',
             'redirect_uris' => ['https://client.example/cb'],
+            'be_user' => 0,
         ]);
         $clientRepository->method('validateRedirectUri')->willReturn(true);
 
@@ -295,6 +296,7 @@ final class OAuthMiddlewareTest extends TestCase
             'client_id' => 'client-abc',
             'client_name' => 'Test Client',
             'redirect_uris' => ['https://client.example/cb'],
+            'be_user' => 0,
         ]);
         $clientRepository->method('validateRedirectUri')->willReturn(true);
 
@@ -350,6 +352,7 @@ final class OAuthMiddlewareTest extends TestCase
             'client_id' => 'client-abc',
             'client_name' => 'Test Client',
             'redirect_uris' => ['https://client.example/cb'],
+            'be_user' => 0,
         ]);
         $clientRepository->method('validateRedirectUri')->willReturn(true);
 
@@ -644,6 +647,144 @@ final class OAuthMiddlewareTest extends TestCase
     }
 
     /** @return ServerRequestInterface&\PHPUnit\Framework\MockObject\Stub */
+    /**
+     * The backend module lets an administrator bind a client to one backend user. That binding
+     * has to refuse everyone else at the consent screen, not merely be stored.
+     */
+    public function testAuthorizeGetDeniesClientRestrictedToAnotherUser(): void
+    {
+        $beUser = $this->createStub(BackendUserAuthentication::class);
+        $beUser->method('getUserId')->willReturn(42);
+        $beUser->method('getUserName')->willReturn('editor');
+        $GLOBALS['BE_USER'] = $beUser;
+
+        $request = $this->createRequest('/mcp/oauth/authorize', 'GET');
+        $request->method('getQueryParams')->willReturn([
+            'response_type' => 'code',
+            'client_id' => 'client-abc',
+            'redirect_uri' => 'https://client.example/cb',
+            'code_challenge' => 'challenge-value',
+            'code_challenge_method' => 'S256',
+            'state' => 'opaque-state',
+        ]);
+
+        $clientRepository = $this->createStub(ClientRepository::class);
+        $clientRepository->method('findByClientId')->willReturn([
+            'uid' => 1,
+            'client_id' => 'client-abc',
+            'client_name' => 'Bound Client',
+            'redirect_uris' => '["https://client.example/cb"]',
+            'be_user' => 7,
+        ]);
+        $clientRepository->method('validateRedirectUri')->willReturn(true);
+        $clientRepository->method('restrictsToAnotherUser')->willReturnCallback(
+            static fn (array $client, int $beUserUid): bool => (int) $client['be_user'] > 0 && (int) $client['be_user'] !== $beUserUid,
+        );
+
+        $handler = $this->createMock(RequestHandlerInterface::class);
+        $handler->expects(self::never())->method('handle');
+
+        $middleware = $this->createMiddlewareWithCapture(clientRepository: $clientRepository);
+        $middleware->process($request, $handler);
+
+        self::assertSame(403, $this->capturedStatusCode);
+        $body = $this->capturedBodies[0] ?? '';
+        self::assertStringContainsString('Access denied', $body);
+        self::assertStringContainsString('Bound Client', $body);
+        self::assertStringContainsString('restricted to a different TYPO3 backend user', $body);
+        self::assertStringContainsString('editor', $body);
+        self::assertStringContainsString('error=access_denied', $body);
+        self::assertStringNotContainsString('Authorize Access', $body);
+        self::assertStringNotContainsString('name="csrf_token"', $body);
+        self::assertArrayNotHasKey('Set-Cookie', $this->capturedHeaders);
+        self::assertSame('DENY', $this->capturedHeaders['X-Frame-Options'] ?? null);
+        self::assertSame('no-store', $this->capturedHeaders['Cache-Control'] ?? null);
+    }
+
+    public function testAuthorizeGetRendersConsentWhenClientRestrictedToCurrentUser(): void
+    {
+        $beUser = $this->createStub(BackendUserAuthentication::class);
+        $beUser->method('getUserId')->willReturn(42);
+        $beUser->method('getUserName')->willReturn('editor');
+        $GLOBALS['BE_USER'] = $beUser;
+
+        $request = $this->createRequest('/mcp/oauth/authorize', 'GET');
+        $request->method('getQueryParams')->willReturn([
+            'response_type' => 'code',
+            'client_id' => 'client-abc',
+            'redirect_uri' => 'https://client.example/cb',
+            'code_challenge' => 'challenge-value',
+            'code_challenge_method' => 'S256',
+        ]);
+
+        $clientRepository = $this->createStub(ClientRepository::class);
+        $clientRepository->method('findByClientId')->willReturn([
+            'uid' => 1,
+            'client_id' => 'client-abc',
+            'client_name' => 'Bound Client',
+            'redirect_uris' => '["https://client.example/cb"]',
+            'be_user' => 42,
+        ]);
+        $clientRepository->method('validateRedirectUri')->willReturn(true);
+        $clientRepository->method('restrictsToAnotherUser')->willReturnCallback(
+            static fn (array $client, int $beUserUid): bool => (int) $client['be_user'] > 0 && (int) $client['be_user'] !== $beUserUid,
+        );
+
+        $middleware = $this->createMiddlewareWithCapture(clientRepository: $clientRepository);
+        $middleware->process($request, $this->createStub(RequestHandlerInterface::class));
+
+        self::assertSame(200, $this->capturedStatusCode);
+        self::assertStringContainsString('Authorize Access', $this->capturedBodies[0] ?? '');
+    }
+
+    /**
+     * The POST is what mints the code, so the binding is enforced there too — a forged form, or a
+     * client re-assigned between GET and POST, must not get a code.
+     */
+    public function testAuthorizePostDeniesClientRestrictedToAnotherUser(): void
+    {
+        $beUser = $this->createStub(BackendUserAuthentication::class);
+        $beUser->method('getUserId')->willReturn(42);
+        $beUser->method('getUserName')->willReturn('editor');
+        $GLOBALS['BE_USER'] = $beUser;
+
+        $request = $this->createRequest('/mcp/oauth/authorize', 'POST');
+        $csrf = bin2hex(random_bytes(16));
+        $request->method('getCookieParams')->willReturn(['mcp_csrf' => $csrf]);
+        $request->method('getParsedBody')->willReturn([
+            'csrf_token' => $csrf,
+            'client_id' => 'client-abc',
+            'redirect_uri' => 'https://client.example/cb',
+            'code_challenge' => 'challenge-value',
+            'code_challenge_method' => 'S256',
+            'state' => 'opaque-state',
+        ]);
+
+        $clientRepository = $this->createStub(ClientRepository::class);
+        $clientRepository->method('findByClientId')->willReturn([
+            'uid' => 1,
+            'client_id' => 'client-abc',
+            'client_name' => 'Bound Client',
+            'redirect_uris' => '["https://client.example/cb"]',
+            'be_user' => 7,
+        ]);
+        $clientRepository->method('validateRedirectUri')->willReturn(true);
+        $clientRepository->method('restrictsToAnotherUser')->willReturn(true);
+
+        $authorizationService = $this->createMock(AuthorizationService::class);
+        $authorizationService->expects(self::never())->method('createAuthorizationCode');
+
+        $middleware = $this->createMiddlewareWithCapture(
+            clientRepository: $clientRepository,
+            authorizationService: $authorizationService,
+        );
+        $middleware->process($request, $this->createStub(RequestHandlerInterface::class));
+
+        self::assertSame(403, $this->capturedStatusCode);
+        self::assertSame('access_denied', $this->decodeCapturedBody()['error'] ?? null);
+        self::assertStringContainsString('mcp_csrf=;', $this->capturedHeaders['Set-Cookie'] ?? '');
+    }
+
     private function createRequest(string $path, string $method, string $scheme = 'https'): ServerRequestInterface
     {
         $uri = $this->createStub(UriInterface::class);

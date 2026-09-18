@@ -7,6 +7,7 @@ namespace MarekSkopal\MsMcpServer\Tests\Unit\OAuth;
 use Doctrine\DBAL\Result;
 use MarekSkopal\MsMcpServer\OAuth\ClientRepository;
 use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use TYPO3\CMS\Core\Database\Connection;
 use TYPO3\CMS\Core\Database\ConnectionPool;
@@ -34,6 +35,24 @@ final class ClientRepositoryTest extends TestCase
         $client = $repository->findByClientId('test-client-id');
 
         self::assertSame($expectedClient, $client);
+    }
+
+    /** @return iterable<string, array{0: array<string, mixed>, 1: int, 2: bool}> */
+    public static function restrictsToAnotherUserProvider(): iterable
+    {
+        yield 'unbound client (0) admits anyone' => [['be_user' => 0], 42, false];
+        yield 'bound to the same user' => [['be_user' => 42], 42, false];
+        yield 'bound to a different user' => [['be_user' => 7], 42, true];
+        yield 'bound to a different user, DB returns a string' => [['be_user' => '7'], 42, true];
+        yield 'legacy row without the column admits anyone' => [[], 42, false];
+    }
+
+    #[DataProvider('restrictsToAnotherUserProvider')]
+    public function testRestrictsToAnotherUser(array $client, int $beUserUid, bool $expected): void
+    {
+        $repository = new ClientRepository($this->createStub(ConnectionPool::class));
+
+        self::assertSame($expected, $repository->restrictsToAnotherUser($client, $beUserUid));
     }
 
     public function testFindByClientIdReturnsNullWhenNotFound(): void
