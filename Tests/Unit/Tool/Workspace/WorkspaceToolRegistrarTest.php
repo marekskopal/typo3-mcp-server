@@ -7,6 +7,7 @@ namespace MarekSkopal\MsMcpServer\Tests\Unit\Tool\Workspace;
 use Doctrine\DBAL\Result;
 use MarekSkopal\MsMcpServer\Logging\AuditLogger;
 use MarekSkopal\MsMcpServer\Service\DataHandlerService;
+use MarekSkopal\MsMcpServer\Service\PermissionService;
 use MarekSkopal\MsMcpServer\Service\RecordService;
 use MarekSkopal\MsMcpServer\Tool\Result\ErrorResult;
 use MarekSkopal\MsMcpServer\Tool\Result\RecordDeletedResult;
@@ -303,8 +304,135 @@ final class WorkspaceToolRegistrarTest extends TestCase
         self::assertSame(-10, $result['tables']['pages'][0]['stage']);
     }
 
+    /**
+     * `table` is a free-form parameter and the lookup ran with every restriction removed, so a
+     * "found" / "not found" difference told the caller which uids exist in a table they may not
+     * read. The refusal has to be indistinguishable from a missing version, and must not query.
+     */
+    public function testPublishToolRefusesTableOutsideTheReadGrant(): void
+    {
+        $this->givenWorkspaceUser();
+
+        $connectionPool = $this->createMock(ConnectionPool::class);
+        $connectionPool->expects(self::never())->method('getQueryBuilderForTable');
+
+        $dataHandlerService = $this->createMock(DataHandlerService::class);
+        $dataHandlerService->expects(self::never())->method('processCommand');
+
+        $closure = $this->getRegisteredClosure(
+            $this->createStub(RecordService::class),
+            $dataHandlerService,
+            $connectionPool,
+            'workspace_publish',
+            $this->permissionServiceAllowing(['tt_content']),
+        );
+        $publishResult = $closure('pages', 100);
+
+        self::assertInstanceOf(ErrorResult::class, $publishResult);
+        self::assertStringContainsString('Workspace version not found in workspace 5', $publishResult->error);
+    }
+
+    public function testStageSetToolRefusesTableOutsideTheReadGrant(): void
+    {
+        $this->givenWorkspaceUser();
+
+        $dataHandlerService = $this->createMock(DataHandlerService::class);
+        $dataHandlerService->expects(self::never())->method('updateRecord');
+
+        $closure = $this->getRegisteredClosure(
+            $this->createStub(RecordService::class),
+            $dataHandlerService,
+            $this->createStub(ConnectionPool::class),
+            'workspace_stage_set',
+            $this->permissionServiceAllowing([]),
+        );
+        $stageResult = $closure('pages', 100, -10);
+
+        self::assertInstanceOf(ErrorResult::class, $stageResult);
+        self::assertStringContainsString('Workspace version not found in workspace 5', $stageResult->error);
+    }
+
+    /** A table that carries no t3ver_* columns reached the query and failed as an opaque error. */
+    public function testPublishToolRefusesTableThatIsNotWorkspaceAware(): void
+    {
+        $this->givenWorkspaceUser();
+        $GLOBALS['TCA']['sys_log'] = ['ctrl' => []];
+
+        $connectionPool = $this->createMock(ConnectionPool::class);
+        $connectionPool->expects(self::never())->method('getQueryBuilderForTable');
+
+        $closure = $this->getRegisteredClosure(
+            $this->createStub(RecordService::class),
+            $this->createStub(DataHandlerService::class),
+            $connectionPool,
+            'workspace_publish',
+        );
+        $publishResult = $closure('sys_log', 100);
+
+        self::assertInstanceOf(ErrorResult::class, $publishResult);
+        self::assertStringContainsString('Workspace version not found in workspace 5', $publishResult->error);
+    }
+
+    /** The lookup is bound to the caller's own workspace, so one member cannot act on another's. */
+    public function testPublishToolConstrainsTheLookupToTheCurrentWorkspace(): void
+    {
+        $this->givenWorkspaceUser(7);
+
+        $conditions = [];
+        $result = $this->createStub(Result::class);
+        $result->method('fetchAssociative')->willReturn(false);
+
+        $queryBuilder = $this->createWorkspaceQueryBuilder($result, $conditions);
+        $connectionPool = $this->createStub(ConnectionPool::class);
+        $connectionPool->method('getQueryBuilderForTable')->willReturn($queryBuilder);
+
+        $closure = $this->getRegisteredClosure(
+            $this->createStub(RecordService::class),
+            $this->createStub(DataHandlerService::class),
+            $connectionPool,
+            'workspace_publish',
+        );
+        $closure('pages', 100);
+
+        self::assertContains('uid = 100', $conditions);
+        self::assertContains('t3ver_wsid = 7', $conditions);
+    }
+
+    public function testChangesListOmitsTablesTheUserMayNotSelect(): void
+    {
+        $this->givenWorkspaceUser();
+
+        $pagesResult = $this->createStub(Result::class);
+        $pagesResult->method('fetchAllAssociative')->willReturn([
+            ['uid' => 100, 'pid' => 1, 't3ver_oid' => 42, 't3ver_state' => 0, 't3ver_stage' => 0, 't3ver_wsid' => 5],
+        ]);
+
+        $connectionPool = $this->createStub(ConnectionPool::class);
+        $connectionPool->method('getQueryBuilderForTable')
+            ->willReturnCallback(function (string $table) use ($pagesResult): QueryBuilder {
+                // tt_content is workspace-aware but outside the grant, so it must never be queried.
+                self::assertSame('pages', $table);
+
+                return $this->createWorkspaceQueryBuilder($pagesResult);
+            });
+
+        $closure = $this->getRegisteredClosure(
+            $this->createStub(RecordService::class),
+            $this->createStub(DataHandlerService::class),
+            $connectionPool,
+            'workspace_changes_list',
+            $this->permissionServiceAllowing(['pages']),
+        );
+        /** @var array{tables: array<string, list<array<string, mixed>>>} $result */
+        $result = json_decode($closure(), true, 512, JSON_THROW_ON_ERROR);
+
+        self::assertSame(['pages'], array_keys($result['tables']));
+    }
+
     public function testPublishToolBuildsSwapCommand(): void
     {
+        $this->givenWorkspaceUser();
+
         $row = ['uid' => 100, 'pid' => 1, 't3ver_oid' => 42, 't3ver_state' => 0, 't3ver_stage' => 0, 't3ver_wsid' => 5];
 
         $result = $this->createStub(Result::class);
@@ -339,6 +467,8 @@ final class WorkspaceToolRegistrarTest extends TestCase
 
     public function testPublishToolUsesWorkspaceUidForNewPlaceholders(): void
     {
+        $this->givenWorkspaceUser();
+
         $row = ['uid' => 100, 'pid' => 1, 't3ver_oid' => 0, 't3ver_state' => 1, 't3ver_stage' => 0, 't3ver_wsid' => 5];
 
         $result = $this->createStub(Result::class);
@@ -370,6 +500,8 @@ final class WorkspaceToolRegistrarTest extends TestCase
 
     public function testPublishToolReturnsErrorWhenVersionNotFound(): void
     {
+        $this->givenWorkspaceUser();
+
         $result = $this->createStub(Result::class);
         $result->method('fetchAssociative')->willReturn(false);
 
@@ -386,11 +518,13 @@ final class WorkspaceToolRegistrarTest extends TestCase
         $publishResult = $closure('pages', 999);
 
         self::assertInstanceOf(ErrorResult::class, $publishResult);
-        self::assertSame('Workspace version not found', $publishResult->error);
+        self::assertStringContainsString('Workspace version not found in workspace 5', $publishResult->error);
     }
 
     public function testDiscardToolBuildsClearWsidCommand(): void
     {
+        $this->givenWorkspaceUser();
+
         $row = ['uid' => 100, 'pid' => 1, 't3ver_oid' => 42, 't3ver_state' => 0, 't3ver_stage' => 0, 't3ver_wsid' => 5];
 
         $result = $this->createStub(Result::class);
@@ -423,9 +557,7 @@ final class WorkspaceToolRegistrarTest extends TestCase
 
     public function testStageSetToolUpdatesT3verStage(): void
     {
-        $beUser = $this->createStub(BackendUserAuthentication::class);
-        $beUser->method('workspaceCheckStageForCurrent')->willReturn(true);
-        $GLOBALS['BE_USER'] = $beUser;
+        $this->givenWorkspaceUser();
 
         $row = ['uid' => 100, 'pid' => 1, 't3ver_oid' => 42, 't3ver_state' => 0, 't3ver_stage' => 0, 't3ver_wsid' => 5];
 
@@ -475,14 +607,51 @@ final class WorkspaceToolRegistrarTest extends TestCase
         ?RecordService $recordService = null,
         ?DataHandlerService $dataHandlerService = null,
         ?ConnectionPool $connectionPool = null,
+        ?PermissionService $permissionService = null,
     ): WorkspaceToolRegistrar {
         return new WorkspaceToolRegistrar(
             $recordService ?? $this->createStub(RecordService::class),
             $dataHandlerService ?? $this->createStub(DataHandlerService::class),
             $connectionPool ?? $this->createStub(ConnectionPool::class),
+            $permissionService ?? $this->permissionServiceAllowing(),
             new NullLogger(),
             $this->createStub(AuditLogger::class),
         );
+    }
+
+    /**
+     * Read access is now required for the table a workspace tool names. Unless a case says
+     * otherwise the caller may read everything, which is what an administrator gets.
+     *
+     * @param list<string>|null $allowedTables null allows every table
+     */
+    private function permissionServiceAllowing(?array $allowedTables = null): PermissionService
+    {
+        $permissionService = $this->createStub(PermissionService::class);
+        $permissionService->method('canSelectTable')->willReturnCallback(
+            static fn (string $table): bool => $allowedTables === null || in_array($table, $allowedTables, true),
+        );
+
+        return $permissionService;
+    }
+
+    /**
+     * A backend user standing in a workspace, with `pages` and `tt_content` versioned — the
+     * precondition every version-level tool now has.
+     */
+    private function givenWorkspaceUser(int $workspace = 5): BackendUserAuthentication
+    {
+        $beUser = $this->createStub(BackendUserAuthentication::class);
+        $beUser->workspace = $workspace;
+        $beUser->method('workspaceCheckStageForCurrent')->willReturn(true);
+        $GLOBALS['BE_USER'] = $beUser;
+
+        $GLOBALS['TCA'] = [
+            'pages' => ['ctrl' => ['versioningWS' => true]],
+            'tt_content' => ['ctrl' => ['versioningWS' => true]],
+        ];
+
+        return $beUser;
     }
 
     private function getRegisteredClosure(
@@ -490,8 +659,9 @@ final class WorkspaceToolRegistrarTest extends TestCase
         DataHandlerService $dataHandlerService,
         ?ConnectionPool $connectionPool,
         string $toolName,
+        ?PermissionService $permissionService = null,
     ): \Closure {
-        $registrar = $this->createRegistrar($recordService, $dataHandlerService, $connectionPool);
+        $registrar = $this->createRegistrar($recordService, $dataHandlerService, $connectionPool, $permissionService);
 
         $builder = Server::builder();
         $registrar->register($builder);
@@ -521,18 +691,37 @@ final class WorkspaceToolRegistrarTest extends TestCase
     }
 
     /** @return QueryBuilder&\PHPUnit\Framework\MockObject\Stub */
-    private function createWorkspaceQueryBuilder(Result $result): QueryBuilder
+    /**
+     * @param list<string> $conditions filled with the rendered WHERE conditions, so a case can
+     *                                 assert which columns the lookup was bound to
+     */
+    private function createWorkspaceQueryBuilder(Result $result, array &$conditions = []): QueryBuilder
     {
         $restrictions = $this->createStub(QueryRestrictionContainerInterface::class);
+
         $expressionBuilder = $this->createStub(ExpressionBuilder::class);
+        $expressionBuilder->method('eq')->willReturnCallback(
+            static fn (string $field, mixed $value): string => $field . ' = ' . (string) $value,
+        );
 
         $queryBuilder = $this->createStub(QueryBuilder::class);
         $queryBuilder->method('getRestrictions')->willReturn($restrictions);
         $queryBuilder->method('expr')->willReturn($expressionBuilder);
-        $queryBuilder->method('createNamedParameter')->willReturn("'0'");
+        // The bound value, echoed back so the rendered condition shows what was compared.
+        $queryBuilder->method('createNamedParameter')->willReturnCallback(
+            static fn (mixed $value): string => is_scalar($value) ? (string) $value : "'0'",
+        );
+        $queryBuilder->method('where')->willReturnCallback(
+            static function (string ...$predicates) use ($queryBuilder, &$conditions): QueryBuilder {
+                foreach ($predicates as $predicate) {
+                    $conditions[] = $predicate;
+                }
+
+                return $queryBuilder;
+            },
+        );
         $queryBuilder->method('select')->willReturnSelf();
         $queryBuilder->method('from')->willReturnSelf();
-        $queryBuilder->method('where')->willReturnSelf();
         $queryBuilder->method('andWhere')->willReturnSelf();
         $queryBuilder->method('setMaxResults')->willReturnSelf();
         $queryBuilder->method('orderBy')->willReturnSelf();

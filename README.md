@@ -581,8 +581,8 @@ Registered only when `typo3/cms-workspaces` is installed. Direct (live-mode) ope
 | `workspace_list` | List workspaces accessible to the current backend user (including the implicit live workspace, uid 0). |
 | `workspace_get` | Get workspace metadata by uid: title, custom stages flag, current user access level. |
 | `workspace_switch` | Switch the active workspace. Persists to `be_users.workspace_id`. Use uid `0` to return to live. |
-| `workspace_changes_list` | List records modified in the current workspace, grouped by table, with `t3ver_state` and stage. |
-| `workspace_publish` | Publish a workspace version to live (swap). |
+| `workspace_changes_list` | List records modified in the current workspace, grouped by table, with `t3ver_state` and stage. Limited to tables the user may read. |
+| `workspace_publish` | Publish a workspace version to live (swap). The version must live in the user's current workspace and in a table they may read — otherwise it reports "not found"; use `workspace_switch` first. |
 | `workspace_discard` | Discard a workspace version, dropping unpublished changes. |
 | `workspace_stage_set` | Move a workspace version to a different stage (`-10` ready to publish, `-20` ready to review, `0` editing, or a custom stage uid). |
 

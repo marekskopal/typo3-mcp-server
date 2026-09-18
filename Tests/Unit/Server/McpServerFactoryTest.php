@@ -204,7 +204,14 @@ final class McpServerFactoryTest extends TestCase
         $dynamicToolRegistrar = new DynamicToolRegistrar($tcaSchemaService, $discoveredTableRepository, $logger, $tableToolFactory);
         $redirectToolRegistrar = new RedirectToolRegistrar($recordService, $dataHandlerService, $logger, $auditLogger, $tableToolFactory);
         $schedulerToolRegistrar = new SchedulerToolRegistrar($recordService, $connectionPool, $logger, $auditLogger, $tableToolFactory);
-        $workspaceToolRegistrar = new WorkspaceToolRegistrar($recordService, $dataHandlerService, $connectionPool, $logger, $auditLogger);
+        $workspaceToolRegistrar = new WorkspaceToolRegistrar(
+            $recordService,
+            $dataHandlerService,
+            $connectionPool,
+            $this->createStub(PermissionService::class),
+            $logger,
+            $auditLogger,
+        );
 
         $sessionRepository = $this->createStub(McpSessionRepository::class);
         $extensionConfiguration = $this->createStub(ExtensionConfiguration::class);
