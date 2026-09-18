@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+### Security
+- **Raised the TYPO3 requirement past TYPO3-CORE-SA-2026-022.** `typo3/cms-*` was constrained to `^13.4.34 || ^14.3.6`, both of which permit versions of `typo3/cms-backend` affected by CVE-2026-77132 (Information Disclosure via Backend Localization Wizard, fixed in 13.4.35 / 14.3.7). The affected code is core's localization wizard and is not reachable through MCP, but a consumer's fresh `composer install` of this extension could land on a vulnerable core — the same failure the 1.2.0 floor raise closed for SA-2026-021. The floor is now `^13.4.35 || ^14.3.7`, and the `CI` and `Integration Tests` matrix legs are pinned to the same versions.
+- **CI runs `composer audit`.** A new `Dependency audit` job fails the build on any published advisory against a resolved dependency, so the next core security release is caught when it is published rather than at the next manual audit.
+
 ### Fixed
 - **Static analysis never ran against TYPO3 v13.** The `phpstan` CI job matrixed on PHP version only and ran a plain `composer install`, which always resolves to the highest allowed TYPO3 — so half of the supported matrix (v13.4.34+) was unanalysed, while the `tests` job had been covering both branches all along. The job now mirrors the test matrix, and the ten errors that had accumulated behind the gap are fixed: `BackendLayoutView::getBackendLayoutForPage()` returns `?BackendLayout` on v13 and a null would have been dereferenced into a fatal, so `BackendLayoutResource` now reports "No backend layout could be resolved for page N." instead; `DataHandler::$errorLog` is typed `list<non-empty-string>` on v14 but untyped on v13, so its entries are normalized before being relayed. `PasswordHasBeenResetEvent` genuinely does not exist on v13 (the listener is documented as v14-only and is never dispatched there), which `phpstan.neon` now states in two `ignoreErrors` entries scoped to that one file.
 
