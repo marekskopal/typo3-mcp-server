@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace MarekSkopal\MsMcpServer\Tests\Unit\Service;
 
+use Doctrine\DBAL\Result;
 use MarekSkopal\MsMcpServer\Service\FileService;
 use MarekSkopal\MsMcpServer\Service\StoragePermissionService;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
-use Doctrine\DBAL\Result;
 use TYPO3\CMS\Core\Authentication\BackendUserAuthentication;
 use TYPO3\CMS\Core\Database\ConnectionPool;
 use TYPO3\CMS\Core\Database\Query\Expression\ExpressionBuilder;
@@ -396,8 +396,9 @@ final class FileServiceTest extends TestCase
 
     public function testUploadFileFromUrlRejectsHostResolvingToPrivateIp(): void
     {
-        $storageRepository = $this->createStub(StorageRepository::class);
-        $service = $this->createService($storageRepository);
+        // The destination is writable, so the request gets as far as the fetch and the SSRF guard
+        // is what stops it.
+        $service = $this->createService($this->storageRepositoryAllowingUpload());
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionCode(1712002015);
@@ -409,14 +410,66 @@ final class FileServiceTest extends TestCase
 
     public function testUploadFileFromUrlRejectsLinkLocalMetadataIp(): void
     {
-        $storageRepository = $this->createStub(StorageRepository::class);
-        $service = $this->createService($storageRepository);
+        $service = $this->createService($this->storageRepositoryAllowingUpload());
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionCode(1712002015);
 
         // AWS / GCP / Azure cloud metadata endpoint — must be blocked.
         $service->uploadFileFromUrl(1, '/', 'http://169.254.169.254/latest/meta-data/');
+    }
+
+    /**
+     * A user who cannot reach the storage at all must be refused before the server fetches
+     * anything: otherwise one tool call is a free 100 MB download, whatever their file rights.
+     */
+    public function testUploadFileFromUrlRefusesInaccessibleStorageBeforeDownloading(): void
+    {
+        $storageRepository = $this->createStub(StorageRepository::class);
+        $storageRepository->method('findByUid')->willReturn(null);
+
+        $service = $this->createService($storageRepository);
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionCode(1712002000);
+
+        // A host that would fail the SSRF guard: reaching that failure would prove the storage was
+        // resolved too late.
+        $service->uploadFileFromUrl(1, '/', 'http://169.254.169.254/latest/meta-data/');
+    }
+
+    public function testUploadFileFromUrlRefusesUnwritableFolderBeforeDownloading(): void
+    {
+        $storage = $this->createMock(ResourceStorage::class);
+        $storage->method('getFolder')->willReturn($this->createStub(Folder::class));
+        $storage->expects(self::once())
+            ->method('checkFolderActionPermission')
+            ->with('add', self::anything())
+            ->willReturn(false);
+        $storage->expects(self::never())->method('addFile');
+
+        $storageRepository = $this->createStub(StorageRepository::class);
+        $storageRepository->method('findByUid')->willReturn($storage);
+
+        $service = $this->createService($storageRepository);
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionCode(1712002021);
+
+        $service->uploadFileFromUrl(1, '/restricted', 'http://169.254.169.254/latest/meta-data/');
+    }
+
+    /** A storage the user may reach and add files to, for cases that must get past the permission gate. */
+    private function storageRepositoryAllowingUpload(): StorageRepository
+    {
+        $storage = $this->createStub(ResourceStorage::class);
+        $storage->method('getFolder')->willReturn($this->createStub(Folder::class));
+        $storage->method('checkFolderActionPermission')->willReturn(true);
+
+        $storageRepository = $this->createStub(StorageRepository::class);
+        $storageRepository->method('findByUid')->willReturn($storage);
+
+        return $storageRepository;
     }
 
     public function testGetStorageThrowsWhenNotFound(): void
@@ -835,10 +888,8 @@ final class FileServiceTest extends TestCase
         }
     }
 
-    private function createService(
-        ?StorageRepository $storageRepository = null,
-        ?ConnectionPool $connectionPool = null,
-    ): FileService {
+    private function createService(?StorageRepository $storageRepository = null, ?ConnectionPool $connectionPool = null,): FileService
+    {
         return new FileService(
             $storageRepository ?? $this->createStub(StorageRepository::class),
             $connectionPool ?? $this->createStub(ConnectionPool::class),
