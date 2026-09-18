@@ -23,7 +23,10 @@ use Psr\Log\NullLogger;
 use Psr\Http\Message\UriInterface;
 use Psr\Http\Server\RequestHandlerInterface;
 use TYPO3\CMS\Core\Authentication\BackendUserAuthentication;
+use TYPO3\CMS\Core\Authentication\Mfa\MfaProviderManifestInterface;
+use TYPO3\CMS\Core\Authentication\Mfa\MfaRequiredException;
 use TYPO3\CMS\Core\Configuration\ExtensionConfiguration;
+use TYPO3\CMS\Core\Utility\GeneralUtility;
 
 #[CoversClass(OAuthMiddleware::class)]
 final class OAuthMiddlewareTest extends TestCase
@@ -48,6 +51,7 @@ final class OAuthMiddlewareTest extends TestCase
     protected function tearDown(): void
     {
         unset($GLOBALS['BE_USER'], $GLOBALS['TYPO3_CONF_VARS']);
+        GeneralUtility::purgeInstances();
     }
 
     public function testNonOAuthPathPassesThrough(): void
@@ -783,6 +787,175 @@ final class OAuthMiddlewareTest extends TestCase
         self::assertSame(403, $this->capturedStatusCode);
         self::assertSame('access_denied', $this->decodeCapturedBody()['error'] ?? null);
         self::assertStringContainsString('mcp_csrf=;', $this->capturedHeaders['Set-Cookie'] ?? '');
+    }
+
+    /**
+     * Core's backend middleware refuses every module to a user whom the `requireMfa` policy
+     * obliges to set MFA up first. The consent screen runs in the frontend stack and has to
+     * apply the same gate itself, or such a user could mint a long-lived token from a
+     * password-only session.
+     */
+    public function testAuthorizeGetRedirectsToBackendLoginWhenMfaSetupIsRequired(): void
+    {
+        $GLOBALS['BE_USER'] = $this->createBackendUserRequiringMfaSetup();
+
+        $request = $this->createRequest('/mcp/oauth/authorize', 'GET');
+        $request->method('getQueryParams')->willReturn($this->validAuthorizeParams());
+
+        $handler = $this->createMock(RequestHandlerInterface::class);
+        $handler->expects(self::never())->method('handle');
+
+        $middleware = $this->createMiddlewareWithCapture(clientRepository: $this->clientRepositoryAcceptingClient());
+        $middleware->process($request, $handler);
+
+        self::assertSame(302, $this->capturedStatusCode);
+        self::assertSame('/typo3/login?login_status=login', $this->capturedHeaders['Location'] ?? '');
+        self::assertStringStartsWith('mcp_oauth_continuation=', $this->capturedHeaders['Set-Cookie'] ?? '');
+        self::assertSame([], $this->capturedBodies, 'No consent form may be rendered');
+    }
+
+    /** @return iterable<string, array{0: mixed, 1: int|null}> */
+    public static function mfaSetupRequirementSatisfiedProvider(): iterable
+    {
+        yield 'MFA already passed in this session' => [true, null];
+        yield 'switch-user mode, which core exempts' => [null, 1];
+    }
+
+    #[DataProvider('mfaSetupRequirementSatisfiedProvider')]
+    public function testAuthorizeGetRendersConsentWhenMfaSetupRequirementIsSatisfied(
+        mixed $mfaSessionFlag,
+        ?int $switchUserOriginalUid,
+    ): void {
+        $beUser = $this->createStub(BackendUserAuthentication::class);
+        $beUser->method('getUserId')->willReturn(42);
+        $beUser->method('getUserName')->willReturn('editor');
+        $beUser->method('isMfaSetupRequired')->willReturn(true);
+        $beUser->method('getSessionData')->willReturn($mfaSessionFlag);
+        $beUser->method('getOriginalUserIdWhenInSwitchUserMode')->willReturn($switchUserOriginalUid);
+        $GLOBALS['BE_USER'] = $beUser;
+
+        $request = $this->createRequest('/mcp/oauth/authorize', 'GET');
+        $request->method('getQueryParams')->willReturn($this->validAuthorizeParams());
+
+        $middleware = $this->createMiddlewareWithCapture(clientRepository: $this->clientRepositoryAcceptingClient());
+        $middleware->process($request, $this->createStub(RequestHandlerInterface::class));
+
+        self::assertSame(200, $this->capturedStatusCode);
+        self::assertStringContainsString('Authorize Access', $this->capturedBodies[0] ?? '');
+    }
+
+    public function testAuthorizePostReturns401WhenMfaSetupIsRequired(): void
+    {
+        $GLOBALS['BE_USER'] = $this->createBackendUserRequiringMfaSetup();
+
+        $request = $this->createRequest('/mcp/oauth/authorize', 'POST');
+        $csrf = bin2hex(random_bytes(16));
+        $request->method('getCookieParams')->willReturn(['mcp_csrf' => $csrf]);
+        $request->method('getParsedBody')->willReturn(['csrf_token' => $csrf] + $this->validAuthorizeParams());
+
+        $authorizationService = $this->createMock(AuthorizationService::class);
+        $authorizationService->expects(self::never())->method('createAuthorizationCode');
+
+        $middleware = $this->createMiddlewareWithCapture(
+            clientRepository: $this->clientRepositoryAcceptingClient(),
+            authorizationService: $authorizationService,
+        );
+        $middleware->process($request, $this->createStub(RequestHandlerInterface::class));
+
+        self::assertSame(401, $this->capturedStatusCode);
+        self::assertSame('login_required', $this->decodeCapturedBody()['error'] ?? null);
+    }
+
+    /**
+     * A session whose first factor passed but whose MFA challenge is still open makes `start()`
+     * throw `MfaRequiredException`. That used to escape as an uncaught 500; it is a
+     * not-authenticated state, so the user is sent through the backend login (which routes them
+     * to the MFA form), and the half-authenticated object is not left in `$GLOBALS['BE_USER']`.
+     */
+    public function testAuthorizeGetRedirectsToBackendLoginWhenSessionStillOwesMfaChallenge(): void
+    {
+        unset($GLOBALS['BE_USER']);
+
+        $beUser = $this->createStub(BackendUserAuthentication::class);
+        $beUser->method('start')->willThrowException(
+            new MfaRequiredException($this->createStub(MfaProviderManifestInterface::class), 1613687097),
+        );
+        GeneralUtility::addInstance(BackendUserAuthentication::class, $beUser);
+
+        $request = $this->createRequest('/mcp/oauth/authorize', 'GET');
+        $request->method('getQueryParams')->willReturn($this->validAuthorizeParams());
+
+        $handler = $this->createMock(RequestHandlerInterface::class);
+        $handler->expects(self::never())->method('handle');
+
+        $middleware = $this->createMiddlewareWithCapture(clientRepository: $this->clientRepositoryAcceptingClient());
+        $middleware->process($request, $handler);
+
+        self::assertSame(302, $this->capturedStatusCode);
+        self::assertSame('/typo3/login?login_status=login', $this->capturedHeaders['Location'] ?? '');
+        self::assertArrayNotHasKey('BE_USER', $GLOBALS);
+    }
+
+    public function testBackendBounceIgnoredWhenMfaSetupIsRequired(): void
+    {
+        $GLOBALS['BE_USER'] = $this->createBackendUserRequiringMfaSetup();
+
+        $cookie = new OAuthContinuationCookie();
+        $cookieValue = $this->extractCookieValue(
+            $cookie->issue('/mcp/oauth/authorize?client_id=client-abc', secure: true),
+        );
+
+        $request = $this->createRequest('/typo3/main', 'GET');
+        $request->method('getCookieParams')->willReturn([
+            OAuthContinuationCookie::COOKIE_NAME => $cookieValue,
+        ]);
+
+        $expectedResponse = $this->createStub(ResponseInterface::class);
+        $handler = $this->createMock(RequestHandlerInterface::class);
+        $handler->expects(self::once())->method('handle')->with($request)->willReturn($expectedResponse);
+
+        $middleware = $this->createMiddleware();
+        self::assertSame($expectedResponse, $middleware->process($request, $handler));
+    }
+
+    private function createBackendUserRequiringMfaSetup(): BackendUserAuthentication
+    {
+        $beUser = $this->createStub(BackendUserAuthentication::class);
+        $beUser->method('getUserId')->willReturn(42);
+        $beUser->method('getUserName')->willReturn('newcomer');
+        $beUser->method('isMfaSetupRequired')->willReturn(true);
+        $beUser->method('getSessionData')->willReturn(null);
+        $beUser->method('getOriginalUserIdWhenInSwitchUserMode')->willReturn(null);
+
+        return $beUser;
+    }
+
+    /** @return array<string, string> */
+    private function validAuthorizeParams(): array
+    {
+        return [
+            'response_type' => 'code',
+            'client_id' => 'client-abc',
+            'redirect_uri' => 'https://client.example/cb',
+            'code_challenge' => 'challenge-value',
+            'code_challenge_method' => 'S256',
+            'state' => 'opaque-state',
+        ];
+    }
+
+    private function clientRepositoryAcceptingClient(): ClientRepository
+    {
+        $clientRepository = $this->createStub(ClientRepository::class);
+        $clientRepository->method('findByClientId')->willReturn([
+            'uid' => 1,
+            'client_id' => 'client-abc',
+            'client_name' => 'Test Client',
+            'redirect_uris' => '["https://client.example/cb"]',
+            'be_user' => 0,
+        ]);
+        $clientRepository->method('validateRedirectUri')->willReturn(true);
+
+        return $clientRepository;
     }
 
     private function createRequest(string $path, string $method, string $scheme = 'https'): ServerRequestInterface
