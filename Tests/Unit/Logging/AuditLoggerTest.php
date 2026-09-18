@@ -114,6 +114,90 @@ final class AuditLoggerTest extends TestCase
         $auditLogger->logSuccess('RecordUpdateTool', 'tool', [42, 'tt_content', ['title' => 'secret payload']], 5);
     }
 
+    /**
+     * Nearly every write tool takes its payload as a JSON *string*, so `is_string()` used to keep
+     * the first 100 characters of it — record content, and potentially personal data, copied into
+     * a table every administrator can read. Only the field names are recorded now.
+     */
+    public function testLogSuccessReducesJsonObjectArgumentsToFieldNames(): void
+    {
+        $fields = json_encode(
+            ['header' => 'Contact us', 'bodytext' => 'Reach Jane at jane@example.com', 'hidden' => 0],
+            JSON_THROW_ON_ERROR,
+        );
+
+        $args = $this->captureLoggedArguments([42, $fields]);
+
+        self::assertSame([42, '{header, bodytext, hidden}'], $args);
+        self::assertStringNotContainsString('jane@example.com', json_encode($args, JSON_THROW_ON_ERROR));
+    }
+
+    /** @return iterable<string, array{0: string, 1: string}> */
+    public static function stringArgumentProvider(): iterable
+    {
+        yield 'table name kept as it is' => ['tt_content', 'tt_content'];
+        yield 'plain-text search term kept' => ['Brio', 'Brio'];
+        yield 'uid list kept' => ['1,2,3', '1,2,3'];
+        yield 'JSON list carries no field content' => ['[1,2,3]', '[1,2,3]'];
+        yield 'search condition reduced to its field' => ['{"title":{"like":"secret"}}', '{title}'];
+        yield 'empty object' => ['{}', '{}'];
+        yield 'whitespace around the object' => ['  {"title":"x"}  ', '{title}'];
+        yield 'malformed JSON kept so the failure stays diagnosable' => ['{"title":', '{"title":'];
+        yield 'control characters stripped from field names' => ["{\"ti\\u0000tle\":\"x\"}", '{title}'];
+    }
+
+    #[DataProvider('stringArgumentProvider')]
+    public function testStringArgumentsAreRedactedByShape(string $argument, string $expected): void
+    {
+        self::assertSame([$expected], $this->captureLoggedArguments([$argument]));
+    }
+
+    public function testLongValuesAndWideObjectsStayBounded(): void
+    {
+        $longTerm = str_repeat('a', 300);
+        self::assertSame(100, mb_strlen((string) $this->captureLoggedArguments([$longTerm])[0]));
+
+        $manyFields = [];
+        for ($i = 0; $i < 40; $i++) {
+            $manyFields['field_' . $i] = 'value';
+        }
+
+        $logged = (string) $this->captureLoggedArguments([json_encode($manyFields, JSON_THROW_ON_ERROR)])[0];
+        self::assertStringStartsWith('{field_0, field_1,', $logged);
+        self::assertLessThanOrEqual(100, mb_strlen($logged));
+        self::assertStringNotContainsString('value', $logged);
+    }
+
+    /**
+     * Runs one successful invocation and returns what landed in `log_data.args`.
+     *
+     * @param list<mixed> $arguments
+     * @return list<mixed>
+     */
+    private function captureLoggedArguments(array $arguments): array
+    {
+        $captured = [];
+
+        $connection = $this->createMock(Connection::class);
+        $connection->expects(self::once())
+            ->method('insert')
+            ->willReturnCallback(static function (string $table, array $data) use (&$captured): int {
+                /** @var array{args?: list<mixed>} $logData */
+                $logData = json_decode((string) $data['log_data'], true, 512, JSON_THROW_ON_ERROR);
+                $captured = $logData['args'] ?? [];
+
+                return 1;
+            });
+
+        $connectionPool = $this->createStub(ConnectionPool::class);
+        $connectionPool->method('getConnectionForTable')->willReturn($connection);
+
+        $this->createAuditLogger($connectionPool, new NullLogger())
+            ->logSuccess('ContentUpdateTool', 'tool', $arguments, 5);
+
+        return $captured;
+    }
+
     public function testLogFailureIsReportedToPsrLoggerWhenDatabaseFails(): void
     {
         $connection = $this->createStub(Connection::class);
