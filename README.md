@@ -31,7 +31,7 @@ These are the kinds of tasks an AI agent can accomplish autonomously through thi
 ## Requirements
 
 - PHP 8.3+
-- TYPO3 v13.4.34+ or v14.3.6+ (these are the first releases past TYPO3-CORE-SA-2026-021)
+- TYPO3 v13.4.35+ or v14.3.7+ (these are the first releases past TYPO3-CORE-SA-2026-022)
 
 ## Installation
 
@@ -734,7 +734,7 @@ see v14. CI runs PHPStan and PHPUnit against both supported branches; to reprodu
 locally, pin the branch first and restore afterwards:
 
 ```bash
-composer require --no-update typo3/cms-core:^13.4.34 && composer update
+composer require --no-update typo3/cms-core:^13.4.35 && composer update
 vendor/bin/phpstan analyse && vendor/bin/phpunit
 
 git checkout composer.json && composer update
