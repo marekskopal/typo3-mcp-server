@@ -7,6 +7,7 @@ namespace MarekSkopal\MsMcpServer\Tests\Unit\Service;
 use MarekSkopal\MsMcpServer\Service\TcaSchemaService;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
+use TYPO3\CMS\Core\Authentication\BackendUserAuthentication;
 
 #[CoversClass(TcaSchemaService::class)]
 final class TcaSchemaServiceTest extends TestCase
@@ -21,7 +22,7 @@ final class TcaSchemaServiceTest extends TestCase
 
     protected function tearDown(): void
     {
-        unset($GLOBALS['TCA']);
+        unset($GLOBALS['TCA'], $GLOBALS['BE_USER']);
     }
 
     public function testGetListFieldsReturnsUidPidWhenTableNotInTca(): void
@@ -935,5 +936,111 @@ final class TcaSchemaServiceTest extends TestCase
 
         self::assertNull($this->service->getLabelField('tx_test'));
         self::assertNull($this->service->getLabelField('nonexistent_table'));
+    }
+    /**
+     * TCA `exclude` is not an edit-only flag: core's list module builds its columns from
+     * BackendUtility::getAllowedFieldsForTable(), which drops such a column for a user without the
+     * `non_exclude_fields` grant. This read surface returned every field regardless.
+     */
+    public function testExcludeFieldsAreOmittedWithoutTheGrant(): void
+    {
+        $this->givenTableWithExcludeField();
+        $this->givenBackendUserGranting([]);
+
+        $readFields = $this->service->getReadFields('tx_test');
+
+        self::assertContains('title', $readFields);
+        self::assertNotContains('secret_note', $readFields);
+        self::assertNotContains('secret_note', $this->service->getWritableFields('tx_test'));
+        self::assertSame(
+            ['title'],
+            array_column($this->service->getFieldsSchema('tx_test')['fields'], 'name'),
+        );
+    }
+
+    public function testExcludeFieldsAreKeptWithTheGrant(): void
+    {
+        $this->givenTableWithExcludeField();
+        $this->givenBackendUserGranting(['tx_test:secret_note']);
+
+        self::assertContains('secret_note', $this->service->getReadFields('tx_test'));
+        self::assertContains('secret_note', $this->service->getWritableFields('tx_test'));
+    }
+
+    /** An administrator passes check() for everything, so nothing changes for them. */
+    public function testExcludeFieldsAreKeptForAdministrators(): void
+    {
+        $this->givenTableWithExcludeField();
+        $this->givenBackendUserGranting(null);
+
+        self::assertContains('secret_note', $this->service->getReadFields('tx_test'));
+    }
+
+    /** No authenticated user is not a way to see more. */
+    public function testExcludeFieldsAreOmittedWithoutABackendUser(): void
+    {
+        $this->givenTableWithExcludeField();
+        unset($GLOBALS['BE_USER']);
+
+        self::assertNotContains('secret_note', $this->service->getReadFields('tx_test'));
+    }
+
+    /** `hidden` carries `exclude => true` in most TCA, and reaches the list fields through ctrl. */
+    public function testListFieldsDropExcludedCtrlFields(): void
+    {
+        $GLOBALS['TCA']['tx_test'] = [
+            'ctrl' => [
+                'label' => 'title',
+                'label_alt' => 'secret_note',
+                'enablecolumns' => ['disabled' => 'hidden'],
+            ],
+            'columns' => [
+                'title' => ['config' => ['type' => 'input']],
+                'secret_note' => ['exclude' => true, 'config' => ['type' => 'input']],
+                'hidden' => ['exclude' => true, 'config' => ['type' => 'check']],
+            ],
+        ];
+        $this->givenBackendUserGranting([]);
+
+        self::assertSame(['uid', 'pid', 'title'], $this->service->getListFields('tx_test'));
+    }
+
+    public function testExcludedMmFieldIsNotReportedAsAnMmField(): void
+    {
+        $GLOBALS['TCA']['tx_test'] = [
+            'ctrl' => [],
+            'columns' => [
+                'groups' => [
+                    'exclude' => true,
+                    'config' => ['type' => 'select', 'foreign_table' => 'tx_group', 'MM' => 'tx_test_group_mm'],
+                ],
+            ],
+        ];
+        $this->givenBackendUserGranting([]);
+
+        self::assertSame([], array_keys($this->service->getMMFields('tx_test')));
+        self::assertFalse($this->service->isMMField('tx_test', 'groups'));
+    }
+
+    private function givenTableWithExcludeField(): void
+    {
+        $GLOBALS['TCA']['tx_test'] = [
+            'ctrl' => [],
+            'columns' => [
+                'title' => ['config' => ['type' => 'input']],
+                'secret_note' => ['exclude' => true, 'config' => ['type' => 'text']],
+            ],
+        ];
+    }
+
+    /** @param list<string>|null $granted null stands for an administrator, who passes everything */
+    private function givenBackendUserGranting(?array $granted): void
+    {
+        $backendUser = $this->createStub(BackendUserAuthentication::class);
+        $backendUser->method('check')->willReturnCallback(
+            static fn (string $type, string $value): bool => $granted === null || in_array($value, $granted, true),
+        );
+
+        $GLOBALS['BE_USER'] = $backendUser;
     }
 }

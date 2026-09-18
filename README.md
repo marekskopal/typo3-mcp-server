@@ -549,6 +549,8 @@ Tools for inspecting the authenticated backend user's effective permissions.
 | `permission_check_page` | Check what the current user can do on a page: show, edit, delete, create subpages, edit content. |
 | `permission_check_summary` | Summary of the current user's permissions: admin status, allowed tables for read/write, languages, file permissions, web/file mounts. |
 
+**Exclude fields.** A column TCA marks `exclude` (`pages.TSconfig`, `tt_content.pi_flexform`, most `starttime` / `endtime` / `fe_group`, usually `hidden`) is returned and accepted only for a user who holds the matching `non_exclude_fields` grant — the same rule that decides whether the backend's list module renders the column. Administrators hold every grant, so nothing is hidden from them. A field withheld this way is reported in `ignoredFields` when a write names it, and never appears in `table_schema`.
+
 ### Redirects
 
 Registered only when `typo3/cms-redirects` is installed. Operates on the `sys_redirect` table through DataHandler.
