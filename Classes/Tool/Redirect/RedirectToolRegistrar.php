@@ -10,12 +10,12 @@ use MarekSkopal\MsMcpServer\Service\RecordService;
 use MarekSkopal\MsMcpServer\Tool\Helper\JsonObjectParser;
 use MarekSkopal\MsMcpServer\Tool\Helper\RegistrarToolRunner;
 use MarekSkopal\MsMcpServer\Tool\Result\RecordCreatedResult;
+use MarekSkopal\MsMcpServer\Tool\Result\RecordListResult;
 use MarekSkopal\MsMcpServer\Tool\Table\TableToolConfig;
 use MarekSkopal\MsMcpServer\Tool\Table\TableToolFactory;
 use Mcp\Server\Builder;
 use Psr\Log\LoggerInterface;
 use TYPO3\CMS\Core\Utility\ExtensionManagementUtility;
-use const JSON_THROW_ON_ERROR;
 
 readonly class RedirectToolRegistrar
 {
@@ -130,7 +130,7 @@ readonly class RedirectToolRegistrar
                 $recordService,
                 $logger,
                 $auditLogger
-            ): string {
+            ): RecordListResult {
                 return RegistrarToolRunner::run('redirect_list', $auditLogger, $logger, static function () use (
                     $recordService,
                     $pid,
@@ -140,7 +140,7 @@ readonly class RedirectToolRegistrar
                     $sourcePath,
                     $target,
                     $disabled,
-                ): string {
+                ): RecordListResult {
                     /** @var array<string, array{operator: string, value: string}> $conditions */
                     $conditions = [];
 
@@ -168,7 +168,7 @@ readonly class RedirectToolRegistrar
                         'DESC',
                     );
 
-                    return json_encode($result, JSON_THROW_ON_ERROR);
+                    return RecordListResult::fromQuery($result);
                 }, arguments: [$pid, $limit, $offset, $sourceHost, $sourcePath, $target, $disabled], tableName: self::TABLE);
             },
             name: 'redirect_list',

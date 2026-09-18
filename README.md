@@ -389,6 +389,8 @@ The **System > MCP Server** backend module provides:
 
 ## Tools Reference
 
+**How a tool answers.** Every tool returns a JSON object describing what it did. A tool **never** encodes a failure into a successful result: if the tool could not do what was asked — a malformed `fields` or `search` payload, an unknown table or field, a permission the user does not hold, a write whose target does not exist — the call fails with an MCP tool error carrying the reason, which a client sees as an error rather than as data. What a tool *did* do comes back as data, and that includes a read that matched nothing: an empty `records` list, or, for the `*_get` tools, `{"found": false, "table": …, "uid": …, "message": …}`. The rule is worth knowing because the distinction is the one an agent acts on — an error means "ask differently", a result means "this is the answer".
+
 **Write errors.** A write that TYPO3's DataHandler refuses — no permission, an invalid value — is reported with DataHandler's own message (`TYPO3 DataHandler reported errors while updating pages:68: …`). If a DataHandler *hook* throws (an extension reacting to the change, such as EXT:redirects on a slug change), the tool reports the exception class and code and that the change **may already have been applied**, since hooks run after the row is written; read the record back to verify. The raw exception message goes to the TYPO3 log only, because it can embed SQL or file paths.
 
 ### Pages
@@ -723,6 +725,8 @@ HTTP request → McpServerMiddleware (Bearer auth)
 Tools, resources, and prompts are **auto-discovered** via DI container tags — no manual registration needed. Adding a new tool is as simple as creating a class with a `#[McpTool]` attribute.
 
 Error handling is **centralized** in `ErrorHandlingProxy`. Tool classes contain only business logic — no try/catch boilerplate, no logger injection.
+
+Every tool returns a typed result object from `Classes/Tool/Result/`, never a hand-rolled JSON string, and signals failure by throwing `ToolCallException` — see [How a tool answers](#tools-reference).
 
 **Audit logging** records every tool and resource invocation to TYPO3's `sys_log` table — visible in the backend log module with user ID, tool name, execution time, and outcome.
 

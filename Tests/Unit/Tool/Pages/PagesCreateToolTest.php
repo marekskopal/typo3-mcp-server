@@ -7,7 +7,6 @@ namespace MarekSkopal\MsMcpServer\Tests\Unit\Tool\Pages;
 use MarekSkopal\MsMcpServer\Service\DataHandlerService;
 use MarekSkopal\MsMcpServer\Service\TcaSchemaService;
 use MarekSkopal\MsMcpServer\Tool\Pages\PagesCreateTool;
-use MarekSkopal\MsMcpServer\Tool\Result\ErrorResult;
 use MarekSkopal\MsMcpServer\Tool\Result\RecordCreatedResult;
 use Mcp\Exception\ToolCallException;
 use PHPUnit\Framework\Attributes\CoversClass;
@@ -165,11 +164,11 @@ final class PagesCreateToolTest extends TestCase
             ->method('createRecord');
 
         $tool = new PagesCreateTool($dataHandlerService, new TcaSchemaService());
-        $result = $tool->execute(0, json_encode(['bad_field' => 'x'], JSON_THROW_ON_ERROR));
 
-        self::assertInstanceOf(ErrorResult::class, $result);
-        self::assertSame('No valid fields provided', $result->error);
-        self::assertSame(['bad_field'], $result->context['ignoredFields']);
+        $this->expectException(ToolCallException::class);
+        $this->expectExceptionMessage('No valid fields provided');
+
+        $tool->execute(0, json_encode(['bad_field' => 'x'], JSON_THROW_ON_ERROR));
     }
 
     public function testExecuteSetsSysLanguageUid(): void

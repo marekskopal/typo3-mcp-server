@@ -6,10 +6,10 @@ namespace MarekSkopal\MsMcpServer\Tests\Unit\Tool\Pages;
 
 use MarekSkopal\MsMcpServer\Service\RecordService;
 use MarekSkopal\MsMcpServer\Service\TcaSchemaService;
+use MarekSkopal\MsMcpServer\Tests\Unit\Support\JsonResult;
 use MarekSkopal\MsMcpServer\Tool\Pages\PagesGetTool;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
-use const JSON_THROW_ON_ERROR;
 
 #[CoversClass(PagesGetTool::class)]
 final class PagesGetToolTest extends TestCase
@@ -62,7 +62,7 @@ final class PagesGetToolTest extends TestCase
             ->willReturn($expectedRecord);
 
         $tool = new PagesGetTool($recordService, new TcaSchemaService());
-        $result = json_decode($tool->execute(42), true, 512, JSON_THROW_ON_ERROR);
+        $result = JsonResult::of($tool->execute(42));
 
         self::assertSame(42, $result['uid']);
         self::assertSame('Test Page', $result['title']);
@@ -90,7 +90,7 @@ final class PagesGetToolTest extends TestCase
             ->willReturn($translations);
 
         $tool = new PagesGetTool($recordService, new TcaSchemaService());
-        $result = json_decode($tool->execute(42), true, 512, JSON_THROW_ON_ERROR);
+        $result = JsonResult::of($tool->execute(42));
 
         self::assertSame($translations, $result['translations']);
     }
@@ -110,7 +110,7 @@ final class PagesGetToolTest extends TestCase
         $recordService->expects(self::never())->method('findTranslations');
 
         $tool = new PagesGetTool($recordService, new TcaSchemaService());
-        $result = json_decode($tool->execute(87), true, 512, JSON_THROW_ON_ERROR);
+        $result = JsonResult::of($tool->execute(87));
 
         self::assertArrayNotHasKey('translations', $result);
     }
@@ -124,9 +124,12 @@ final class PagesGetToolTest extends TestCase
             ->willReturn(null);
 
         $tool = new PagesGetTool($recordService, new TcaSchemaService());
-        $result = json_decode($tool->execute(999), true, 512, JSON_THROW_ON_ERROR);
+        $result = JsonResult::of($tool->execute(999));
 
-        self::assertSame('Page not found', $result['error']);
+        self::assertFalse($result['found']);
+        self::assertSame('pages', $result['table']);
+        self::assertSame(999, $result['uid']);
+        self::assertSame('Page not found', $result['message']);
     }
 
     public function testExecuteThrowsExceptionOnError(): void

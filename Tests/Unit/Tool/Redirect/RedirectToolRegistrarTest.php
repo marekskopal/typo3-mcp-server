@@ -7,8 +7,8 @@ namespace MarekSkopal\MsMcpServer\Tests\Unit\Tool\Redirect;
 use MarekSkopal\MsMcpServer\Logging\AuditLogger;
 use MarekSkopal\MsMcpServer\Service\DataHandlerService;
 use MarekSkopal\MsMcpServer\Service\RecordService;
+use MarekSkopal\MsMcpServer\Tests\Unit\Support\JsonResult;
 use MarekSkopal\MsMcpServer\Tool\Redirect\RedirectToolRegistrar;
-use MarekSkopal\MsMcpServer\Tool\Result\ErrorResult;
 use MarekSkopal\MsMcpServer\Tool\Result\RecordCreatedResult;
 use MarekSkopal\MsMcpServer\Tool\Result\RecordDeletedResult;
 use MarekSkopal\MsMcpServer\Tool\Result\RecordUpdatedResult;
@@ -86,7 +86,7 @@ final class RedirectToolRegistrarTest extends TestCase
             ->willReturn($expectedResult);
 
         $closure = $this->getRegisteredClosure($recordService, $this->createStub(DataHandlerService::class), 'list');
-        $result = json_decode($closure(), true, 512, JSON_THROW_ON_ERROR);
+        $result = JsonResult::of($closure());
 
         self::assertSame(1, $result['total']);
         self::assertSame('*', $result['records'][0]['source_host']);
@@ -242,7 +242,7 @@ final class RedirectToolRegistrarTest extends TestCase
             ->willReturn($record);
 
         $closure = $this->getRegisteredClosure($recordService, $this->createStub(DataHandlerService::class), 'get');
-        $result = json_decode($closure(1), true, 512, JSON_THROW_ON_ERROR);
+        $result = JsonResult::of($closure(1));
 
         self::assertSame(1, $result['uid']);
         self::assertSame('*', $result['source_host']);
@@ -254,9 +254,12 @@ final class RedirectToolRegistrarTest extends TestCase
         $recordService->method('findByUid')->willReturn(null);
 
         $closure = $this->getRegisteredClosure($recordService, $this->createStub(DataHandlerService::class), 'get');
-        $result = json_decode($closure(999), true, 512, JSON_THROW_ON_ERROR);
+        $result = JsonResult::of($closure(999));
 
-        self::assertSame('Redirect record not found', $result['error']);
+        self::assertFalse($result['found']);
+        self::assertSame('sys_redirect', $result['table']);
+        self::assertSame(999, $result['uid']);
+        self::assertSame('Redirect record not found', $result['message']);
     }
 
     public function testGetToolThrowsOnError(): void
@@ -429,10 +432,11 @@ final class RedirectToolRegistrarTest extends TestCase
             $this->createStub(DataHandlerService::class),
             'update',
         );
-        $result = $closure(1, json_encode(['invalid' => 'value'], JSON_THROW_ON_ERROR));
 
-        self::assertInstanceOf(ErrorResult::class, $result);
-        self::assertSame('No valid fields provided', $result->error);
+        $this->expectException(ToolCallException::class);
+        $this->expectExceptionMessage('No valid fields provided');
+
+        $closure(1, json_encode(['invalid' => 'value'], JSON_THROW_ON_ERROR));
     }
 
     public function testUpdateToolThrowsOnError(): void

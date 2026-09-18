@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace MarekSkopal\MsMcpServer\Tests\Unit\Tool\Translation;
 
 use MarekSkopal\MsMcpServer\Service\SiteLanguageService;
+use MarekSkopal\MsMcpServer\Tests\Unit\Support\JsonResult;
 use MarekSkopal\MsMcpServer\Tool\Translation\SiteLanguagesTool;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
@@ -13,7 +14,6 @@ use TYPO3\CMS\Core\Http\Uri;
 use TYPO3\CMS\Core\Site\Entity\Site;
 use TYPO3\CMS\Core\Site\Entity\SiteLanguage;
 use TYPO3\CMS\Core\Site\SiteFinder;
-use const JSON_THROW_ON_ERROR;
 
 #[CoversClass(SiteLanguagesTool::class)]
 final class SiteLanguagesToolTest extends TestCase
@@ -41,7 +41,7 @@ final class SiteLanguagesToolTest extends TestCase
 
         $service = new SiteLanguageService($siteFinder);
         $tool = new SiteLanguagesTool($service);
-        $result = json_decode($tool->execute(1), true, 512, JSON_THROW_ON_ERROR);
+        $result = JsonResult::of($tool->execute(1));
 
         self::assertCount(2, $result);
         self::assertSame(0, $result[0]['languageId']);

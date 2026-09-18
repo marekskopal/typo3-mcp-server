@@ -6,8 +6,8 @@ namespace MarekSkopal\MsMcpServer\Tool\Permission;
 
 use MarekSkopal\MsMcpServer\Service\PermissionService;
 use MarekSkopal\MsMcpServer\Service\RecordService;
-use MarekSkopal\MsMcpServer\Tool\Result\ErrorResult;
 use MarekSkopal\MsMcpServer\Tool\Result\PagePermissionResult;
+use MarekSkopal\MsMcpServer\Tool\Result\RecordNotFoundResult;
 use Mcp\Capability\Attribute\McpTool;
 
 readonly class PermissionCheckPageTool
@@ -21,7 +21,7 @@ readonly class PermissionCheckPageTool
         description: 'Check what the current user can do on a specific page: show, edit, delete, create subpages,'
             . ' and edit content. Use this before page or content operations.',
     )]
-    public function execute(int $pageId): PagePermissionResult|ErrorResult
+    public function execute(int $pageId): PagePermissionResult|RecordNotFoundResult
     {
         $pageRow = $this->recordService->findByUid(
             'pages',
@@ -30,7 +30,7 @@ readonly class PermissionCheckPageTool
         );
 
         if ($pageRow === null) {
-            return new ErrorResult('Page not found', ['pageId' => $pageId]);
+            return new RecordNotFoundResult('pages', $pageId, 'Page not found');
         }
 
         $result = $this->permissionService->checkPageAccess($pageRow);

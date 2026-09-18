@@ -8,7 +8,7 @@ use MarekSkopal\MsMcpServer\Service\PermissionService;
 use MarekSkopal\MsMcpServer\Service\RecordService;
 use MarekSkopal\MsMcpServer\Tool\Helper\RowField;
 use MarekSkopal\MsMcpServer\Tool\Result\BackendGroupDetailResult;
-use MarekSkopal\MsMcpServer\Tool\Result\ErrorResult;
+use MarekSkopal\MsMcpServer\Tool\Result\RecordNotFoundResult;
 use Mcp\Capability\Attribute\McpTool;
 use Mcp\Exception\ToolCallException;
 
@@ -47,7 +47,7 @@ readonly class BackendGroupGetTool
         description: 'Get a single backend user group (be_groups) by uid. Restricted to admin backend users.'
             . ' Returns an error result for soft-deleted or missing groups.',
     )]
-    public function execute(int $uid): BackendGroupDetailResult|ErrorResult
+    public function execute(int $uid): BackendGroupDetailResult|RecordNotFoundResult
     {
         if (!$this->permissionService->isAdmin()) {
             throw new ToolCallException('Admin access required');
@@ -63,7 +63,7 @@ readonly class BackendGroupGetTool
         $row = $this->recordService->findByUid('be_groups', $uid, $fields);
 
         if ($row === null || RowField::asInt($row, 'deleted') === 1) {
-            return new ErrorResult('Backend group not found', ['uid' => $uid]);
+            return new RecordNotFoundResult('be_groups', $uid, 'Backend group not found');
         }
 
         return new BackendGroupDetailResult(

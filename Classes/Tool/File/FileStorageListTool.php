@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace MarekSkopal\MsMcpServer\Tool\File;
 
 use MarekSkopal\MsMcpServer\Service\FileService;
+use MarekSkopal\MsMcpServer\Tool\Result\StorageListResult;
 use Mcp\Capability\Attribute\McpTool;
-use const JSON_THROW_ON_ERROR;
 
 readonly class FileStorageListTool
 {
@@ -23,8 +23,8 @@ readonly class FileStorageListTool
             . ' "/user_upload/examples/", not "/examples/"). Paths outside the mounts are rejected, and mounts'
             . ' flagged readOnly reject writes.',
     )]
-    public function execute(): string
+    public function execute(): StorageListResult
     {
-        return json_encode($this->fileService->listStorages(), JSON_THROW_ON_ERROR);
+        return new StorageListResult($this->fileService->listStorages()['storages']);
     }
 }

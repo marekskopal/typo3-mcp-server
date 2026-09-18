@@ -9,7 +9,6 @@ use MarekSkopal\MsMcpServer\Service\RecordService;
 use MarekSkopal\MsMcpServer\Tool\Helper\MoveTarget;
 use MarekSkopal\MsMcpServer\Tool\Helper\UidListParser;
 use MarekSkopal\MsMcpServer\Tool\Result\BatchRecordsMovedResult;
-use MarekSkopal\MsMcpServer\Tool\Result\ErrorResult;
 use Mcp\Capability\Attribute\McpTool;
 use Mcp\Exception\ToolCallException;
 
@@ -35,12 +34,9 @@ readonly class RecordMoveBatchTool
         int $targetPid = -1,
         int $afterUid = 0,
         bool $dryRun = false,
-    ): BatchRecordsMovedResult|ErrorResult
+    ): BatchRecordsMovedResult
     {
         $target = MoveTarget::resolve($targetPid, $afterUid);
-        if ($target instanceof ErrorResult) {
-            return $target;
-        }
 
         $uidList = UidListParser::parse($uids);
         $existingUids = $this->recordService->findExistingUids($tableName, $uidList);

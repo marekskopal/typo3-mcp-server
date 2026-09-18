@@ -9,7 +9,7 @@ use Doctrine\DBAL\Schema\Table;
 use MarekSkopal\MsMcpServer\Logging\AuditLogger;
 use MarekSkopal\MsMcpServer\Service\DataHandlerService;
 use MarekSkopal\MsMcpServer\Service\RecordService;
-use MarekSkopal\MsMcpServer\Tool\Result\ErrorResult;
+use MarekSkopal\MsMcpServer\Tests\Unit\Support\JsonResult;
 use MarekSkopal\MsMcpServer\Tool\Result\RecordDeletedResult;
 use MarekSkopal\MsMcpServer\Tool\Result\RecordUpdatedResult;
 use MarekSkopal\MsMcpServer\Tool\Scheduler\SchedulerToolRegistrar;
@@ -136,7 +136,7 @@ final class SchedulerToolRegistrarTest extends TestCase
             ->willReturn($expectedResult);
 
         $closure = $this->getRegisteredClosure($recordService, $this->createStub(DataHandlerService::class), 'list');
-        $result = json_decode($closure(), true, 512, JSON_THROW_ON_ERROR);
+        $result = JsonResult::of($closure());
 
         self::assertSame(1, $result['total']);
         self::assertSame('MyTask', $result['records'][0]['tasktype']);
@@ -229,7 +229,7 @@ final class SchedulerToolRegistrarTest extends TestCase
             ->willReturn($record);
 
         $closure = $this->getRegisteredClosure($recordService, $this->createStub(DataHandlerService::class), 'get');
-        $result = json_decode($closure(1), true, 512, JSON_THROW_ON_ERROR);
+        $result = JsonResult::of($closure(1));
 
         self::assertSame(1, $result['uid']);
         self::assertSame('MyTask', $result['tasktype']);
@@ -241,9 +241,12 @@ final class SchedulerToolRegistrarTest extends TestCase
         $recordService->method('findByUid')->willReturn(null);
 
         $closure = $this->getRegisteredClosure($recordService, $this->createStub(DataHandlerService::class), 'get');
-        $result = json_decode($closure(999), true, 512, JSON_THROW_ON_ERROR);
+        $result = JsonResult::of($closure(999));
 
-        self::assertSame('Scheduler task not found', $result['error']);
+        self::assertFalse($result['found']);
+        self::assertSame('tx_scheduler_task', $result['table']);
+        self::assertSame(999, $result['uid']);
+        self::assertSame('Scheduler task not found', $result['message']);
     }
 
     public function testGetToolThrowsOnError(): void
@@ -293,10 +296,11 @@ final class SchedulerToolRegistrarTest extends TestCase
             $this->createStub(DataHandlerService::class),
             'update',
         );
-        $result = $closure(1, json_encode(['tasktype' => 'invalid'], JSON_THROW_ON_ERROR));
 
-        self::assertInstanceOf(ErrorResult::class, $result);
-        self::assertSame('No valid fields provided', $result->error);
+        $this->expectException(ToolCallException::class);
+        $this->expectExceptionMessage('No valid fields provided');
+
+        $closure(1, json_encode(['tasktype' => 'invalid'], JSON_THROW_ON_ERROR));
     }
 
     public function testUpdateToolThrowsOnError(): void

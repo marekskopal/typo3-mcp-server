@@ -8,7 +8,7 @@ use MarekSkopal\MsMcpServer\Service\CacheService;
 use MarekSkopal\MsMcpServer\Service\PermissionService;
 use MarekSkopal\MsMcpServer\Tool\Cache\CacheClearTool;
 use MarekSkopal\MsMcpServer\Tool\Result\CacheClearedResult;
-use MarekSkopal\MsMcpServer\Tool\Result\ErrorResult;
+use Mcp\Exception\ToolCallException;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 
@@ -61,10 +61,11 @@ final class CacheClearToolTest extends TestCase
         $permissionService->method('isAdmin')->willReturn(false);
 
         $tool = new CacheClearTool($cacheService, $permissionService);
-        $result = $tool->execute('all');
 
-        self::assertInstanceOf(ErrorResult::class, $result);
-        self::assertStringContainsString('administrator privileges', $result->error);
+        $this->expectException(ToolCallException::class);
+        $this->expectExceptionMessage('administrator privileges');
+
+        $tool->execute('all');
     }
 
     public function testExecutePageScopeClearsSpecificPage(): void
@@ -84,10 +85,11 @@ final class CacheClearToolTest extends TestCase
         $cacheService = $this->createStub(CacheService::class);
 
         $tool = new CacheClearTool($cacheService, $this->createAdminPermissionService());
-        $result = $tool->execute('page');
 
-        self::assertInstanceOf(ErrorResult::class, $result);
-        self::assertStringContainsString('pageId is required', $result->error);
+        $this->expectException(ToolCallException::class);
+        $this->expectExceptionMessage('pageId is required');
+
+        $tool->execute('page');
     }
 
     public function testExecuteInvalidScopeReturnsError(): void
@@ -95,10 +97,11 @@ final class CacheClearToolTest extends TestCase
         $cacheService = $this->createStub(CacheService::class);
 
         $tool = new CacheClearTool($cacheService, $this->createAdminPermissionService());
-        $result = $tool->execute('invalid');
 
-        self::assertInstanceOf(ErrorResult::class, $result);
-        self::assertStringContainsString('Invalid scope', $result->error);
+        $this->expectException(ToolCallException::class);
+        $this->expectExceptionMessage('Invalid scope');
+
+        $tool->execute('invalid');
     }
 
     public function testExecuteThrowsExceptionOnError(): void

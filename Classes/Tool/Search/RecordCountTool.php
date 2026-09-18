@@ -6,8 +6,9 @@ namespace MarekSkopal\MsMcpServer\Tool\Search;
 
 use MarekSkopal\MsMcpServer\Service\RecordService;
 use MarekSkopal\MsMcpServer\Service\TcaSchemaService;
+use MarekSkopal\MsMcpServer\Tool\Result\RecordCountResult;
 use Mcp\Capability\Attribute\McpTool;
-use const JSON_THROW_ON_ERROR;
+use Mcp\Exception\ToolCallException;
 
 readonly class RecordCountTool
 {
@@ -25,11 +26,11 @@ readonly class RecordCountTool
             . ' an "exact": false in the response means the result set was too large to overlay in full.'
             . ' Many-to-many relation fields cannot be used as search conditions and are rejected with an error.',
     )]
-    public function execute(string $tableName, int $pid = -1, string $search = '',): string
+    public function execute(string $tableName, int $pid = -1, string $search = '',): RecordCountResult
     {
         $readFields = $this->tcaSchemaService->getReadFields($tableName);
         if ($readFields === ['uid', 'pid']) {
-            return json_encode(['error' => 'Table not found or has no readable fields: ' . $tableName], JSON_THROW_ON_ERROR);
+            throw new ToolCallException('Table not found or has no readable fields: ' . $tableName);
         }
 
         $allowedFields = array_merge(['uid', 'pid'], $readFields);
@@ -39,17 +40,6 @@ readonly class RecordCountTool
 
         $count = $this->recordService->count($tableName, $pid >= 0 ? $pid : null, $searchConditions);
 
-        $response = ['table' => $tableName, 'count' => $count['count']];
-        // Only ever false in a non-live workspace on a result set too large to overlay in full,
-        // where the count is a floor. Say so rather than let it read as exact.
-        if (!$count['exact']) {
-            $response['exact'] = false;
-        }
-
-        if ($ignoredFields !== []) {
-            $response['ignoredFields'] = $ignoredFields;
-        }
-
-        return json_encode($response, JSON_THROW_ON_ERROR);
+        return new RecordCountResult($tableName, $count['count'], $count['exact'], $ignoredFields);
     }
 }

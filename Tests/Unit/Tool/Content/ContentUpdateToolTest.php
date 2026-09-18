@@ -7,8 +7,8 @@ namespace MarekSkopal\MsMcpServer\Tests\Unit\Tool\Content;
 use MarekSkopal\MsMcpServer\Service\DataHandlerService;
 use MarekSkopal\MsMcpServer\Service\TcaSchemaService;
 use MarekSkopal\MsMcpServer\Tool\Content\ContentUpdateTool;
-use MarekSkopal\MsMcpServer\Tool\Result\ErrorResult;
 use MarekSkopal\MsMcpServer\Tool\Result\RecordUpdatedResult;
+use Mcp\Exception\ToolCallException;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 use const JSON_THROW_ON_ERROR;
@@ -111,11 +111,11 @@ final class ContentUpdateToolTest extends TestCase
 
         $tool = new ContentUpdateTool($dataHandlerService, new TcaSchemaService());
         $fields = json_encode(['invalid_field' => 'value', 'another_bad' => 'value'], JSON_THROW_ON_ERROR);
-        $result = $tool->execute(10, $fields);
 
-        self::assertInstanceOf(ErrorResult::class, $result);
-        self::assertSame('No valid fields provided', $result->error);
-        self::assertSame(['invalid_field', 'another_bad'], $result->context['ignoredFields']);
+        $this->expectException(ToolCallException::class);
+        $this->expectExceptionMessage('No valid fields provided');
+
+        $tool->execute(10, $fields);
     }
 
     public function testExecuteUpdatesPluginFields(): void

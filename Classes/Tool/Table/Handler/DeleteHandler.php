@@ -7,9 +7,9 @@ namespace MarekSkopal\MsMcpServer\Tool\Table\Handler;
 use MarekSkopal\MsMcpServer\Logging\AuditLogger;
 use MarekSkopal\MsMcpServer\Service\DataHandlerService;
 use MarekSkopal\MsMcpServer\Service\RecordService;
-use MarekSkopal\MsMcpServer\Tool\Result\ErrorResult;
 use MarekSkopal\MsMcpServer\Tool\Result\RecordDeletedResult;
 use MarekSkopal\MsMcpServer\Tool\Table\TableToolConfig;
+use Mcp\Exception\ToolCallException;
 use Psr\Log\LoggerInterface;
 
 /** `<prefix>_delete`. @internal */
@@ -36,16 +36,16 @@ final readonly class DeleteHandler extends AbstractTableToolHandler
             . ' Set dryRun to true to check what would happen without deleting anything.';
     }
 
-    public function __invoke(int $uid, bool $dryRun = false): RecordDeletedResult|ErrorResult
+    public function __invoke(int $uid, bool $dryRun = false): RecordDeletedResult
     {
         return $this->run(
-            function () use ($uid, $dryRun): RecordDeletedResult|ErrorResult {
+            function () use ($uid, $dryRun): RecordDeletedResult {
                 if ($dryRun) {
                     // A preview that skipped this would answer "would delete" for a uid that does
                     // not exist or that this user cannot see. findByUid() applies the same read
                     // permissions, so the preview agrees with what the real call would do.
                     if ($this->recordService->findByUid($this->config->tableName, $uid, ['uid']) === null) {
-                        return new ErrorResult($this->config->subjectSentenceStart() . ' not found: ' . $uid);
+                        throw new ToolCallException($this->config->subjectSentenceStart() . ' not found: ' . $uid);
                     }
 
                     return new RecordDeletedResult($uid, dryRun: true);

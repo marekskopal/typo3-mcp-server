@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace MarekSkopal\MsMcpServer\Tests\Unit\Tool\File;
 
 use MarekSkopal\MsMcpServer\Service\FileService;
+use MarekSkopal\MsMcpServer\Tests\Unit\Support\JsonResult;
 use MarekSkopal\MsMcpServer\Tool\File\FileGetInfoTool;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
-use const JSON_THROW_ON_ERROR;
 
 #[CoversClass(FileGetInfoTool::class)]
 final class FileGetInfoToolTest extends TestCase
@@ -16,6 +16,7 @@ final class FileGetInfoToolTest extends TestCase
     public function testExecuteReturnsFileInfo(): void
     {
         $expectedResult = [
+            'uid' => 7,
             'name' => 'image.png',
             'identifier' => '/images/image.png',
             'size' => 2048,
@@ -32,8 +33,9 @@ final class FileGetInfoToolTest extends TestCase
             ->willReturn($expectedResult);
 
         $tool = new FileGetInfoTool($fileService);
-        $result = json_decode($tool->execute('/images/image.png'), true, 512, JSON_THROW_ON_ERROR);
+        $result = JsonResult::of($tool->execute('/images/image.png'));
 
+        self::assertSame(7, $result['uid']);
         self::assertSame('image.png', $result['name']);
         self::assertSame(2048, $result['size']);
     }

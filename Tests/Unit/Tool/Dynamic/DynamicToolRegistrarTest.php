@@ -9,11 +9,11 @@ use MarekSkopal\MsMcpServer\Repository\DiscoveredTableRepository;
 use MarekSkopal\MsMcpServer\Service\DataHandlerService;
 use MarekSkopal\MsMcpServer\Service\RecordService;
 use MarekSkopal\MsMcpServer\Service\TcaSchemaService;
+use MarekSkopal\MsMcpServer\Tests\Unit\Support\JsonResult;
 use MarekSkopal\MsMcpServer\Tool\Dynamic\DynamicToolRegistrar;
 use MarekSkopal\MsMcpServer\Tool\Result\BatchRecordsDeletedResult;
 use MarekSkopal\MsMcpServer\Tool\Result\BatchRecordsMovedResult;
 use MarekSkopal\MsMcpServer\Tool\Result\BatchRecordsUpdatedResult;
-use MarekSkopal\MsMcpServer\Tool\Result\ErrorResult;
 use MarekSkopal\MsMcpServer\Tool\Result\RecordCreatedResult;
 use MarekSkopal\MsMcpServer\Tool\Result\RecordDeletedResult;
 use MarekSkopal\MsMcpServer\Tool\Result\RecordMovedResult;
@@ -47,7 +47,9 @@ final class DynamicToolRegistrarTest extends TestCase
 
     protected function tearDown(): void
     {
-        unset($GLOBALS['TYPO3_CONF_VARS']['EXTCONF']['ms_mcp_server']['tables']);
+        // Several tests make the table translatable by writing TCA mid-body. Clearing it here rather
+        // than at the end of each body keeps a failing test from leaking that into the next one.
+        unset($GLOBALS['TYPO3_CONF_VARS']['EXTCONF']['ms_mcp_server']['tables'], $GLOBALS['TCA'][self::TABLE]);
     }
 
     public function testRegisterAddsToolsToBuilder(): void
@@ -120,7 +122,6 @@ final class DynamicToolRegistrarTest extends TestCase
         self::assertNotNull($listTool);
         $listTool();
 
-        unset($GLOBALS['TCA'][self::TABLE]);
     }
 
     public function testRegisterSkipsTableWithNoReadFields(): void
@@ -155,7 +156,7 @@ final class DynamicToolRegistrarTest extends TestCase
             ->willReturn($expectedResult);
 
         $closure = $this->getRegisteredClosure($recordService, $this->createStub(DataHandlerService::class),'list');
-        $result = json_decode($closure(10), true, 512, JSON_THROW_ON_ERROR);
+        $result = JsonResult::of($closure(10));
 
         self::assertSame(1, $result['total']);
         self::assertSame('Test', $result['records'][0]['title']);
@@ -186,7 +187,7 @@ final class DynamicToolRegistrarTest extends TestCase
             ->willReturn($record);
 
         $closure = $this->getRegisteredClosure($recordService, $this->createStub(DataHandlerService::class),'get');
-        $result = json_decode($closure(1), true, 512, JSON_THROW_ON_ERROR);
+        $result = JsonResult::of($closure(1));
 
         self::assertSame(1, $result['uid']);
         self::assertSame('Test', $result['title']);
@@ -198,9 +199,12 @@ final class DynamicToolRegistrarTest extends TestCase
         $recordService->method('findByUid')->willReturn(null);
 
         $closure = $this->getRegisteredClosure($recordService, $this->createStub(DataHandlerService::class),'get');
-        $result = json_decode($closure(999), true, 512, JSON_THROW_ON_ERROR);
+        $result = JsonResult::of($closure(999));
 
-        self::assertSame('Item record not found', $result['error']);
+        self::assertFalse($result['found']);
+        self::assertSame('tx_test_domain_model_item', $result['table']);
+        self::assertSame(999, $result['uid']);
+        self::assertSame('Item record not found', $result['message']);
     }
 
     public function testGetToolThrowsToolCallExceptionOnError(): void
@@ -331,11 +335,11 @@ final class DynamicToolRegistrarTest extends TestCase
             $dataHandlerService,
             'create',
         );
-        $result = $closure(10, json_encode(['invalid' => 'value'], JSON_THROW_ON_ERROR));
 
-        self::assertInstanceOf(ErrorResult::class, $result);
-        self::assertSame('No valid fields provided', $result->error);
-        self::assertSame(['invalid'], $result->context['ignoredFields']);
+        $this->expectException(ToolCallException::class);
+        $this->expectExceptionMessage('No valid fields provided');
+
+        $closure(10, json_encode(['invalid' => 'value'], JSON_THROW_ON_ERROR));
     }
 
     public function testCreateToolThrowsToolCallExceptionOnError(): void
@@ -405,11 +409,11 @@ final class DynamicToolRegistrarTest extends TestCase
             $dataHandlerService,
             'update',
         );
-        $result = $closure(1, json_encode(['invalid' => 'value'], JSON_THROW_ON_ERROR));
 
-        self::assertInstanceOf(ErrorResult::class, $result);
-        self::assertSame('No valid fields provided', $result->error);
-        self::assertSame(['invalid'], $result->context['ignoredFields']);
+        $this->expectException(ToolCallException::class);
+        $this->expectExceptionMessage('No valid fields provided');
+
+        $closure(1, json_encode(['invalid' => 'value'], JSON_THROW_ON_ERROR));
     }
 
     public function testUpdateToolThrowsToolCallExceptionOnError(): void
@@ -479,9 +483,10 @@ final class DynamicToolRegistrarTest extends TestCase
             $dataHandlerService,
             'move',
         );
-        $result = $closure(5);
 
-        self::assertInstanceOf(ErrorResult::class, $result);
+        $this->expectException(ToolCallException::class);
+
+        $closure(5);
     }
 
     public function testMoveToolThrowsToolCallExceptionOnError(): void
@@ -594,7 +599,6 @@ final class DynamicToolRegistrarTest extends TestCase
         self::assertNotNull($listTool);
         $listTool(10, 20, 0, 0);
 
-        unset($GLOBALS['TCA'][self::TABLE]);
     }
 
     public function testGetToolIncludesTranslationsForTranslatableTable(): void
@@ -652,11 +656,10 @@ final class DynamicToolRegistrarTest extends TestCase
             }
         }
         self::assertNotNull($getTool);
-        $result = json_decode($getTool(1), true, 512, JSON_THROW_ON_ERROR);
+        $result = JsonResult::of($getTool(1));
 
         self::assertSame([['uid' => 2, 'sys_language_uid' => 1]], $result['translations']);
 
-        unset($GLOBALS['TCA'][self::TABLE]);
     }
 
     public function testRegisterIncludesDiscoveredTables(): void
@@ -939,9 +942,10 @@ final class DynamicToolRegistrarTest extends TestCase
         $dataHandlerService->expects(self::never())->method('moveRecords');
 
         $closure = $this->getRegisteredClosure($recordService, $dataHandlerService, 'move_batch');
-        $result = $closure('10,20');
 
-        self::assertInstanceOf(ErrorResult::class, $result);
+        $this->expectException(ToolCallException::class);
+
+        $closure('10,20');
     }
 
     public function testMoveBatchToolThrowsWhenNoUidsExist(): void

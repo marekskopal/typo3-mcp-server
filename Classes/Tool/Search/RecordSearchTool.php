@@ -6,8 +6,9 @@ namespace MarekSkopal\MsMcpServer\Tool\Search;
 
 use MarekSkopal\MsMcpServer\Service\RecordService;
 use MarekSkopal\MsMcpServer\Service\TcaSchemaService;
+use MarekSkopal\MsMcpServer\Tool\Result\RecordListResult;
 use Mcp\Capability\Attribute\McpTool;
-use const JSON_THROW_ON_ERROR;
+use Mcp\Exception\ToolCallException;
 
 readonly class RecordSearchTool
 {
@@ -40,11 +41,11 @@ readonly class RecordSearchTool
         int $pid = -1,
         string $orderBy = '',
         string $orderDirection = 'ASC',
-    ): string
+    ): RecordListResult
     {
         $readFields = $this->tcaSchemaService->getReadFields($tableName);
         if ($readFields === ['uid', 'pid']) {
-            return json_encode(['error' => 'Table not found or has no readable fields: ' . $tableName], JSON_THROW_ON_ERROR);
+            throw new ToolCallException('Table not found or has no readable fields: ' . $tableName);
         }
 
         // Filter search fields to only allow readable fields and parse conditions
@@ -54,9 +55,9 @@ readonly class RecordSearchTool
         $ignoredFields = $parsed['ignoredFields'];
 
         if ($validSearch === [] && $ignoredFields !== []) {
-            return json_encode(
-                ['error' => 'No valid search fields provided', 'ignoredFields' => $ignoredFields],
-                JSON_THROW_ON_ERROR,
+            throw new ToolCallException(
+                'No valid search fields provided. Not readable on ' . $tableName . ': '
+                    . implode(', ', $ignoredFields) . '. Call table_schema to see the readable fields.',
             );
         }
 
@@ -76,11 +77,6 @@ readonly class RecordSearchTool
             $orderDirection,
         );
 
-        $response = $result;
-        if ($ignoredFields !== []) {
-            $response['ignoredFields'] = $ignoredFields;
-        }
-
-        return json_encode($response, JSON_THROW_ON_ERROR);
+        return RecordListResult::fromQuery($result, $ignoredFields);
     }
 }

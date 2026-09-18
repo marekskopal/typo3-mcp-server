@@ -5,11 +5,11 @@ declare(strict_types=1);
 namespace MarekSkopal\MsMcpServer\Tests\Unit\Tool\File;
 
 use MarekSkopal\MsMcpServer\Service\FileService;
+use MarekSkopal\MsMcpServer\Tests\Unit\Support\JsonResult;
 use MarekSkopal\MsMcpServer\Tool\File\FileUploadTool;
 use Mcp\Exception\ToolCallException;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
-use const JSON_THROW_ON_ERROR;
 
 #[CoversClass(FileUploadTool::class)]
 final class FileUploadToolTest extends TestCase
@@ -31,12 +31,7 @@ final class FileUploadToolTest extends TestCase
             ->willReturn($expectedResult);
 
         $tool = new FileUploadTool($fileService);
-        $result = json_decode(
-            $tool->execute('upload.txt', base64_encode('Hello, World!')),
-            true,
-            512,
-            JSON_THROW_ON_ERROR,
-        );
+        $result = JsonResult::of($tool->execute('upload.txt', base64_encode('Hello, World!')));
 
         self::assertSame(42, $result['uid']);
         self::assertSame('upload.txt', $result['name']);
@@ -60,12 +55,7 @@ final class FileUploadToolTest extends TestCase
             ->willReturn($expectedResult);
 
         $tool = new FileUploadTool($fileService);
-        $result = json_decode(
-            $tool->execute('page.html', content: '<h1>Hello World</h1>'),
-            true,
-            512,
-            JSON_THROW_ON_ERROR,
-        );
+        $result = JsonResult::of($tool->execute('page.html', content: '<h1>Hello World</h1>'));
 
         self::assertSame(43, $result['uid']);
         self::assertSame('page.html', $result['name']);

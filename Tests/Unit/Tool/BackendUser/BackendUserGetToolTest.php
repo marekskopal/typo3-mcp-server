@@ -8,7 +8,7 @@ use MarekSkopal\MsMcpServer\Service\PermissionService;
 use MarekSkopal\MsMcpServer\Service\RecordService;
 use MarekSkopal\MsMcpServer\Tool\BackendUser\BackendUserGetTool;
 use MarekSkopal\MsMcpServer\Tool\Result\BackendUserDetailResult;
-use MarekSkopal\MsMcpServer\Tool\Result\ErrorResult;
+use MarekSkopal\MsMcpServer\Tool\Result\RecordNotFoundResult;
 use Mcp\Exception\ToolCallException;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
@@ -78,11 +78,14 @@ final class BackendUserGetToolTest extends TestCase
         $recordService->method('findByUid')->willReturn(null);
 
         $tool = new BackendUserGetTool($recordService, $permissionService);
+
         $result = $tool->execute(999);
 
-        self::assertInstanceOf(ErrorResult::class, $result);
-        self::assertSame('Backend user not found', $result->error);
-        self::assertSame(['uid' => 999], $result->context);
+        self::assertInstanceOf(RecordNotFoundResult::class, $result);
+        self::assertFalse($result->found);
+        self::assertSame('be_users', $result->table);
+        self::assertSame(999, $result->uid);
+        self::assertSame('Backend user not found', $result->message);
     }
 
     public function testExecuteReturnsErrorForSoftDeletedUser(): void
@@ -98,9 +101,8 @@ final class BackendUserGetToolTest extends TestCase
         ]);
 
         $tool = new BackendUserGetTool($recordService, $permissionService);
-        $result = $tool->execute(5);
 
-        self::assertInstanceOf(ErrorResult::class, $result);
+        self::assertInstanceOf(RecordNotFoundResult::class, $tool->execute(5));
     }
 
     public function testExecuteThrowsForNonAdmin(): void

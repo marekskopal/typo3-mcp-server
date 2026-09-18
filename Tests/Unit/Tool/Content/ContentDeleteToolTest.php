@@ -7,8 +7,8 @@ namespace MarekSkopal\MsMcpServer\Tests\Unit\Tool\Content;
 use MarekSkopal\MsMcpServer\Service\DataHandlerService;
 use MarekSkopal\MsMcpServer\Service\RecordService;
 use MarekSkopal\MsMcpServer\Tool\Content\ContentDeleteTool;
-use MarekSkopal\MsMcpServer\Tool\Result\ErrorResult;
 use MarekSkopal\MsMcpServer\Tool\Result\RecordDeletedResult;
+use Mcp\Exception\ToolCallException;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 
@@ -42,10 +42,11 @@ final class ContentDeleteToolTest extends TestCase
         $dataHandlerService->expects(self::never())->method('deleteRecord');
 
         $tool = new ContentDeleteTool($dataHandlerService, $recordService);
-        $result = $tool->execute(999, dryRun: true);
 
-        self::assertInstanceOf(ErrorResult::class, $result);
-        self::assertStringContainsString('not found or not accessible: 999', $result->error);
+        $this->expectException(ToolCallException::class);
+        $this->expectExceptionMessage('not found or not accessible: 999');
+
+        $tool->execute(999, dryRun: true);
     }
 
     public function testExecuteDeletesContentAndReturnsResult(): void

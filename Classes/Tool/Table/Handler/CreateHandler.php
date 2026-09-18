@@ -6,7 +6,6 @@ namespace MarekSkopal\MsMcpServer\Tool\Table\Handler;
 
 use MarekSkopal\MsMcpServer\Logging\AuditLogger;
 use MarekSkopal\MsMcpServer\Service\DataHandlerService;
-use MarekSkopal\MsMcpServer\Tool\Result\ErrorResult;
 use MarekSkopal\MsMcpServer\Tool\Result\RecordCreatedResult;
 use MarekSkopal\MsMcpServer\Tool\Table\TableToolConfig;
 use Psr\Log\LoggerInterface;
@@ -39,10 +38,10 @@ final readonly class CreateHandler extends AbstractTableToolHandler
             . ' Available fields: ' . $this->config->writableFieldList() . '.' . $this->config->mmFieldHint();
     }
 
-    public function __invoke(int $pid, string $fields): RecordCreatedResult|ErrorResult
+    public function __invoke(int $pid, string $fields): RecordCreatedResult
     {
         return $this->run(
-            fn(): RecordCreatedResult|ErrorResult => RecordCreation::run(
+            fn(): RecordCreatedResult => RecordCreation::run(
                 $this->dataHandlerService,
                 $this->config,
                 $fields,

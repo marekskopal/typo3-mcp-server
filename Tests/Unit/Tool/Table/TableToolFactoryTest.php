@@ -7,7 +7,6 @@ namespace MarekSkopal\MsMcpServer\Tests\Unit\Tool\Table;
 use MarekSkopal\MsMcpServer\Logging\AuditLogger;
 use MarekSkopal\MsMcpServer\Service\DataHandlerService;
 use MarekSkopal\MsMcpServer\Service\RecordService;
-use MarekSkopal\MsMcpServer\Tool\Result\ErrorResult;
 use MarekSkopal\MsMcpServer\Tool\Result\RecordDeletedResult;
 use MarekSkopal\MsMcpServer\Tool\Result\RecordUpdatedResult;
 use MarekSkopal\MsMcpServer\Tool\Table\Handler\CreateHandler;
@@ -69,7 +68,8 @@ final class TableToolFactoryTest extends TestCase
         self::assertSame('', $config->mmFieldHint());
         self::assertSame('', $config->mmReadHint());
         self::assertStringEndsWith('Available fields: title, body.', $this->factory()->update($config)->description());
-        self::assertSame('Get a single Thing record by its uid.', $this->factory()->get($config)->description());
+        self::assertStringEndsWith('not an error.', $this->factory()->get($config)->description());
+        self::assertStringStartsWith('Get a single Thing record by its uid.', $this->factory()->get($config)->description());
     }
 
     /** The scheduler's rows are tasks, and a lowercase label still capitalises for a message. */
@@ -137,7 +137,10 @@ final class TableToolFactoryTest extends TestCase
     {
         $handler = $this->factory()->update($this->config());
 
-        self::assertInstanceOf(ErrorResult::class, $handler(7, '{"nope":1}'));
+        $this->expectException(ToolCallException::class);
+        $this->expectExceptionMessage('No valid fields provided for table "tx_demo_thing"');
+
+        $handler(7, '{"nope":1}');
     }
 
     /** Validation runs inside the audit wrapper, so a bad payload is still logged as a failure. */
@@ -199,10 +202,10 @@ final class TableToolFactoryTest extends TestCase
         $recordService = $this->createStub(RecordService::class);
         $recordService->method('findByUid')->willReturn(null);
 
-        $result = $this->factory(recordService: $recordService)->delete($this->config())(999, dryRun: true);
+        $this->expectException(ToolCallException::class);
+        $this->expectExceptionMessage('Thing record not found: 999');
 
-        self::assertInstanceOf(ErrorResult::class, $result);
-        self::assertSame('Thing record not found: 999', $result->error);
+        $this->factory(recordService: $recordService)->delete($this->config())(999, dryRun: true);
     }
 
     /** @return list<string> */

@@ -6,11 +6,11 @@ namespace MarekSkopal\MsMcpServer\Tests\Unit\Tool\Search;
 
 use MarekSkopal\MsMcpServer\Service\RecordService;
 use MarekSkopal\MsMcpServer\Service\TcaSchemaService;
+use MarekSkopal\MsMcpServer\Tests\Unit\Support\JsonResult;
 use MarekSkopal\MsMcpServer\Tool\Search\RecordCountTool;
 use Mcp\Exception\ToolCallException;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
-use const JSON_THROW_ON_ERROR;
 
 #[CoversClass(RecordCountTool::class)]
 final class RecordCountToolTest extends TestCase
@@ -40,7 +40,7 @@ final class RecordCountToolTest extends TestCase
             ->willReturn(['count' => 42, 'exact' => true]);
 
         $tool = new RecordCountTool($recordService, new TcaSchemaService());
-        $result = json_decode($tool->execute('pages'), true, 512, JSON_THROW_ON_ERROR);
+        $result = JsonResult::of($tool->execute('pages'));
 
         self::assertSame('pages', $result['table']);
         self::assertSame(42, $result['count']);
@@ -55,7 +55,7 @@ final class RecordCountToolTest extends TestCase
             ->willReturn(['count' => 10, 'exact' => true]);
 
         $tool = new RecordCountTool($recordService, new TcaSchemaService());
-        $result = json_decode($tool->execute('pages', 5), true, 512, JSON_THROW_ON_ERROR);
+        $result = JsonResult::of($tool->execute('pages', 5));
 
         self::assertSame(10, $result['count']);
     }
@@ -69,7 +69,7 @@ final class RecordCountToolTest extends TestCase
             ->willReturn(['count' => 3, 'exact' => true]);
 
         $tool = new RecordCountTool($recordService, new TcaSchemaService());
-        $result = json_decode($tool->execute('pages', -1, '{"title":"News"}'), true, 512, JSON_THROW_ON_ERROR);
+        $result = JsonResult::of($tool->execute('pages', -1, '{"title":"News"}'));
 
         self::assertSame(3, $result['count']);
     }
@@ -83,7 +83,7 @@ final class RecordCountToolTest extends TestCase
             ->willReturn(['count' => 7, 'exact' => true]);
 
         $tool = new RecordCountTool($recordService, new TcaSchemaService());
-        $result = json_decode($tool->execute('pages', 10, '{"hidden":{"op":"eq","value":"0"}}'), true, 512, JSON_THROW_ON_ERROR);
+        $result = JsonResult::of($tool->execute('pages', 10, '{"hidden":{"op":"eq","value":"0"}}'));
 
         self::assertSame(7, $result['count']);
     }
@@ -93,10 +93,10 @@ final class RecordCountToolTest extends TestCase
         $recordService = $this->createStub(RecordService::class);
 
         $tool = new RecordCountTool($recordService, new TcaSchemaService());
-        $result = json_decode($tool->execute('unknown_table'), true, 512, JSON_THROW_ON_ERROR);
+        $this->expectException(ToolCallException::class);
+        $this->expectExceptionMessage('unknown_table');
 
-        self::assertArrayHasKey('error', $result);
-        self::assertStringContainsString('unknown_table', $result['error']);
+        $tool->execute('unknown_table');
     }
 
     public function testExecuteReportsInvalidJson(): void
@@ -117,12 +117,7 @@ final class RecordCountToolTest extends TestCase
         $recordService->method('count')->willReturn(['count' => 0, 'exact' => true]);
 
         $tool = new RecordCountTool($recordService, new TcaSchemaService());
-        $result = json_decode(
-            $tool->execute('pages', -1, '{"title":"Test","nonexistent":"value"}'),
-            true,
-            512,
-            JSON_THROW_ON_ERROR,
-        );
+        $result = JsonResult::of($tool->execute('pages', -1, '{"title":"Test","nonexistent":"value"}'));
 
         self::assertSame(0, $result['count']);
         self::assertSame(['nonexistent'], $result['ignoredFields']);
@@ -137,7 +132,7 @@ final class RecordCountToolTest extends TestCase
             ->willReturn(['count' => 100, 'exact' => true]);
 
         $tool = new RecordCountTool($recordService, new TcaSchemaService());
-        $result = json_decode($tool->execute('pages', -1, ''), true, 512, JSON_THROW_ON_ERROR);
+        $result = JsonResult::of($tool->execute('pages', -1, ''));
 
         self::assertSame(100, $result['count']);
     }
@@ -151,7 +146,7 @@ final class RecordCountToolTest extends TestCase
             ->willReturn(['count' => 2, 'exact' => true]);
 
         $tool = new RecordCountTool($recordService, new TcaSchemaService());
-        $result = json_decode($tool->execute('pages', -1, 'Brio'), true, 512, JSON_THROW_ON_ERROR);
+        $result = JsonResult::of($tool->execute('pages', -1, 'Brio'));
 
         self::assertSame(2, $result['count']);
     }

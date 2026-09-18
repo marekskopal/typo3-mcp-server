@@ -8,7 +8,6 @@ use MarekSkopal\MsMcpServer\Service\DataHandlerService;
 use MarekSkopal\MsMcpServer\Service\RecordService;
 use MarekSkopal\MsMcpServer\Tool\Batch\RecordMoveBatchTool;
 use MarekSkopal\MsMcpServer\Tool\Result\BatchRecordsMovedResult;
-use MarekSkopal\MsMcpServer\Tool\Result\ErrorResult;
 use Mcp\Exception\ToolCallException;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
@@ -77,9 +76,10 @@ final class RecordMoveBatchToolTest extends TestCase
         $dataHandlerService->expects(self::never())->method('moveRecords');
 
         $tool = new RecordMoveBatchTool($dataHandlerService, $recordService);
-        $result = $tool->execute('tt_content', '10,20');
 
-        self::assertInstanceOf(ErrorResult::class, $result);
+        $this->expectException(ToolCallException::class);
+
+        $tool->execute('tt_content', '10,20');
     }
 
     public function testExecuteReturnsErrorWhenBothTargetsGiven(): void
@@ -89,10 +89,11 @@ final class RecordMoveBatchToolTest extends TestCase
         $dataHandlerService->expects(self::never())->method('moveRecords');
 
         $tool = new RecordMoveBatchTool($dataHandlerService, $recordService);
-        $result = $tool->execute('tt_content', '10,20', targetPid: 5, afterUid: 42);
 
-        self::assertInstanceOf(ErrorResult::class, $result);
-        self::assertStringContainsString('not both', $result->error);
+        $this->expectException(ToolCallException::class);
+        $this->expectExceptionMessage('not both');
+
+        $tool->execute('tt_content', '10,20', targetPid: 5, afterUid: 42);
     }
 
     public function testExecuteThrowsOnDataHandlerError(): void

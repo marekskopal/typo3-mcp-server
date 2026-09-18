@@ -7,9 +7,9 @@ namespace MarekSkopal\MsMcpServer\Tests\Unit\Tool\Translation;
 use MarekSkopal\MsMcpServer\Service\DataHandlerService;
 use MarekSkopal\MsMcpServer\Service\RecordService;
 use MarekSkopal\MsMcpServer\Service\TcaSchemaService;
-use MarekSkopal\MsMcpServer\Tool\Result\ErrorResult;
 use MarekSkopal\MsMcpServer\Tool\Result\RecordTranslatedResult;
 use MarekSkopal\MsMcpServer\Tool\Translation\RecordTranslateTool;
+use Mcp\Exception\ToolCallException;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 
@@ -61,10 +61,11 @@ final class RecordTranslateToolTest extends TestCase
         $recordService = $this->createStub(RecordService::class);
 
         $tool = new RecordTranslateTool($dataHandlerService, $recordService, new TcaSchemaService());
-        $result = $tool->execute('sys_file', 1, 1);
 
-        self::assertInstanceOf(ErrorResult::class, $result);
-        self::assertStringContainsString('not language-aware', $result->error);
+        $this->expectException(ToolCallException::class);
+        $this->expectExceptionMessage('not language-aware');
+
+        $tool->execute('sys_file', 1, 1);
     }
 
     public function testExecuteReturnsErrorForRecordNotFound(): void
@@ -78,10 +79,11 @@ final class RecordTranslateToolTest extends TestCase
         $dataHandlerService->expects(self::never())->method('localizeRecord');
 
         $tool = new RecordTranslateTool($dataHandlerService, $recordService, new TcaSchemaService());
-        $result = $tool->execute('pages', 999, 1);
 
-        self::assertInstanceOf(ErrorResult::class, $result);
-        self::assertStringContainsString('Record not found', $result->error);
+        $this->expectException(ToolCallException::class);
+        $this->expectExceptionMessage('Record not found');
+
+        $tool->execute('pages', 999, 1);
     }
 
     public function testExecuteReturnsErrorForAllLanguagesRecord(): void
@@ -95,10 +97,11 @@ final class RecordTranslateToolTest extends TestCase
         $dataHandlerService->expects(self::never())->method('localizeRecord');
 
         $tool = new RecordTranslateTool($dataHandlerService, $recordService, new TcaSchemaService());
-        $result = $tool->execute('pages', 1, 1);
 
-        self::assertInstanceOf(ErrorResult::class, $result);
-        self::assertStringContainsString('sys_language_uid = -1', $result->error);
+        $this->expectException(ToolCallException::class);
+        $this->expectExceptionMessage('sys_language_uid = -1');
+
+        $tool->execute('pages', 1, 1);
     }
 
     public function testExecuteReturnsErrorForAlreadyTranslatedRecord(): void
@@ -112,10 +115,11 @@ final class RecordTranslateToolTest extends TestCase
         $dataHandlerService->expects(self::never())->method('localizeRecord');
 
         $tool = new RecordTranslateTool($dataHandlerService, $recordService, new TcaSchemaService());
-        $result = $tool->execute('pages', 5, 1);
 
-        self::assertInstanceOf(ErrorResult::class, $result);
-        self::assertStringContainsString('already a translation', $result->error);
+        $this->expectException(ToolCallException::class);
+        $this->expectExceptionMessage('already a translation');
+
+        $tool->execute('pages', 5, 1);
     }
 
     public function testExecuteThrowsExceptionOnDataHandlerError(): void

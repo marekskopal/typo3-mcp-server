@@ -6,9 +6,9 @@ namespace MarekSkopal\MsMcpServer\Tool\Table\Handler;
 
 use MarekSkopal\MsMcpServer\Logging\AuditLogger;
 use MarekSkopal\MsMcpServer\Service\RecordService;
+use MarekSkopal\MsMcpServer\Tool\Result\RecordListResult;
 use MarekSkopal\MsMcpServer\Tool\Table\TableToolConfig;
 use Psr\Log\LoggerInterface;
-use const JSON_THROW_ON_ERROR;
 
 /**
  * `<prefix>_list` for a translatable table: adds the sysLanguageUid filter and always returns the
@@ -39,10 +39,16 @@ final readonly class TranslatableListHandler extends AbstractTableToolHandler
             . ' Use selectFields (comma-separated) to choose which fields to return.' . $this->config->mmReadHint();
     }
 
-    public function __invoke(int $pid = 0, int $limit = 20, int $offset = 0, int $sysLanguageUid = -1, string $selectFields = '',): string
+    public function __invoke(
+        int $pid = 0,
+        int $limit = 20,
+        int $offset = 0,
+        int $sysLanguageUid = -1,
+        string $selectFields = '',
+    ): RecordListResult
     {
         return $this->run(
-            function () use ($pid, $limit, $offset, $sysLanguageUid, $selectFields): string {
+            function () use ($pid, $limit, $offset, $sysLanguageUid, $selectFields): RecordListResult {
                 $languageField = $this->config->languageField;
                 $fields = SelectedFields::resolve($selectFields, $this->config);
 
@@ -60,7 +66,7 @@ final readonly class TranslatableListHandler extends AbstractTableToolHandler
                     $sysLanguageUid >= 0 ? $languageField : null,
                 );
 
-                return json_encode($result, JSON_THROW_ON_ERROR);
+                return RecordListResult::fromQuery($result);
             },
             [$pid, $limit, $offset, $sysLanguageUid, $selectFields],
         );

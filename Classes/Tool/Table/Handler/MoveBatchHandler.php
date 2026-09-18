@@ -10,7 +10,6 @@ use MarekSkopal\MsMcpServer\Service\RecordService;
 use MarekSkopal\MsMcpServer\Tool\Helper\MoveTarget;
 use MarekSkopal\MsMcpServer\Tool\Helper\UidListParser;
 use MarekSkopal\MsMcpServer\Tool\Result\BatchRecordsMovedResult;
-use MarekSkopal\MsMcpServer\Tool\Result\ErrorResult;
 use MarekSkopal\MsMcpServer\Tool\Table\TableToolConfig;
 use Mcp\Exception\ToolCallException;
 use Psr\Log\LoggerInterface;
@@ -44,19 +43,11 @@ final readonly class MoveBatchHandler extends AbstractTableToolHandler
             . ' affected and nothing is written.';
     }
 
-    public function __invoke(
-        string $uids,
-        int $targetPid = -1,
-        int $afterUid = 0,
-        bool $dryRun = false,
-    ): BatchRecordsMovedResult|ErrorResult
+    public function __invoke(string $uids, int $targetPid = -1, int $afterUid = 0, bool $dryRun = false,): BatchRecordsMovedResult
     {
         return $this->run(
-            function () use ($uids, $targetPid, $afterUid, $dryRun): BatchRecordsMovedResult|ErrorResult {
+            function () use ($uids, $targetPid, $afterUid, $dryRun): BatchRecordsMovedResult {
                 $target = MoveTarget::resolve($targetPid, $afterUid);
-                if ($target instanceof ErrorResult) {
-                    return $target;
-                }
 
                 $uidList = UidListParser::parse($uids);
                 $existingUids = $this->recordService->findExistingUids($this->config->tableName, $uidList);

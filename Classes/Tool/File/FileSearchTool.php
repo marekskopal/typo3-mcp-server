@@ -5,8 +5,9 @@ declare(strict_types=1);
 namespace MarekSkopal\MsMcpServer\Tool\File;
 
 use MarekSkopal\MsMcpServer\Service\FileService;
+use MarekSkopal\MsMcpServer\Tool\Result\FileSearchResult;
 use Mcp\Capability\Attribute\McpTool;
-use const JSON_THROW_ON_ERROR;
+use Mcp\Exception\ToolCallException;
 
 readonly class FileSearchTool
 {
@@ -27,16 +28,13 @@ readonly class FileSearchTool
         int $storageUid = 1,
         int $limit = 20,
         int $offset = 0,
-    ): string {
+    ): FileSearchResult {
         if ($namePattern === '' && $extension === '') {
-            return json_encode(
-                ['error' => 'At least one of namePattern or extension must be provided'],
-                JSON_THROW_ON_ERROR,
-            );
+            throw new ToolCallException('At least one of namePattern or extension must be provided');
         }
 
         $result = $this->fileService->searchFiles($storageUid, $namePattern, $extension, $limit, $offset);
 
-        return json_encode($result, JSON_THROW_ON_ERROR);
+        return new FileSearchResult($result['files'], $result['total']);
     }
 }

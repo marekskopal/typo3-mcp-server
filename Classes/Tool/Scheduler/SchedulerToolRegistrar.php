@@ -7,13 +7,13 @@ namespace MarekSkopal\MsMcpServer\Tool\Scheduler;
 use MarekSkopal\MsMcpServer\Logging\AuditLogger;
 use MarekSkopal\MsMcpServer\Service\RecordService;
 use MarekSkopal\MsMcpServer\Tool\Helper\RegistrarToolRunner;
+use MarekSkopal\MsMcpServer\Tool\Result\RecordListResult;
 use MarekSkopal\MsMcpServer\Tool\Table\TableToolConfig;
 use MarekSkopal\MsMcpServer\Tool\Table\TableToolFactory;
 use Mcp\Server\Builder;
 use Psr\Log\LoggerInterface;
 use TYPO3\CMS\Core\Database\ConnectionPool;
 use TYPO3\CMS\Core\Utility\ExtensionManagementUtility;
-use const JSON_THROW_ON_ERROR;
 
 readonly class SchedulerToolRegistrar
 {
@@ -140,7 +140,7 @@ readonly class SchedulerToolRegistrar
                 $hasTasktype,
                 $hasTaskGroup,
                 $hasDisable,
-            ): string {
+            ): RecordListResult {
                 return RegistrarToolRunner::run('scheduler_list', $auditLogger, $logger, static function () use (
                     $recordService,
                     $fields,
@@ -152,7 +152,7 @@ readonly class SchedulerToolRegistrar
                     $tasktype,
                     $taskGroup,
                     $disable,
-                ): string {
+                ): RecordListResult {
                     /** @var array<string, array{operator: string, value: string}> $conditions */
                     $conditions = [];
 
@@ -177,7 +177,7 @@ readonly class SchedulerToolRegistrar
                         'ASC',
                     );
 
-                    return json_encode($result, JSON_THROW_ON_ERROR);
+                    return RecordListResult::fromQuery($result);
                 }, arguments: [$limit, $offset, $tasktype, $taskGroup, $disable], tableName: self::TABLE);
             },
             name: 'scheduler_list',
