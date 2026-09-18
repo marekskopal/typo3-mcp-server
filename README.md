@@ -342,6 +342,8 @@ Configurable via **Settings > Extension Configuration > ms_mcp_server**:
 
 Every tool, resource and prompt invocation can be written to `sys_log` with the user, timing, arguments (redacted to size-capped scalars) and the affected table/record.
 
+**What is recorded from the arguments.** Scalars — uid, pid, table name, a plain-text search term — are kept, capped at 100 characters each. An argument holding a **JSON object**, which is how every write tool takes its `fields` payload and the search tools take `search`, is reduced to its field *names* (`{header, bodytext, hidden}`): the trail answers which fields were touched without copying record content, and potentially personal data, into a table every administrator can read. Arrays and objects passed directly are omitted entirely.
+
 | Setting | Default | Description |
 |---------|---------|-------------|
 | `auditLogLevel` | `mutations` | How much reaches `sys_log` — see below |

@@ -21,6 +21,9 @@ readonly class AuditLogger
 
     private const int MAX_ARGUMENT_LENGTH = 100;
 
+    /** Cap on how many field names are listed for a JSON-object argument. */
+    private const int MAX_LOGGED_ARGUMENT_KEYS = 20;
+
     private AuditLogLevel $level;
 
     public function __construct(
@@ -159,8 +162,14 @@ readonly class AuditLogger
 
     /**
      * Reduce raw positional arguments to a size-capped, scalar-only list for the audit trail.
-     * Scalars (uid, pid, table name, …) identify the affected target; arrays/objects — which carry
-     * record field payloads — are deliberately omitted so free-text content never lands in the log.
+     *
+     * Scalars (uid, pid, table name, …) identify the affected target; arrays and objects are
+     * omitted. A **string holding a JSON object** is reduced to its key names: nearly every write
+     * tool takes its payload as a `fields` string and the search tools take `search` the same way,
+     * so keeping the raw value copied record content — a bodytext, an e-mail address — into
+     * `sys_log`, a table every administrator can read and that installations routinely ship to an
+     * external log collector. Field *names* are configuration rather than content and are what
+     * makes the trail answer "which fields were changed", so those stay.
      *
      * @param list<mixed> $arguments
      * @return list<string|int|float|bool>
@@ -176,11 +185,63 @@ readonly class AuditLogger
             if (is_int($argument) || is_float($argument) || is_bool($argument)) {
                 $redacted[] = $argument;
             } elseif (is_string($argument)) {
-                $redacted[] = mb_substr($argument, 0, self::MAX_ARGUMENT_LENGTH);
+                $redacted[] = $this->redactString($argument);
             }
         }
 
         return $redacted;
+    }
+
+    /** A JSON object becomes the list of its top-level keys; anything else is the plain value, capped. */
+    private function redactString(string $value): string
+    {
+        $keys = $this->jsonObjectKeys($value);
+        if ($keys === null) {
+            return mb_substr($value, 0, self::MAX_ARGUMENT_LENGTH);
+        }
+
+        return mb_substr('{' . implode(', ', $keys) . '}', 0, self::MAX_ARGUMENT_LENGTH);
+    }
+
+    /**
+     * Top-level key names of a JSON object, or null when the string does not hold one — a JSON
+     * list (`"[1,2]"`, a uid list) carries no field content and is kept as it is.
+     *
+     * @return list<string>|null
+     */
+    private function jsonObjectKeys(string $value): ?array
+    {
+        $trimmed = trim($value);
+        if (!str_starts_with($trimmed, '{')) {
+            return null;
+        }
+
+        try {
+            /** @var mixed $decoded */
+            $decoded = json_decode($trimmed, true, 64, JSON_THROW_ON_ERROR);
+        } catch (\JsonException) {
+            // Malformed payload: the tool rejected it too, so record the (capped) literal, which is
+            // what makes such a failure diagnosable from the trail.
+            return null;
+        }
+
+        if (!is_array($decoded)) {
+            return null;
+        }
+
+        $keys = [];
+        foreach (array_keys($decoded) as $key) {
+            if (count($keys) >= self::MAX_LOGGED_ARGUMENT_KEYS) {
+                $keys[] = '…';
+                break;
+            }
+
+            // Field names reach this from client JSON, so strip control characters for the same
+            // reason the error message above does.
+            $keys[] = (string) preg_replace('/[\x00-\x1F\x7F]/', '', (string) $key);
+        }
+
+        return $keys;
     }
 
     private function resolveRemoteAddress(): string
