@@ -24,6 +24,8 @@ final class MutationClassifierTest extends TestCase
             'RecordCountTool', 'RecordSearchTool', 'TableSchemaTool',
             'PermissionCheckPageTool', 'PermissionCheckSummaryTool', 'PermissionCheckTableTool',
             'SiteLanguagesTool',
+            'TypoScriptActiveTool',
+            'TypoScriptRootlineTool',
         ] as $handler) {
             yield $handler => [$handler];
         }

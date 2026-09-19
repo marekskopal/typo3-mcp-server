@@ -551,6 +551,8 @@ Tools for inspecting the authenticated backend user's effective permissions.
 | `permission_check_page` | Check what the current user can do on a page: show, edit, delete, create subpages, edit content. |
 | `permission_check_summary` | Summary of the current user's permissions: admin status, allowed tables for read/write, languages, file permissions, web/file mounts. |
 
+**Admin-only tables.** A table TCA marks `ctrl.adminOnly` (`sys_template` among them) is withheld from a non-admin on every read path — `record_search`, `record_count`, `table_schema`, the schema resources and the dedicated tools alike — regardless of their `tables_select` grant. This matches core, which hides such a table from the list module and refuses a non-admin's write in DataHandler.
+
 **Exclude fields.** A column TCA marks `exclude` (`pages.TSconfig`, `tt_content.pi_flexform`, most `starttime` / `endtime` / `fe_group`, usually `hidden`) is returned and accepted only for a user who holds the matching `non_exclude_fields` grant — the same rule that decides whether the backend's list module renders the column. Administrators hold every grant, so nothing is hidden from them. A field withheld this way is reported in `ignoredFields` when a write names it, and never appears in `table_schema`.
 
 ### Redirects
@@ -575,6 +577,43 @@ Registered only when `typo3/cms-scheduler` is installed. Operates on the `tx_sch
 | `scheduler_get` | Get a single scheduler task by uid. |
 | `scheduler_update` | Update a task. Writable fields: `disable`, `description`, `task_group`. |
 | `scheduler_delete` | Delete a scheduler task by uid. |
+
+### TypoScript
+
+Operates on the `sys_template` table plus a read-only view of the compiled result. `sys_template` is
+marked `adminOnly` in TCA, so these tools — like the backend's own list module — answer only for an
+administrator; a non-admin is refused whatever their `tables_select` grant says.
+
+| Tool | Description |
+|------|-------------|
+| `typoscript_list` | List TypoScript template records with pagination; filter by `title` (LIKE), `root`, `hidden` and `pid`. The `constants` / `config` source is not included. |
+| `typoscript_get` | Get a single template record by uid, including the full `constants` and `config` source. |
+| `typoscript_create` | Create a template. Required: `pid`, `title`; optional `root`, `clear`, `constants`, `config` and extra `fields` JSON. |
+| `typoscript_update` | Update a template. Pass fields as a JSON object — `constants` and `config` are ordinary writable fields. |
+| `typoscript_delete` | Delete a template by uid. |
+| `typoscript_rootline` | Which TypoScript sources apply to a page and in what order: the rootline, the site and its sets, and every applying `sys_template` record with its `root` / `clear` flags, `basedOn` chain and static includes. |
+| `typoscript_active` | The effective, compiled TypoScript for a page as a flat map of dotted paths. |
+
+**`clear` is a bitmask** deciding what inherited TypoScript a template discards: `0` nothing, `1`
+constants, `2` setup, `3` both. `basedOn` is a comma-separated list of `sys_template` uids and
+`include_static_file` a comma-separated list of `EXT:<key>/<path>` identifiers; neither is an MM
+relation, so both are read and written as the plain strings TYPO3 stores.
+
+**`typoscript_active`** is the equivalent of the backend's *Active TypoScript* view: constants are
+already substituted and conditions resolved, so it is what the frontend would actually use.
+
+```json
+{ "pageId": 12, "path": "lib.contentElement", "setup": {
+  "lib.contentElement": "FLUIDTEMPLATE",
+  "lib.contentElement.templateName": "Default"
+} }
+```
+
+Pass `type` as `setup` (the default), `constants` or `both`, and `path` to return one object path and
+its children. Output is capped at 2000 entries per section; when the result comes back with
+`"truncated": true`, narrow it with `path`. Note that since TYPO3 v13.1 a site and its sets provide
+TypoScript before any `sys_template` record does, which `typoscript_rootline` reports. Conditions are
+evaluated without an HTTP request, so a condition reading the request takes its default branch.
 
 ### Workspaces
 

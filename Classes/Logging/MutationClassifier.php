@@ -38,6 +38,8 @@ final class MutationClassifier
         'PermissionCheckSummaryTool',
         'PermissionCheckTableTool',
         'SiteLanguagesTool',
+        'TypoScriptActiveTool',
+        'TypoScriptRootlineTool',
     ];
 
     /** Tool-name suffixes of read-only registrar tools (`item_list`, `redirect_get`, …). */

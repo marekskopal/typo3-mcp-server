@@ -38,6 +38,7 @@ use MarekSkopal\MsMcpServer\Tool\Content\ContentUpdateTool;
 use MarekSkopal\MsMcpServer\Repository\DiscoveredTableRepository;
 use MarekSkopal\MsMcpServer\Tool\Dynamic\DynamicToolRegistrar;
 use MarekSkopal\MsMcpServer\Tool\Table\TableToolFactory;
+use MarekSkopal\MsMcpServer\Tool\TypoScript\TypoScriptToolRegistrar;
 use MarekSkopal\MsMcpServer\Tool\Redirect\RedirectToolRegistrar;
 use MarekSkopal\MsMcpServer\Tool\Scheduler\SchedulerToolRegistrar;
 use MarekSkopal\MsMcpServer\Tool\Workspace\WorkspaceToolRegistrar;
@@ -213,6 +214,8 @@ final class McpServerFactoryTest extends TestCase
             $auditLogger,
         );
 
+        $typoScriptToolRegistrar = new TypoScriptToolRegistrar($recordService, $dataHandlerService, $logger, $auditLogger, $tableToolFactory);
+
         $sessionRepository = $this->createStub(McpSessionRepository::class);
         $extensionConfiguration = $this->createStub(ExtensionConfiguration::class);
         $extensionConfiguration->method('get')->willReturn(['sessionLifetime' => 86400]);
@@ -222,6 +225,7 @@ final class McpServerFactoryTest extends TestCase
             $dynamicToolRegistrar,
             $redirectToolRegistrar,
             $schedulerToolRegistrar,
+            $typoScriptToolRegistrar,
             $workspaceToolRegistrar,
             $logger,
             $auditLogger,
@@ -244,7 +248,7 @@ final class McpServerFactoryTest extends TestCase
     {
         $toolDir = __DIR__ . '/../../../Classes/Tool';
         $excludedDirs = ['Result', 'Dynamic', 'Redirect', 'Scheduler', 'Workspace', 'Helper', 'Table'];
-        $excludedFiles = ['SearchConditionParser.php', 'SearchParamResolver.php'];
+        $excludedFiles = ['SearchConditionParser.php', 'SearchParamResolver.php', 'TypoScriptToolRegistrar.php'];
 
         $iterator = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($toolDir));
         $missing = [];

@@ -7,7 +7,7 @@ namespace MarekSkopal\MsMcpServer\Tool\Redirect;
 use MarekSkopal\MsMcpServer\Logging\AuditLogger;
 use MarekSkopal\MsMcpServer\Service\DataHandlerService;
 use MarekSkopal\MsMcpServer\Service\RecordService;
-use MarekSkopal\MsMcpServer\Tool\Helper\JsonObjectParser;
+use MarekSkopal\MsMcpServer\Tool\Helper\ExplicitFields;
 use MarekSkopal\MsMcpServer\Tool\Helper\RegistrarToolRunner;
 use MarekSkopal\MsMcpServer\Tool\Result\RecordCreatedResult;
 use MarekSkopal\MsMcpServer\Tool\Result\RecordListResult;
@@ -206,28 +206,14 @@ readonly class RedirectToolRegistrar
                     $targetStatuscode,
                     $fields,
                 ): RecordCreatedResult {
-                    $required = [
+                    [$data, $ignoredFields] = ExplicitFields::merge([
                         'source_host' => $sourceHost,
                         'source_path' => $sourcePath,
                         'target' => $target,
                         'target_statuscode' => $targetStatuscode,
-                    ];
+                    ], $fields, self::WRITABLE_FIELDS);
 
-                    if ($fields !== '') {
-                        $extra = JsonObjectParser::parse($fields, 'fields');
-                        // Explicit params take precedence over fields JSON
-                        $merged = array_merge($extra, $required);
-                    } else {
-                        $merged = $required;
-                    }
-
-                    $filteredData = array_intersect_key($merged, array_flip(self::WRITABLE_FIELDS));
-                    $ignoredFields = array_map(
-                        'strval',
-                        array_values(array_diff(array_keys($merged), array_keys($filteredData))),
-                    );
-
-                    $uid = $dataHandlerService->createRecord(self::TABLE, $pid, $filteredData);
+                    $uid = $dataHandlerService->createRecord(self::TABLE, $pid, $data);
 
                     return new RecordCreatedResult($uid, $ignoredFields);
                 }, arguments: [$sourceHost, $sourcePath, $target, $pid, $targetStatuscode, $fields], tableName: self::TABLE);

@@ -25,9 +25,11 @@ readonly class PermissionService
     {
         $backendUser = $this->getBackendUser();
 
+        // Through canSelectTable(), so the tool that predicts the read path applies the same
+        // adminOnly rule the read path does. Writes need no such step: DataHandler enforces it.
         return [
             'table' => $table,
-            'canSelect' => $backendUser->check('tables_select', $table),
+            'canSelect' => $this->canSelectTable($table),
             'canModify' => $backendUser->check('tables_modify', $table),
         ];
     }
@@ -69,7 +71,9 @@ readonly class PermissionService
 
         return [
             'isAdmin' => $backendUser->isAdmin(),
-            'tablesSelect' => $this->parseCommaSeparatedList($this->getGroupDataString($groupData, 'tables_select')),
+            'tablesSelect' => $this->withoutAdminOnlyTables(
+                $this->parseCommaSeparatedList($this->getGroupDataString($groupData, 'tables_select')),
+            ),
             'tablesModify' => $this->parseCommaSeparatedList($this->getGroupDataString($groupData, 'tables_modify')),
             'allowedLanguages' => $this->parseIntList($this->getGroupDataString($groupData, 'allowed_languages')),
             'filePermissions' => $filePermissions,
@@ -85,11 +89,56 @@ readonly class PermissionService
 
     /**
      * Whether the current backend user may read records of the given table.
-     * Admins always pass; for everyone else this honours the `tables_select` grant.
+     * Admins always pass; for everyone else this honours the `tables_select` grant and TCA's
+     * `ctrl.adminOnly`.
      */
     public function canSelectTable(string $table): bool
     {
-        return $this->getBackendUser()->check('tables_select', $table);
+        $backendUser = $this->getBackendUser();
+
+        // `tables_select` alone is not the whole rule: a table marked `ctrl.adminOnly` (sys_template
+        // among them) is withheld from non-admins whatever their grant says. DataHandler already
+        // applies this to writes (checkModifyAccessList()), and core's list module hides such a
+        // table from the non-admin's column selection, so the read path has to agree.
+        if (!$backendUser->isAdmin() && $this->isTableAdminOnly($table)) {
+            return false;
+        }
+
+        return $backendUser->check('tables_select', $table);
+    }
+
+    /**
+     * The summary's `tablesSelect` has to agree with canSelectTable(): a grant on an `adminOnly`
+     * table is dead for a non-admin, and listing it would send a client to a refusal.
+     *
+     * @param list<string> $tables
+     * @return list<string>
+     */
+    private function withoutAdminOnlyTables(array $tables): array
+    {
+        if ($this->getBackendUser()->isAdmin()) {
+            return $tables;
+        }
+
+        return array_values(array_filter($tables, fn(string $table): bool => !$this->isTableAdminOnly($table)));
+    }
+
+    /** TCA `ctrl.adminOnly` for a table; false when the table has no TCA. */
+    public function isTableAdminOnly(string $table): bool
+    {
+        $tca = $GLOBALS['TCA'] ?? [];
+        if (!is_array($tca)) {
+            return false;
+        }
+
+        $tableConfig = $tca[$table] ?? null;
+        if (!is_array($tableConfig)) {
+            return false;
+        }
+
+        $ctrl = $tableConfig['ctrl'] ?? null;
+
+        return is_array($ctrl) && (bool) ($ctrl['adminOnly'] ?? false);
     }
 
     public function isAdmin(): bool
