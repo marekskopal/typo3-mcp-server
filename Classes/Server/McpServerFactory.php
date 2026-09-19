@@ -10,6 +10,7 @@ use MarekSkopal\MsMcpServer\Server\Session\DatabaseSessionStore;
 use MarekSkopal\MsMcpServer\Tool\Dynamic\DynamicToolRegistrar;
 use MarekSkopal\MsMcpServer\Tool\Redirect\RedirectToolRegistrar;
 use MarekSkopal\MsMcpServer\Tool\Scheduler\SchedulerToolRegistrar;
+use MarekSkopal\MsMcpServer\Tool\TypoScript\TypoScriptToolRegistrar;
 use MarekSkopal\MsMcpServer\Tool\Workspace\WorkspaceToolRegistrar;
 use Mcp\Capability\Attribute\McpPrompt;
 use Mcp\Capability\Attribute\McpResource;
@@ -39,6 +40,7 @@ readonly class McpServerFactory
         private DynamicToolRegistrar $dynamicToolRegistrar,
         private RedirectToolRegistrar $redirectToolRegistrar,
         private SchedulerToolRegistrar $schedulerToolRegistrar,
+        private TypoScriptToolRegistrar $typoScriptToolRegistrar,
         private WorkspaceToolRegistrar $workspaceToolRegistrar,
         private LoggerInterface $logger,
         private AuditLogger $auditLogger,
@@ -75,6 +77,7 @@ readonly class McpServerFactory
         $this->dynamicToolRegistrar->register($builder);
         $this->redirectToolRegistrar->register($builder);
         $this->schedulerToolRegistrar->register($builder);
+        $this->typoScriptToolRegistrar->register($builder);
         $this->workspaceToolRegistrar->register($builder);
 
         foreach ($this->resources as $resource) {

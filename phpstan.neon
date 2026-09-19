@@ -38,6 +38,22 @@ parameters:
         -
             identifier: method.internalClass
             message: '#BackendLayoutView#'
+        # Compiling TypoScript outside a frontend request has no non-internal API: SysTemplateRepository,
+        # FrontendTypoScriptFactory, FrontendTypoScript and the AST nodes are all marked @internal. Core's own
+        # non-frontend caller, Extbase's BackendConfigurationManager, depends on exactly this surface, so the
+        # risk is core's to manage and ours to re-check on a major upgrade. Scoped to the one file that does it.
+        -
+            identifier: parameter.internalClass
+            path: Classes/Service/TypoScriptCompilerService.php
+        -
+            identifier: property.internalClass
+            path: Classes/Service/TypoScriptCompilerService.php
+        -
+            identifier: method.internalClass
+            path: Classes/Service/TypoScriptCompilerService.php
+        -
+            identifier: method.internal
+            path: Classes/Service/TypoScriptCompilerService.php
 
     shipmonkRules:
         allowComparingOnlyComparableTypes:

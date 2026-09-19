@@ -656,6 +656,79 @@ class IntegrationTestRunner {
         }
     }
 
+    async testTypoScriptOperations(pageUid) {
+        section('TypoScript');
+
+        await this.testTool('typoscript_list', {});
+
+        // The rootline view must see the site the fixture page belongs to, not just sys_template rows:
+        // since v13.1 a site and its sets contribute TypoScript before any record does.
+        const rootline = await this.testTool('typoscript_rootline', { pageId: pageUid });
+        this.check('typoscript_rootline reports the page rootline',
+            Array.isArray(rootline?.rootline) && rootline.rootline.length > 0,
+            `got ${JSON.stringify(rootline?.rootline)}`);
+        this.check('typoscript_rootline summarises source instead of returning it',
+            !rootline?.templates?.some(t => 'constants' in t || 'config' in t),
+            'a template carried its full TypoScript source');
+
+        const marker = 'mcpIntegration';
+        const template = await this.testTool('typoscript_create', {
+            pid: pageUid,
+            title: 'MCP integration template',
+            root: 1,
+            clear: 3,
+            constants: `${marker} = one`,
+            config: `page = PAGE\npage.10 = TEXT\npage.10.value = {$${marker}}`,
+        });
+        const tsUid = template?.uid;
+
+        if (!tsUid) {
+            this.check('typoscript_create returns a uid', false, 'no uid returned');
+            return;
+        }
+
+        // A root template with clear=3 replaces the whole subtree's TypoScript, so it must go even
+        // when a check in between fails — otherwise every later suite runs against it.
+        try {
+            await this.exerciseTypoScriptTemplate(pageUid, tsUid, marker);
+        } finally {
+            await this.callToolSafe('typoscript_delete', { uid: tsUid });
+        }
+    }
+
+    async exerciseTypoScriptTemplate(pageUid, tsUid, marker) {
+        const read = await this.testTool('typoscript_get', { uid: tsUid });
+        this.check('typoscript_get returns the TypoScript source',
+            read?.config?.includes('page = PAGE'), `got ${JSON.stringify(read?.config)}`);
+
+        // The whole point of the compiled view: a constant defined here must already be substituted
+        // into setup, which only a real compile can do.
+        const active = await this.testTool('typoscript_active', { pageId: pageUid, type: 'both' });
+        this.check('typoscript_active substitutes constants into setup',
+            active?.setup?.['page.10.value'] === 'one',
+            `got ${JSON.stringify(active?.setup?.['page.10.value'])}`);
+        this.check('typoscript_active reports the constant itself',
+            active?.constants?.[marker] === 'one', `got ${JSON.stringify(active?.constants?.[marker])}`);
+
+        const scoped = await this.testTool('typoscript_active', { pageId: pageUid, type: 'setup', path: 'page.10' });
+        this.check('typoscript_active path filter keeps only the subtree',
+            Object.keys(scoped?.setup ?? {}).every(k => k === 'page.10' || k.startsWith('page.10.')),
+            `got ${JSON.stringify(Object.keys(scoped?.setup ?? {}))}`);
+
+        // A write must be visible to the next compile — the TypoScript cache is passed to the
+        // factory, so this is the check that DataHandler's cache clearing actually reaches it.
+        await this.testTool('typoscript_update', {
+            uid: tsUid,
+            fields: JSON.stringify({ constants: `${marker} = two` }),
+        });
+        const recompiled = await this.callToolSafe('typoscript_active', { pageId: pageUid, type: 'setup' });
+        this.check('typoscript_active reflects an updated constant',
+            recompiled?.setup?.['page.10.value'] === 'two',
+            `got ${JSON.stringify(recompiled?.setup?.['page.10.value'])}`);
+
+        await this.testTool('typoscript_delete', { uid: tsUid });
+    }
+
     async testWorkspaceOperations(pageUid) {
         section('Workspace Operations');
 
@@ -1234,6 +1307,23 @@ class IntegrationTestRunner {
             beUsersDenied = true;
         }
         this.check('record_search on be_users refused', beUsersDenied, 'editor could search be_users');
+
+        // sys_template is ctrl.adminOnly: core hides it from a non-admin whatever tables_select says,
+        // so neither the dedicated tools nor the generic read surface may answer.
+        for (const [name, args] of [
+            ['typoscript_list', {}],
+            ['typoscript_active', { pageId: 1 }],
+            ['typoscript_rootline', { pageId: 1 }],
+            ['record_search', { tableName: 'sys_template', search: '{}' }],
+        ]) {
+            let denied = false;
+            try {
+                await this.callTool(name, args);
+            } catch {
+                denied = true;
+            }
+            this.check(`${name} on sys_template refused`, denied, `editor could reach sys_template via ${name}`);
+        }
     }
 
     // ---- Main execution ----
@@ -1261,6 +1351,7 @@ class IntegrationTestRunner {
         await this.testConditionalTools();
         await this.testDynamicTools(pageUid);
         await this.testMMRelationFields(pageUid);
+        await this.testTypoScriptOperations(pageUid);
         await this.testWorkspaceOperations(pageUid);
         await this.cleanupRecords(pageUid, childUid, contentUid);
 

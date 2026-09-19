@@ -22,7 +22,7 @@ final class PermissionServiceTest extends TestCase
 {
     protected function tearDown(): void
     {
-        unset($GLOBALS['BE_USER']);
+        unset($GLOBALS['BE_USER'], $GLOBALS['TCA']['sys_template'], $GLOBALS['TCA']['tt_content']);
     }
 
     public function testCheckTableAccessReturnsSelectAndModifyForAllowedTable(): void
@@ -251,6 +251,90 @@ final class PermissionServiceTest extends TestCase
         $this->expectExceptionCode(1714000010);
 
         $service->checkTableAccess('pages');
+    }
+
+    public function testCanSelectTableHonoursTablesSelect(): void
+    {
+        $GLOBALS['TCA']['tt_content'] = ['ctrl' => []];
+
+        $backendUser = $this->createStub(BackendUserAuthentication::class);
+        $backendUser->method('isAdmin')->willReturn(false);
+        $backendUser->method('check')->willReturnMap([['tables_select', 'tt_content', true]]);
+
+        $GLOBALS['BE_USER'] = $backendUser;
+
+        self::assertTrue((new PermissionService())->canSelectTable('tt_content'));
+    }
+
+    public function testCanSelectTableRefusesAnAdminOnlyTableForANonAdmin(): void
+    {
+        // sys_template is ctrl.adminOnly, so the grant does not matter — core's list module hides
+        // the table from a non-admin too, and DataHandler already refuses their writes.
+        $GLOBALS['TCA']['sys_template'] = ['ctrl' => ['adminOnly' => true]];
+
+        $backendUser = $this->createStub(BackendUserAuthentication::class);
+        $backendUser->method('isAdmin')->willReturn(false);
+        $backendUser->method('check')->willReturn(true);
+
+        $GLOBALS['BE_USER'] = $backendUser;
+
+        self::assertFalse((new PermissionService())->canSelectTable('sys_template'));
+    }
+
+    public function testCanSelectTableAllowsAnAdminOnlyTableForAnAdmin(): void
+    {
+        $GLOBALS['TCA']['sys_template'] = ['ctrl' => ['adminOnly' => true]];
+
+        $backendUser = $this->createStub(BackendUserAuthentication::class);
+        $backendUser->method('isAdmin')->willReturn(true);
+        $backendUser->method('check')->willReturn(true);
+
+        $GLOBALS['BE_USER'] = $backendUser;
+
+        self::assertTrue((new PermissionService())->canSelectTable('sys_template'));
+    }
+
+    public function testCheckTableAccessAgreesWithCanSelectTableOnAnAdminOnlyTable(): void
+    {
+        $GLOBALS['TCA']['sys_template'] = ['ctrl' => ['adminOnly' => true]];
+
+        // The grant says yes; the permission tool must still say what the read path will do.
+        $backendUser = $this->createStub(BackendUserAuthentication::class);
+        $backendUser->method('isAdmin')->willReturn(false);
+        $backendUser->method('check')->willReturn(true);
+
+        $GLOBALS['BE_USER'] = $backendUser;
+
+        $result = (new PermissionService())->checkTableAccess('sys_template');
+
+        self::assertFalse($result['canSelect']);
+        // Writes are DataHandler's call, and it already refuses; nothing to second-guess here.
+        self::assertTrue($result['canModify']);
+    }
+
+    public function testPermissionSummaryOmitsAdminOnlyTablesFromTablesSelectForANonAdmin(): void
+    {
+        $GLOBALS['TCA']['sys_template'] = ['ctrl' => ['adminOnly' => true]];
+        $GLOBALS['TCA']['tt_content'] = ['ctrl' => []];
+
+        $backendUser = $this->createStub(BackendUserAuthentication::class);
+        $backendUser->method('isAdmin')->willReturn(false);
+        $backendUser->method('getFilePermissions')->willReturn([]);
+        $backendUser->groupData = ['tables_select' => 'tt_content,sys_template', 'tables_modify' => 'tt_content,sys_template'];
+
+        $GLOBALS['BE_USER'] = $backendUser;
+
+        $summary = (new PermissionService())->getPermissionSummary();
+
+        self::assertSame(['tt_content'], $summary['tablesSelect']);
+        self::assertSame(['tt_content', 'sys_template'], $summary['tablesModify']);
+    }
+
+    public function testIsTableAdminOnlyIsFalseWithoutTca(): void
+    {
+        $GLOBALS['BE_USER'] = $this->createStub(BackendUserAuthentication::class);
+
+        self::assertFalse((new PermissionService())->isTableAdminOnly('tx_nothing_here'));
     }
 
     public function testIsAdminReturnsTrueForAdmin(): void
