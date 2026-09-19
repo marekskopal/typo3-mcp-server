@@ -6,8 +6,8 @@ namespace MarekSkopal\MsMcpServer\Tool\Pages;
 
 use MarekSkopal\MsMcpServer\Service\RecordService;
 use MarekSkopal\MsMcpServer\Service\TcaSchemaService;
+use MarekSkopal\MsMcpServer\Tool\Result\PageTreeResult;
 use Mcp\Capability\Attribute\McpTool;
-use const JSON_THROW_ON_ERROR;
 
 readonly class PageTreeTool
 {
@@ -23,7 +23,7 @@ readonly class PageTreeTool
         name: 'pages_tree',
         description: 'Get the page tree hierarchy starting from a given page ID. Returns nested structure with children. Use depth to control how deep to traverse (max 10).',
     )]
-    public function execute(int $pid = 0, int $depth = 3): string
+    public function execute(int $pid = 0, int $depth = 3): PageTreeResult
     {
         $depth = min(max($depth, 1), self::MAX_DEPTH);
 
@@ -43,7 +43,7 @@ readonly class PageTreeTool
         $nodeCount = 0;
         $tree = $this->buildTree($pid, $depth, $nodeCount, $fields);
 
-        return json_encode(['tree' => $tree, 'totalNodes' => $nodeCount], JSON_THROW_ON_ERROR);
+        return new PageTreeResult($tree, $nodeCount);
     }
 
     /**

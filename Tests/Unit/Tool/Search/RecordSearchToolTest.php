@@ -6,11 +6,11 @@ namespace MarekSkopal\MsMcpServer\Tests\Unit\Tool\Search;
 
 use MarekSkopal\MsMcpServer\Service\RecordService;
 use MarekSkopal\MsMcpServer\Service\TcaSchemaService;
+use MarekSkopal\MsMcpServer\Tests\Unit\Support\JsonResult;
 use MarekSkopal\MsMcpServer\Tool\Search\RecordSearchTool;
 use Mcp\Exception\ToolCallException;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
-use const JSON_THROW_ON_ERROR;
 
 #[CoversClass(RecordSearchTool::class)]
 final class RecordSearchToolTest extends TestCase
@@ -59,7 +59,7 @@ final class RecordSearchToolTest extends TestCase
             ->willReturn($expectedResult);
 
         $tool = new RecordSearchTool($recordService, new TcaSchemaService());
-        $result = json_decode($tool->execute('pages', '{"title":"Hello"}'), true, 512, JSON_THROW_ON_ERROR);
+        $result = JsonResult::of($tool->execute('pages', '{"title":"Hello"}'));
 
         self::assertSame(1, $result['total']);
         self::assertSame('Hello World', $result['records'][0]['title']);
@@ -90,12 +90,7 @@ final class RecordSearchToolTest extends TestCase
         $recordService->method('search')->willReturn(['records' => [], 'total' => 0]);
 
         $tool = new RecordSearchTool($recordService, new TcaSchemaService());
-        $result = json_decode(
-            $tool->execute('pages', '{"title":"Test","nonexistent":"value"}'),
-            true,
-            512,
-            JSON_THROW_ON_ERROR,
-        );
+        $result = JsonResult::of($tool->execute('pages', '{"title":"Test","nonexistent":"value"}'));
 
         self::assertSame(0, $result['total']);
         self::assertSame(['nonexistent'], $result['ignoredFields']);
@@ -106,10 +101,10 @@ final class RecordSearchToolTest extends TestCase
         $recordService = $this->createStub(RecordService::class);
 
         $tool = new RecordSearchTool($recordService, new TcaSchemaService());
-        $result = json_decode($tool->execute('unknown_table', '{"title":"Test"}'), true, 512, JSON_THROW_ON_ERROR);
+        $this->expectException(ToolCallException::class);
+        $this->expectExceptionMessage('unknown_table');
 
-        self::assertArrayHasKey('error', $result);
-        self::assertStringContainsString('unknown_table', $result['error']);
+        $tool->execute('unknown_table', '{"title":"Test"}');
     }
 
     public function testExecuteReportsInvalidJson(): void
@@ -145,15 +140,10 @@ final class RecordSearchToolTest extends TestCase
         $recordService = $this->createStub(RecordService::class);
 
         $tool = new RecordSearchTool($recordService, new TcaSchemaService());
-        $result = json_decode(
-            $tool->execute('pages', '{"nonexistent":"value"}'),
-            true,
-            512,
-            JSON_THROW_ON_ERROR,
-        );
+        $this->expectException(ToolCallException::class);
+        $this->expectExceptionMessage('Not readable on pages: nonexistent');
 
-        self::assertArrayHasKey('error', $result);
-        self::assertSame(['nonexistent'], $result['ignoredFields']);
+        $tool->execute('pages', '{"nonexistent":"value"}');
     }
 
     public function testExecuteWithEmptyStringListsByPidWithoutFilter(): void
@@ -172,7 +162,7 @@ final class RecordSearchToolTest extends TestCase
             ->willReturn(['records' => [['uid' => 1, 'pid' => 10]], 'total' => 1]);
 
         $tool = new RecordSearchTool($recordService, new TcaSchemaService());
-        $result = json_decode($tool->execute('pages', '', 20, 0, 10), true, 512, JSON_THROW_ON_ERROR);
+        $result = JsonResult::of($tool->execute('pages', '', 20, 0, 10));
 
         self::assertSame(1, $result['total']);
     }
@@ -212,12 +202,7 @@ final class RecordSearchToolTest extends TestCase
             ->willReturn(['records' => [['uid' => 1, 'title' => 'Home']], 'total' => 1]);
 
         $tool = new RecordSearchTool($recordService, new TcaSchemaService());
-        $result = json_decode(
-            $tool->execute('pages', '{"title":{"op":"eq","value":"Home"}}'),
-            true,
-            512,
-            JSON_THROW_ON_ERROR,
-        );
+        $result = JsonResult::of($tool->execute('pages', '{"title":{"op":"eq","value":"Home"}}'));
 
         self::assertSame(1, $result['total']);
         self::assertSame('Home', $result['records'][0]['title']);
@@ -405,7 +390,7 @@ final class RecordSearchToolTest extends TestCase
             ->willReturn(['records' => [], 'total' => 0]);
 
         $tool = new RecordSearchTool($recordService, new TcaSchemaService());
-        $result = json_decode($tool->execute('pages', 'Brio'), true, 512, JSON_THROW_ON_ERROR);
+        $result = JsonResult::of($tool->execute('pages', 'Brio'));
 
         self::assertSame(0, $result['total']);
     }

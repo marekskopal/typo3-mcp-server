@@ -6,9 +6,9 @@ namespace MarekSkopal\MsMcpServer\Tool\File;
 
 use MarekSkopal\MsMcpServer\Service\RecordService;
 use MarekSkopal\MsMcpServer\Service\TcaSchemaService;
-use MarekSkopal\MsMcpServer\Tool\Result\ErrorResult;
 use MarekSkopal\MsMcpServer\Tool\Result\FileReferenceListResult;
 use Mcp\Capability\Attribute\McpTool;
+use Mcp\Exception\ToolCallException;
 
 readonly class FileReferenceListTool
 {
@@ -21,13 +21,13 @@ readonly class FileReferenceListTool
         description: 'List all file references attached to a record\'s file/image field.'
             . ' Returns reference UIDs (needed for file_reference_remove), sys_file UIDs (for file_get_info), and metadata overrides.',
     )]
-    public function execute(string $table, int $uid, string $fieldName): FileReferenceListResult|ErrorResult
+    public function execute(string $table, int $uid, string $fieldName): FileReferenceListResult
     {
         $fileFields = $this->tcaSchemaService->getFileFields($table);
         if (!in_array($fieldName, $fileFields, true)) {
-            return new ErrorResult(
-                'Field \'' . $fieldName . '\' is not a file field on table \'' . $table . '\'',
-                ['availableFileFields' => $fileFields],
+            throw new ToolCallException(
+                'Field \'' . $fieldName . '\' is not a file field on table \'' . $table
+                    . '\'. Available file fields: ' . (implode(', ', $fileFields) ?: '(none)'),
             );
         }
 

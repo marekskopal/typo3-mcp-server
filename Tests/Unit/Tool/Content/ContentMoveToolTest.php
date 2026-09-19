@@ -6,8 +6,8 @@ namespace MarekSkopal\MsMcpServer\Tests\Unit\Tool\Content;
 
 use MarekSkopal\MsMcpServer\Service\DataHandlerService;
 use MarekSkopal\MsMcpServer\Tool\Content\ContentMoveTool;
-use MarekSkopal\MsMcpServer\Tool\Result\ErrorResult;
 use MarekSkopal\MsMcpServer\Tool\Result\RecordMovedResult;
+use Mcp\Exception\ToolCallException;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 
@@ -65,11 +65,11 @@ final class ContentMoveToolTest extends TestCase
         $dataHandlerService->expects(self::never())->method('moveRecord');
 
         $tool = new ContentMoveTool($dataHandlerService);
-        $result = $tool->execute(42);
 
-        self::assertInstanceOf(ErrorResult::class, $result);
-        self::assertStringContainsString('targetPid', $result->error);
-        self::assertStringContainsString('afterUid', $result->error);
+        $this->expectException(ToolCallException::class);
+        $this->expectExceptionMessageMatches('/targetPid.*afterUid/');
+
+        $tool->execute(42);
     }
 
     public function testExecuteReturnsErrorWhenBothTargetsGiven(): void
@@ -78,10 +78,11 @@ final class ContentMoveToolTest extends TestCase
         $dataHandlerService->expects(self::never())->method('moveRecord');
 
         $tool = new ContentMoveTool($dataHandlerService);
-        $result = $tool->execute(42, targetPid: 10, afterUid: 5);
 
-        self::assertInstanceOf(ErrorResult::class, $result);
-        self::assertStringContainsString('not both', $result->error);
+        $this->expectException(ToolCallException::class);
+        $this->expectExceptionMessage('not both');
+
+        $tool->execute(42, targetPid: 10, afterUid: 5);
     }
 
     public function testExecuteThrowsExceptionOnError(): void

@@ -6,8 +6,8 @@ namespace MarekSkopal\MsMcpServer\Tool\Table\Handler;
 
 use MarekSkopal\MsMcpServer\Logging\AuditLogger;
 use MarekSkopal\MsMcpServer\Service\DataHandlerService;
+use MarekSkopal\MsMcpServer\Tool\Helper\FieldRejection;
 use MarekSkopal\MsMcpServer\Tool\Helper\JsonObjectParser;
-use MarekSkopal\MsMcpServer\Tool\Result\ErrorResult;
 use MarekSkopal\MsMcpServer\Tool\Result\RecordUpdatedResult;
 use MarekSkopal\MsMcpServer\Tool\Table\TableToolConfig;
 use Psr\Log\LoggerInterface;
@@ -43,17 +43,17 @@ final readonly class UpdateHandler extends AbstractTableToolHandler
             . $this->config->mmFieldHint();
     }
 
-    public function __invoke(int $uid, string $fields): RecordUpdatedResult|ErrorResult
+    public function __invoke(int $uid, string $fields): RecordUpdatedResult
     {
         return $this->run(
-            function () use ($uid, $fields): RecordUpdatedResult|ErrorResult {
+            function () use ($uid, $fields): RecordUpdatedResult {
                 $data = JsonObjectParser::parse($fields, 'fields');
 
                 $filteredData = array_intersect_key($data, array_flip($this->config->writableFields));
                 $ignoredFields = array_values(array_diff(array_keys($data), array_keys($filteredData)));
 
                 if ($filteredData === []) {
-                    return new ErrorResult('No valid fields provided', ['ignoredFields' => $ignoredFields]);
+                    throw FieldRejection::noValidFields($this->config->tableName, $ignoredFields);
                 }
 
                 $this->dataHandlerService->updateRecord($this->config->tableName, $uid, $filteredData);

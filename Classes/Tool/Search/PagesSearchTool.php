@@ -6,8 +6,9 @@ namespace MarekSkopal\MsMcpServer\Tool\Search;
 
 use MarekSkopal\MsMcpServer\Service\RecordService;
 use MarekSkopal\MsMcpServer\Service\TcaSchemaService;
+use MarekSkopal\MsMcpServer\Tool\Result\RecordListResult;
 use Mcp\Capability\Attribute\McpTool;
-use const JSON_THROW_ON_ERROR;
+use Mcp\Exception\ToolCallException;
 
 readonly class PagesSearchTool
 {
@@ -32,20 +33,23 @@ readonly class PagesSearchTool
         int $pid = -1,
         string $orderBy = '',
         string $orderDirection = 'ASC',
-    ): string {
+    ): RecordListResult {
         $readFields = $this->tcaSchemaService->getReadFields('pages');
         $allowedFields = array_merge(['uid', 'pid'], $readFields);
         $searchConditions = SearchParamResolver::parseSearch($search, $allowedFields, 'title')['conditions'];
 
         if ($searchConditions === []) {
-            return json_encode(['error' => 'No valid search conditions provided'], JSON_THROW_ON_ERROR);
+            throw new ToolCallException(
+                'No valid search conditions provided. Pass a plain-text term to LIKE-match against "title",'
+                    . ' or a JSON object keyed by readable field names.',
+            );
         }
 
         $orderableFields = array_values(array_diff($allowedFields, array_keys($this->tcaSchemaService->getMMFields('pages'))));
         $resolvedOrderBy = SearchParamResolver::resolveOrderBy($orderBy, $orderableFields);
         $orderDirection = SearchParamResolver::normalizeOrderDirection($orderDirection);
 
-        return json_encode(
+        return RecordListResult::fromQuery(
             $this->recordService->search(
                 'pages',
                 $searchConditions,
@@ -56,7 +60,6 @@ readonly class PagesSearchTool
                 $resolvedOrderBy,
                 $orderDirection,
             ),
-            JSON_THROW_ON_ERROR,
         );
     }
 }

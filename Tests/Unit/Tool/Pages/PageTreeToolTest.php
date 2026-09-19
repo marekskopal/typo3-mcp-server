@@ -6,10 +6,10 @@ namespace MarekSkopal\MsMcpServer\Tests\Unit\Tool\Pages;
 
 use MarekSkopal\MsMcpServer\Service\RecordService;
 use MarekSkopal\MsMcpServer\Service\TcaSchemaService;
+use MarekSkopal\MsMcpServer\Tests\Unit\Support\JsonResult;
 use MarekSkopal\MsMcpServer\Tool\Pages\PageTreeTool;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
-use const JSON_THROW_ON_ERROR;
 
 #[CoversClass(PageTreeTool::class)]
 final class PageTreeToolTest extends TestCase
@@ -52,7 +52,7 @@ final class PageTreeToolTest extends TestCase
             });
 
         $tool = new PageTreeTool($recordService, new TcaSchemaService());
-        $result = json_decode($tool->execute(0, 3), true, 512, JSON_THROW_ON_ERROR);
+        $result = JsonResult::of($tool->execute(0, 3));
 
         self::assertSame(2, $result['totalNodes']);
         self::assertSame('Root', $result['tree'][0]['title']);
@@ -71,7 +71,7 @@ final class PageTreeToolTest extends TestCase
             ->willReturn(['records' => [['uid' => 1, 'pid' => 0, 'title' => 'Root']], 'total' => 1]);
 
         $tool = new PageTreeTool($recordService, new TcaSchemaService());
-        $result = json_decode($tool->execute(0, 1), true, 512, JSON_THROW_ON_ERROR);
+        $result = JsonResult::of($tool->execute(0, 1));
 
         self::assertSame(1, $result['totalNodes']);
         self::assertSame([], $result['tree'][0]['children']);
@@ -85,7 +85,7 @@ final class PageTreeToolTest extends TestCase
             ->willReturn(['records' => [], 'total' => 0]);
 
         $tool = new PageTreeTool($recordService, new TcaSchemaService());
-        $result = json_decode($tool->execute(999), true, 512, JSON_THROW_ON_ERROR);
+        $result = JsonResult::of($tool->execute(999));
 
         self::assertSame([], $result['tree']);
         self::assertSame(0, $result['totalNodes']);
@@ -115,7 +115,7 @@ final class PageTreeToolTest extends TestCase
         $tool = new PageTreeTool($recordService, new TcaSchemaService());
 
         // Depth 99 should be clamped to 10, but with empty results it just returns empty
-        $result = json_decode($tool->execute(0, 99), true, 512, JSON_THROW_ON_ERROR);
+        $result = JsonResult::of($tool->execute(0, 99));
 
         self::assertSame([], $result['tree']);
     }

@@ -6,10 +6,10 @@ namespace MarekSkopal\MsMcpServer\Tests\Unit\Tool\Content;
 
 use MarekSkopal\MsMcpServer\Service\RecordService;
 use MarekSkopal\MsMcpServer\Service\TcaSchemaService;
+use MarekSkopal\MsMcpServer\Tests\Unit\Support\JsonResult;
 use MarekSkopal\MsMcpServer\Tool\Content\ContentGetTool;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
-use const JSON_THROW_ON_ERROR;
 
 #[CoversClass(ContentGetTool::class)]
 final class ContentGetToolTest extends TestCase
@@ -61,7 +61,7 @@ final class ContentGetToolTest extends TestCase
             ->willReturn($expectedRecord);
 
         $tool = new ContentGetTool($recordService, new TcaSchemaService());
-        $result = json_decode($tool->execute(42), true, 512, JSON_THROW_ON_ERROR);
+        $result = JsonResult::of($tool->execute(42));
 
         self::assertSame(42, $result['uid']);
         self::assertSame('Test Header', $result['header']);
@@ -89,7 +89,7 @@ final class ContentGetToolTest extends TestCase
             ->willReturn($translations);
 
         $tool = new ContentGetTool($recordService, new TcaSchemaService());
-        $result = json_decode($tool->execute(42), true, 512, JSON_THROW_ON_ERROR);
+        $result = JsonResult::of($tool->execute(42));
 
         self::assertSame($translations, $result['translations']);
     }
@@ -110,7 +110,7 @@ final class ContentGetToolTest extends TestCase
         $recordService->expects(self::never())->method('findTranslations');
 
         $tool = new ContentGetTool($recordService, new TcaSchemaService());
-        $result = json_decode($tool->execute(87), true, 512, JSON_THROW_ON_ERROR);
+        $result = JsonResult::of($tool->execute(87));
 
         self::assertArrayNotHasKey('translations', $result);
     }
@@ -124,9 +124,12 @@ final class ContentGetToolTest extends TestCase
             ->willReturn(null);
 
         $tool = new ContentGetTool($recordService, new TcaSchemaService());
-        $result = json_decode($tool->execute(999), true, 512, JSON_THROW_ON_ERROR);
+        $result = JsonResult::of($tool->execute(999));
 
-        self::assertSame('Content element not found', $result['error']);
+        self::assertFalse($result['found']);
+        self::assertSame('tt_content', $result['table']);
+        self::assertSame(999, $result['uid']);
+        self::assertSame('Content element not found', $result['message']);
     }
 
     public function testExecuteThrowsExceptionOnError(): void

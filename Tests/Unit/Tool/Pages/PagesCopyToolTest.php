@@ -6,8 +6,8 @@ namespace MarekSkopal\MsMcpServer\Tests\Unit\Tool\Pages;
 
 use MarekSkopal\MsMcpServer\Service\DataHandlerService;
 use MarekSkopal\MsMcpServer\Tool\Pages\PagesCopyTool;
-use MarekSkopal\MsMcpServer\Tool\Result\ErrorResult;
 use MarekSkopal\MsMcpServer\Tool\Result\RecordCopiedResult;
+use Mcp\Exception\ToolCallException;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 
@@ -80,9 +80,10 @@ final class PagesCopyToolTest extends TestCase
         $dataHandlerService->expects(self::never())->method('copyRecord');
 
         $tool = new PagesCopyTool($dataHandlerService);
-        $result = $tool->execute(42);
 
-        self::assertInstanceOf(ErrorResult::class, $result);
+        $this->expectException(ToolCallException::class);
+
+        $tool->execute(42);
     }
 
     public function testExecuteThrowsExceptionOnError(): void

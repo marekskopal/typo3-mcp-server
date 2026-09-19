@@ -5,10 +5,11 @@ declare(strict_types=1);
 namespace MarekSkopal\MsMcpServer\Tests\Unit\Tool\File;
 
 use MarekSkopal\MsMcpServer\Service\FileService;
+use MarekSkopal\MsMcpServer\Tests\Unit\Support\JsonResult;
 use MarekSkopal\MsMcpServer\Tool\File\FileSearchTool;
+use Mcp\Exception\ToolCallException;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
-use const JSON_THROW_ON_ERROR;
 
 #[CoversClass(FileSearchTool::class)]
 final class FileSearchToolTest extends TestCase
@@ -27,7 +28,7 @@ final class FileSearchToolTest extends TestCase
             ->willReturn($expectedResult);
 
         $tool = new FileSearchTool($fileService);
-        $result = json_decode($tool->execute('logo'), true, 512, JSON_THROW_ON_ERROR);
+        $result = JsonResult::of($tool->execute('logo'));
 
         self::assertSame(1, $result['total']);
         self::assertSame('logo.png', $result['files'][0]['name']);
@@ -62,10 +63,10 @@ final class FileSearchToolTest extends TestCase
         $fileService = $this->createStub(FileService::class);
 
         $tool = new FileSearchTool($fileService);
-        $result = json_decode($tool->execute(), true, 512, JSON_THROW_ON_ERROR);
+        $this->expectException(ToolCallException::class);
+        $this->expectExceptionMessage('namePattern or extension');
 
-        self::assertArrayHasKey('error', $result);
-        self::assertStringContainsString('namePattern or extension', $result['error']);
+        $tool->execute();
     }
 
     public function testExecuteThrowsExceptionOnError(): void

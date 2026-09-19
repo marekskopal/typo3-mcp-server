@@ -6,8 +6,9 @@ namespace MarekSkopal\MsMcpServer\Tool\Schema;
 
 use MarekSkopal\MsMcpServer\Service\PermissionService;
 use MarekSkopal\MsMcpServer\Service\TcaSchemaService;
+use MarekSkopal\MsMcpServer\Tool\Result\TableSchemaResult;
 use Mcp\Capability\Attribute\McpTool;
-use const JSON_THROW_ON_ERROR;
+use Mcp\Exception\ToolCallException;
 
 readonly class TableSchemaTool
 {
@@ -20,18 +21,18 @@ readonly class TableSchemaTool
         description: 'Get the schema of a database table including field types, labels, select options, and constraints.'
             . ' Use this to discover valid field values before creating or updating records.',
     )]
-    public function execute(string $tableName): string
+    public function execute(string $tableName): TableSchemaResult
     {
         if (!$this->permissionService->canSelectTable($tableName)) {
-            return json_encode(['error' => 'Access denied: you do not have read permission for table: ' . $tableName], JSON_THROW_ON_ERROR);
+            throw new ToolCallException('Access denied: you do not have read permission for table: ' . $tableName);
         }
 
         $schema = $this->tcaSchemaService->getFieldsSchema($tableName);
 
         if ($schema['fields'] === []) {
-            return json_encode(['error' => 'Table not found or has no readable fields: ' . $tableName], JSON_THROW_ON_ERROR);
+            throw new ToolCallException('Table not found or has no readable fields: ' . $tableName);
         }
 
-        return json_encode($schema, JSON_THROW_ON_ERROR);
+        return new TableSchemaResult($schema['table'], $schema['fields']);
     }
 }

@@ -6,8 +6,9 @@ namespace MarekSkopal\MsMcpServer\Tool\Content;
 
 use MarekSkopal\MsMcpServer\Service\RecordService;
 use MarekSkopal\MsMcpServer\Service\TcaSchemaService;
+use MarekSkopal\MsMcpServer\Tool\Result\RecordNotFoundResult;
+use MarekSkopal\MsMcpServer\Tool\Result\RecordResult;
 use Mcp\Capability\Attribute\McpTool;
-use const JSON_THROW_ON_ERROR;
 
 readonly class ContentGetTool
 {
@@ -15,8 +16,11 @@ readonly class ContentGetTool
     {
     }
 
-    #[McpTool(name: 'content_get', description: 'Get a single content element by its uid.')]
-    public function execute(int $uid): string
+    #[McpTool(
+        name: 'content_get',
+        description: 'Get a single content element by its uid.' . ' A uid that does not exist is reported as {"found": false}, not an error.',
+    )]
+    public function execute(int $uid): RecordResult|RecordNotFoundResult
     {
         $translationConfig = $this->tcaSchemaService->getTranslationConfig('tt_content');
         $fields = $this->tcaSchemaService->getReadFields('tt_content');
@@ -34,7 +38,7 @@ readonly class ContentGetTool
         $record = $this->recordService->findByUid('tt_content', $uid, $fields);
 
         if ($record === null) {
-            return json_encode(['error' => 'Content element not found'], JSON_THROW_ON_ERROR);
+            return new RecordNotFoundResult('tt_content', $uid, 'Content element not found');
         }
 
         $sysLanguageUid = $record[$languageField ?? ''] ?? -1;
@@ -47,9 +51,12 @@ readonly class ContentGetTool
             )
             && (int) $sysLanguageUid === 0
         ) {
-            $record['translations'] = $this->recordService->findTranslations('tt_content', $uid, $languageField, $transOrigPointerField);
+            return new RecordResult(
+                $record,
+                $this->recordService->findTranslations('tt_content', $uid, $languageField, $transOrigPointerField),
+            );
         }
 
-        return json_encode($record, JSON_THROW_ON_ERROR);
+        return new RecordResult($record);
     }
 }

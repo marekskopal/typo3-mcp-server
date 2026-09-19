@@ -6,9 +6,9 @@ namespace MarekSkopal\MsMcpServer\Tool\Table\Handler;
 
 use MarekSkopal\MsMcpServer\Logging\AuditLogger;
 use MarekSkopal\MsMcpServer\Service\RecordService;
+use MarekSkopal\MsMcpServer\Tool\Result\RecordListResult;
 use MarekSkopal\MsMcpServer\Tool\Table\TableToolConfig;
 use Psr\Log\LoggerInterface;
-use const JSON_THROW_ON_ERROR;
 
 /**
  * `<prefix>_list` for a table without translations. The translatable variant is
@@ -39,10 +39,10 @@ final readonly class ListHandler extends AbstractTableToolHandler
             . ' Use selectFields (comma-separated) to choose which fields to return.' . $this->config->mmReadHint();
     }
 
-    public function __invoke(int $pid = 0, int $limit = 20, int $offset = 0, string $selectFields = ''): string
+    public function __invoke(int $pid = 0, int $limit = 20, int $offset = 0, string $selectFields = ''): RecordListResult
     {
         return $this->run(
-            function () use ($pid, $limit, $offset, $selectFields): string {
+            function () use ($pid, $limit, $offset, $selectFields): RecordListResult {
                 $result = $this->recordService->findByPid(
                     $this->config->tableName,
                     $pid,
@@ -51,7 +51,7 @@ final readonly class ListHandler extends AbstractTableToolHandler
                     SelectedFields::resolve($selectFields, $this->config),
                 );
 
-                return json_encode($result, JSON_THROW_ON_ERROR);
+                return RecordListResult::fromQuery($result);
             },
             [$pid, $limit, $offset, $selectFields],
         );

@@ -6,10 +6,10 @@ namespace MarekSkopal\MsMcpServer\Tests\Unit\Tool\Pages;
 
 use MarekSkopal\MsMcpServer\Service\RecordService;
 use MarekSkopal\MsMcpServer\Service\TcaSchemaService;
+use MarekSkopal\MsMcpServer\Tests\Unit\Support\JsonResult;
 use MarekSkopal\MsMcpServer\Tool\Pages\PagesListTool;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
-use const JSON_THROW_ON_ERROR;
 
 #[CoversClass(PagesListTool::class)]
 final class PagesListToolTest extends TestCase
@@ -57,7 +57,7 @@ final class PagesListToolTest extends TestCase
             ->willReturn($expectedResult);
 
         $tool = new PagesListTool($recordService, new TcaSchemaService());
-        $result = json_decode($tool->execute(), true, 512, JSON_THROW_ON_ERROR);
+        $result = JsonResult::of($tool->execute());
 
         self::assertSame(1, $result['total']);
         self::assertSame('Root Page', $result['records'][0]['title']);

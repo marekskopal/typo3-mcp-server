@@ -6,8 +6,8 @@ namespace MarekSkopal\MsMcpServer\Tool\Content;
 
 use MarekSkopal\MsMcpServer\Service\DataHandlerService;
 use MarekSkopal\MsMcpServer\Service\TcaSchemaService;
+use MarekSkopal\MsMcpServer\Tool\Helper\FieldRejection;
 use MarekSkopal\MsMcpServer\Tool\Helper\JsonObjectParser;
-use MarekSkopal\MsMcpServer\Tool\Result\ErrorResult;
 use MarekSkopal\MsMcpServer\Tool\Result\RecordCreatedResult;
 use Mcp\Capability\Attribute\McpTool;
 
@@ -22,7 +22,7 @@ readonly class ContentCreateTool
         description: 'Create a new content element on a page. Pass fields as a JSON object string.'
             . ' Use sysLanguageUid to set the language (0 = default, -1 = all languages).',
     )]
-    public function execute(int $pid, string $fields, int $sysLanguageUid = 0): RecordCreatedResult|ErrorResult
+    public function execute(int $pid, string $fields, int $sysLanguageUid = 0): RecordCreatedResult
     {
         $data = JsonObjectParser::parse($fields, 'fields');
 
@@ -39,7 +39,7 @@ readonly class ContentCreateTool
         $ignoredFields = array_values(array_diff(array_keys($data), array_keys($filteredData)));
 
         if ($filteredData === []) {
-            return new ErrorResult('No valid fields provided', ['ignoredFields' => $ignoredFields]);
+            throw FieldRejection::noValidFields('tt_content', $ignoredFields);
         }
 
         $uid = $this->dataHandlerService->createRecord('tt_content', $pid, $filteredData);

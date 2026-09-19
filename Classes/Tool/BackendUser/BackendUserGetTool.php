@@ -8,7 +8,7 @@ use MarekSkopal\MsMcpServer\Service\PermissionService;
 use MarekSkopal\MsMcpServer\Service\RecordService;
 use MarekSkopal\MsMcpServer\Tool\Helper\RowField;
 use MarekSkopal\MsMcpServer\Tool\Result\BackendUserDetailResult;
-use MarekSkopal\MsMcpServer\Tool\Result\ErrorResult;
+use MarekSkopal\MsMcpServer\Tool\Result\RecordNotFoundResult;
 use Mcp\Capability\Attribute\McpTool;
 use Mcp\Exception\ToolCallException;
 
@@ -49,7 +49,7 @@ readonly class BackendUserGetTool
             . ' Returns an error result for soft-deleted or missing users.'
             . ' Sensitive fields (password, mfa) are never returned.',
     )]
-    public function execute(int $uid): BackendUserDetailResult|ErrorResult
+    public function execute(int $uid): BackendUserDetailResult|RecordNotFoundResult
     {
         if (!$this->permissionService->isAdmin()) {
             throw new ToolCallException('Admin access required');
@@ -58,7 +58,7 @@ readonly class BackendUserGetTool
         $row = $this->recordService->findByUid('be_users', $uid, self::DETAIL_FIELDS);
 
         if ($row === null || RowField::asInt($row, 'deleted') === 1) {
-            return new ErrorResult('Backend user not found', ['uid' => $uid]);
+            return new RecordNotFoundResult('be_users', $uid, 'Backend user not found');
         }
 
         return new BackendUserDetailResult(

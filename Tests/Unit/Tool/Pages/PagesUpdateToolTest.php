@@ -7,8 +7,8 @@ namespace MarekSkopal\MsMcpServer\Tests\Unit\Tool\Pages;
 use MarekSkopal\MsMcpServer\Service\DataHandlerService;
 use MarekSkopal\MsMcpServer\Service\TcaSchemaService;
 use MarekSkopal\MsMcpServer\Tool\Pages\PagesUpdateTool;
-use MarekSkopal\MsMcpServer\Tool\Result\ErrorResult;
 use MarekSkopal\MsMcpServer\Tool\Result\RecordUpdatedResult;
+use Mcp\Exception\ToolCallException;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 use const JSON_THROW_ON_ERROR;
@@ -97,11 +97,11 @@ final class PagesUpdateToolTest extends TestCase
             ->method('updateRecord');
 
         $tool = new PagesUpdateTool($dataHandlerService, new TcaSchemaService());
-        $result = $tool->execute(1, json_encode(['bad_field' => 'x'], JSON_THROW_ON_ERROR));
 
-        self::assertInstanceOf(ErrorResult::class, $result);
-        self::assertSame('No valid fields provided', $result->error);
-        self::assertSame(['bad_field'], $result->context['ignoredFields']);
+        $this->expectException(ToolCallException::class);
+        $this->expectExceptionMessage('No valid fields provided');
+
+        $tool->execute(1, json_encode(['bad_field' => 'x'], JSON_THROW_ON_ERROR));
     }
 
     public function testExecuteThrowsExceptionOnError(): void

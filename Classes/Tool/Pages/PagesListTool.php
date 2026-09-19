@@ -6,8 +6,8 @@ namespace MarekSkopal\MsMcpServer\Tool\Pages;
 
 use MarekSkopal\MsMcpServer\Service\RecordService;
 use MarekSkopal\MsMcpServer\Service\TcaSchemaService;
+use MarekSkopal\MsMcpServer\Tool\Result\RecordListResult;
 use Mcp\Capability\Attribute\McpTool;
-use const JSON_THROW_ON_ERROR;
 
 readonly class PagesListTool
 {
@@ -22,7 +22,13 @@ readonly class PagesListTool
             . ' In a non-live workspace, results are workspace-overlaid: the response carries "hasMore"'
             . ' instead of "total" (a SQL COUNT cannot be overlaid) — page with offset until hasMore is false.',
     )]
-    public function execute(int $pid = 0, int $limit = 20, int $offset = 0, int $sysLanguageUid = -1, string $selectFields = ''): string
+    public function execute(
+        int $pid = 0,
+        int $limit = 20,
+        int $offset = 0,
+        int $sysLanguageUid = -1,
+        string $selectFields = '',
+    ): RecordListResult
     {
         $translationConfig = $this->tcaSchemaService->getTranslationConfig('pages');
 
@@ -58,6 +64,6 @@ readonly class PagesListTool
             $sysLanguageUid >= 0 ? $languageField : null,
         );
 
-        return json_encode($result, JSON_THROW_ON_ERROR);
+        return RecordListResult::fromQuery($result);
     }
 }

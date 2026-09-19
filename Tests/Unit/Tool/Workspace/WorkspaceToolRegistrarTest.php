@@ -9,7 +9,7 @@ use MarekSkopal\MsMcpServer\Logging\AuditLogger;
 use MarekSkopal\MsMcpServer\Service\DataHandlerService;
 use MarekSkopal\MsMcpServer\Service\PermissionService;
 use MarekSkopal\MsMcpServer\Service\RecordService;
-use MarekSkopal\MsMcpServer\Tool\Result\ErrorResult;
+use MarekSkopal\MsMcpServer\Tests\Unit\Support\JsonResult;
 use MarekSkopal\MsMcpServer\Tool\Result\RecordDeletedResult;
 use MarekSkopal\MsMcpServer\Tool\Result\RecordUpdatedResult;
 use MarekSkopal\MsMcpServer\Tool\Workspace\WorkspaceToolRegistrar;
@@ -25,7 +25,6 @@ use TYPO3\CMS\Core\Database\Query\QueryBuilder;
 use TYPO3\CMS\Core\Database\Query\Restriction\QueryRestrictionContainerInterface;
 use TYPO3\CMS\Core\Package\PackageManager;
 use TYPO3\CMS\Core\Utility\ExtensionManagementUtility;
-use const JSON_THROW_ON_ERROR;
 
 #[CoversClass(WorkspaceToolRegistrar::class)]
 final class WorkspaceToolRegistrarTest extends TestCase
@@ -119,7 +118,7 @@ final class WorkspaceToolRegistrarTest extends TestCase
 
         $closure = $this->getRegisteredClosure($recordService, $this->createStub(DataHandlerService::class), null, 'workspace_list');
         /** @var list<array{uid: int, title: string, access: string}> $result */
-        $result = json_decode($closure(), true, 512, JSON_THROW_ON_ERROR);
+        $result = JsonResult::of($closure());
 
         self::assertSame(0, $result[0]['uid']);
         self::assertSame('Live workspace', $result[0]['title']);
@@ -156,7 +155,7 @@ final class WorkspaceToolRegistrarTest extends TestCase
             'workspace_get',
         );
         /** @var array{uid: int, title: string, access: string} $result */
-        $result = json_decode($closure(0), true, 512, JSON_THROW_ON_ERROR);
+        $result = JsonResult::of($closure(0));
 
         self::assertSame(0, $result['uid']);
         self::assertSame('Live workspace', $result['title']);
@@ -174,10 +173,11 @@ final class WorkspaceToolRegistrarTest extends TestCase
             null,
             'workspace_get',
         );
-        /** @var array{error: string} $result */
-        $result = json_decode($closure(99), true, 512, JSON_THROW_ON_ERROR);
 
-        self::assertSame('Workspace not accessible to current user', $result['error']);
+        $this->expectException(ToolCallException::class);
+        $this->expectExceptionMessage('Workspace not accessible to current user');
+
+        $closure(99);
     }
 
     public function testGetToolReturnsErrorWhenWorkspaceNotFound(): void
@@ -190,10 +190,12 @@ final class WorkspaceToolRegistrarTest extends TestCase
         $recordService->method('findByUid')->willReturn(null);
 
         $closure = $this->getRegisteredClosure($recordService, $this->createStub(DataHandlerService::class), null, 'workspace_get');
-        /** @var array{error: string} $result */
-        $result = json_decode($closure(5), true, 512, JSON_THROW_ON_ERROR);
+        $result = JsonResult::of($closure(5));
 
-        self::assertSame('Workspace not found', $result['error']);
+        self::assertFalse($result['found']);
+        self::assertSame('sys_workspace', $result['table']);
+        self::assertSame(5, $result['uid']);
+        self::assertSame('Workspace not found', $result['message']);
     }
 
     public function testSwitchToolPersistsWorkspace(): void
@@ -230,10 +232,11 @@ final class WorkspaceToolRegistrarTest extends TestCase
             null,
             'workspace_switch',
         );
-        $result = $closure(99);
 
-        self::assertInstanceOf(ErrorResult::class, $result);
-        self::assertSame('Workspace not accessible to current user', $result->error);
+        $this->expectException(ToolCallException::class);
+        $this->expectExceptionMessage('Workspace 99 is not accessible to the current user');
+
+        $closure(99);
     }
 
     public function testChangesListInLiveReturnsEmpty(): void
@@ -249,7 +252,7 @@ final class WorkspaceToolRegistrarTest extends TestCase
             'workspace_changes_list',
         );
         /** @var array{workspaceId: int, tables: array<string, mixed>} $result */
-        $result = json_decode($closure(), true, 512, JSON_THROW_ON_ERROR);
+        $result = JsonResult::of($closure());
 
         self::assertSame(0, $result['workspaceId']);
         self::assertSame([], $result['tables']);
@@ -293,7 +296,7 @@ final class WorkspaceToolRegistrarTest extends TestCase
             'workspace_changes_list',
         );
         /** @var array{workspaceId: int, tables: array<string, list<array<string, mixed>>>} $result */
-        $result = json_decode($closure(), true, 512, JSON_THROW_ON_ERROR);
+        $result = JsonResult::of($closure());
 
         self::assertSame(5, $result['workspaceId']);
         self::assertArrayHasKey('pages', $result['tables']);
@@ -326,10 +329,11 @@ final class WorkspaceToolRegistrarTest extends TestCase
             'workspace_publish',
             $this->permissionServiceAllowing(['tt_content']),
         );
-        $publishResult = $closure('pages', 100);
 
-        self::assertInstanceOf(ErrorResult::class, $publishResult);
-        self::assertStringContainsString('Workspace version not found in workspace 5', $publishResult->error);
+        $this->expectException(ToolCallException::class);
+        $this->expectExceptionMessage('not found in workspace 5');
+
+        $closure('pages', 100);
     }
 
     public function testStageSetToolRefusesTableOutsideTheReadGrant(): void
@@ -346,10 +350,11 @@ final class WorkspaceToolRegistrarTest extends TestCase
             'workspace_stage_set',
             $this->permissionServiceAllowing([]),
         );
-        $stageResult = $closure('pages', 100, -10);
 
-        self::assertInstanceOf(ErrorResult::class, $stageResult);
-        self::assertStringContainsString('Workspace version not found in workspace 5', $stageResult->error);
+        $this->expectException(ToolCallException::class);
+        $this->expectExceptionMessage('not found in workspace 5');
+
+        $closure('pages', 100, -10);
     }
 
     /** A table that carries no t3ver_* columns reached the query and failed as an opaque error. */
@@ -367,10 +372,11 @@ final class WorkspaceToolRegistrarTest extends TestCase
             $connectionPool,
             'workspace_publish',
         );
-        $publishResult = $closure('sys_log', 100);
 
-        self::assertInstanceOf(ErrorResult::class, $publishResult);
-        self::assertStringContainsString('Workspace version not found in workspace 5', $publishResult->error);
+        $this->expectException(ToolCallException::class);
+        $this->expectExceptionMessage('not found in workspace 5');
+
+        $closure('sys_log', 100);
     }
 
     /** The lookup is bound to the caller's own workspace, so one member cannot act on another's. */
@@ -392,7 +398,12 @@ final class WorkspaceToolRegistrarTest extends TestCase
             $connectionPool,
             'workspace_publish',
         );
-        $closure('pages', 100);
+
+        // The refusal is the point of the other tests; here only the WHERE it was built from matters.
+        try {
+            $closure('pages', 100);
+        } catch (ToolCallException) {
+        }
 
         self::assertContains('uid = 100', $conditions);
         self::assertContains('t3ver_wsid = 7', $conditions);
@@ -424,7 +435,7 @@ final class WorkspaceToolRegistrarTest extends TestCase
             $this->permissionServiceAllowing(['pages']),
         );
         /** @var array{tables: array<string, list<array<string, mixed>>>} $result */
-        $result = json_decode($closure(), true, 512, JSON_THROW_ON_ERROR);
+        $result = JsonResult::of($closure());
 
         self::assertSame(['pages'], array_keys($result['tables']));
     }
@@ -515,10 +526,11 @@ final class WorkspaceToolRegistrarTest extends TestCase
             $connectionPool,
             'workspace_publish',
         );
-        $publishResult = $closure('pages', 999);
 
-        self::assertInstanceOf(ErrorResult::class, $publishResult);
-        self::assertStringContainsString('Workspace version not found in workspace 5', $publishResult->error);
+        $this->expectException(ToolCallException::class);
+        $this->expectExceptionMessage('not found in workspace 5');
+
+        $closure('pages', 999);
     }
 
     public function testDiscardToolBuildsClearWsidCommand(): void
@@ -597,10 +609,11 @@ final class WorkspaceToolRegistrarTest extends TestCase
             $this->createStub(ConnectionPool::class),
             'workspace_stage_set',
         );
-        $stageResult = $closure('pages', 100, -10);
 
-        self::assertInstanceOf(ErrorResult::class, $stageResult);
-        self::assertSame('Stage not accessible to current user', $stageResult->error);
+        $this->expectException(ToolCallException::class);
+        $this->expectExceptionMessage('Stage -10 is not accessible to the current user');
+
+        $closure('pages', 100, -10);
     }
 
     private function createRegistrar(

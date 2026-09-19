@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace MarekSkopal\MsMcpServer\Tests\Unit\Tool\File;
 
 use MarekSkopal\MsMcpServer\Service\FileService;
+use MarekSkopal\MsMcpServer\Tests\Unit\Support\JsonResult;
 use MarekSkopal\MsMcpServer\Tool\File\FileUploadFromUrlTool;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
-use const JSON_THROW_ON_ERROR;
 
 #[CoversClass(FileUploadFromUrlTool::class)]
 final class FileUploadFromUrlToolTest extends TestCase
@@ -30,7 +30,7 @@ final class FileUploadFromUrlToolTest extends TestCase
             ->willReturn($expectedResult);
 
         $tool = new FileUploadFromUrlTool($fileService);
-        $result = json_decode($tool->execute('https://example.com/image.png'), true, 512, JSON_THROW_ON_ERROR);
+        $result = JsonResult::of($tool->execute('https://example.com/image.png'));
 
         self::assertSame(42, $result['uid']);
         self::assertSame('image.png', $result['name']);

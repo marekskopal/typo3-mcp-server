@@ -6,8 +6,8 @@ namespace MarekSkopal\MsMcpServer\Tests\Unit\Tool\File;
 
 use MarekSkopal\MsMcpServer\Service\DataHandlerService;
 use MarekSkopal\MsMcpServer\Tool\File\FileReferenceRemoveTool;
-use MarekSkopal\MsMcpServer\Tool\Result\ErrorResult;
 use MarekSkopal\MsMcpServer\Tool\Result\FileReferenceRemovedResult;
+use Mcp\Exception\ToolCallException;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 
@@ -53,10 +53,11 @@ final class FileReferenceRemoveToolTest extends TestCase
         $dataHandlerService->expects(self::never())->method('deleteRecord');
 
         $tool = new FileReferenceRemoveTool($dataHandlerService);
-        $result = $tool->execute('0,');
 
-        self::assertInstanceOf(ErrorResult::class, $result);
-        self::assertSame('No valid reference UIDs provided', $result->error);
+        $this->expectException(ToolCallException::class);
+        $this->expectExceptionMessage('No valid reference UIDs provided');
+
+        $tool->execute('0,');
     }
 
     public function testExecuteFiltersInvalidUids(): void

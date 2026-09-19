@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace MarekSkopal\MsMcpServer\Tests\Unit\Tool\File;
 
 use MarekSkopal\MsMcpServer\Service\FileService;
+use MarekSkopal\MsMcpServer\Tests\Unit\Support\JsonResult;
 use MarekSkopal\MsMcpServer\Tool\File\FileListTool;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
-use const JSON_THROW_ON_ERROR;
 
 #[CoversClass(FileListTool::class)]
 final class FileListToolTest extends TestCase
@@ -29,7 +29,7 @@ final class FileListToolTest extends TestCase
             ->willReturn($expectedResult);
 
         $tool = new FileListTool($fileService);
-        $result = json_decode($tool->execute(), true, 512, JSON_THROW_ON_ERROR);
+        $result = JsonResult::of($tool->execute());
 
         self::assertSame(1, $result['totalFiles']);
         self::assertSame('test.txt', $result['files'][0]['name']);

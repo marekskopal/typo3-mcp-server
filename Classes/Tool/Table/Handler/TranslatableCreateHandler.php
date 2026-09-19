@@ -6,7 +6,6 @@ namespace MarekSkopal\MsMcpServer\Tool\Table\Handler;
 
 use MarekSkopal\MsMcpServer\Logging\AuditLogger;
 use MarekSkopal\MsMcpServer\Service\DataHandlerService;
-use MarekSkopal\MsMcpServer\Tool\Result\ErrorResult;
 use MarekSkopal\MsMcpServer\Tool\Result\RecordCreatedResult;
 use MarekSkopal\MsMcpServer\Tool\Table\TableToolConfig;
 use Psr\Log\LoggerInterface;
@@ -35,10 +34,10 @@ final readonly class TranslatableCreateHandler extends AbstractTableToolHandler
             . ' Use sysLanguageUid to set the language (0 = default, -1 = all languages).';
     }
 
-    public function __invoke(int $pid, string $fields, int $sysLanguageUid = 0): RecordCreatedResult|ErrorResult
+    public function __invoke(int $pid, string $fields, int $sysLanguageUid = 0): RecordCreatedResult
     {
         return $this->run(
-            fn(): RecordCreatedResult|ErrorResult => RecordCreation::run(
+            fn(): RecordCreatedResult => RecordCreation::run(
                 $this->dataHandlerService,
                 $this->config,
                 $fields,

@@ -579,15 +579,13 @@ class IntegrationTestRunner {
             this.skipped.push({ tool: 'backend_user_get', reason: 'no admin uid' });
         }
 
-        // Missing uid returns an ErrorResult (still a successful tool call)
+        // A read that matched nothing is data, not an error: a successful call carrying found:false.
         const missing = await this.testTool('backend_user_get', { uid: 999_999 });
-        if (missing && !missing.error) {
-            this.failed.push({
-                tool: 'backend_user_get (missing uid)',
-                error: 'expected error result for missing uid',
-            });
-            fail('backend_user_get (missing uid)', 'expected error result');
-        }
+        this.check(
+            'backend_user_get (missing uid) reports found:false',
+            missing?.found === false && missing?.table === 'be_users',
+            `expected a not-found result, got ${JSON.stringify(missing)}`,
+        );
 
         // ---- backend_group_list / backend_group_get ----
         const groups = await this.testTool('backend_group_list', {});
@@ -1123,14 +1121,16 @@ class IntegrationTestRunner {
         this.check(
             'pages_get inside webmount',
             visible?.title === 'Editor Visible Page',
-            `expected fixture title, got '${visible?.title ?? visible?.error}'`,
+            `expected fixture title, got '${visible?.title ?? JSON.stringify(visible)}'`,
         );
 
         // Outside the webmount, although perms_everybody grants SHOW — must be refused.
+        // Either the call is refused outright or the page is simply invisible to this user, which
+        // pages_get reports as found:false. Both are containment; returning the row is not.
         const outside = await this.callToolSafe('pages_get', { uid: 91 });
         this.check(
             'pages_get outside webmount refused',
-            outside === null || !!outside.error,
+            outside === null || outside.found === false,
             `page outside webmount was returned: '${outside?.title}'`,
         );
 
@@ -1185,8 +1185,8 @@ class IntegrationTestRunner {
         const inMount = await this.callToolSafe('file_list', { directoryPath: '/user_upload/', storageUid: 1 });
         this.check(
             'file_list inside the filemount',
-            inMount !== null && !inMount.error,
-            `listing the mount failed: ${inMount?.error ?? 'no result'}`,
+            Array.isArray(inMount?.files),
+            `listing the mount failed: ${JSON.stringify(inMount)}`,
         );
 
         // Outside the mount: refused, both for reads and for writes. The write case is the one
@@ -1194,7 +1194,7 @@ class IntegrationTestRunner {
         const outsideList = await this.callToolSafe('file_list', { directoryPath: '/outside-mount/', storageUid: 1 });
         this.check(
             'file_list outside the filemount refused',
-            outsideList === null || !!outsideList.error,
+            outsideList === null,
             'editor listed a directory outside their filemount',
         );
 
@@ -1206,7 +1206,7 @@ class IntegrationTestRunner {
         });
         this.check(
             'file_upload outside the filemount refused',
-            outsideUpload === null || !!outsideUpload.error,
+            outsideUpload === null,
             `editor uploaded into a directory outside their filemount: ${JSON.stringify(outsideUpload)}`,
         );
 
@@ -1226,11 +1226,10 @@ class IntegrationTestRunner {
         );
 
         section('Editor: table grants still enforced');
-        // No tables_select for be_users — must be refused (error result or tool error).
+        // No tables_select for be_users — must be refused with a tool error, never a result.
         let beUsersDenied = false;
         try {
-            const result = await this.callTool('record_search', { tableName: 'be_users', search: '{}' });
-            beUsersDenied = !!result?.error;
+            await this.callTool('record_search', { tableName: 'be_users', search: '{}' });
         } catch {
             beUsersDenied = true;
         }

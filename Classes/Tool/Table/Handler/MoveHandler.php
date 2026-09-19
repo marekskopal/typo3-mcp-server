@@ -7,7 +7,6 @@ namespace MarekSkopal\MsMcpServer\Tool\Table\Handler;
 use MarekSkopal\MsMcpServer\Logging\AuditLogger;
 use MarekSkopal\MsMcpServer\Service\DataHandlerService;
 use MarekSkopal\MsMcpServer\Tool\Helper\MoveTarget;
-use MarekSkopal\MsMcpServer\Tool\Result\ErrorResult;
 use MarekSkopal\MsMcpServer\Tool\Result\RecordMovedResult;
 use MarekSkopal\MsMcpServer\Tool\Table\TableToolConfig;
 use Psr\Log\LoggerInterface;
@@ -35,14 +34,11 @@ final readonly class MoveHandler extends AbstractTableToolHandler
             . ' targetPid (move to the top of that page) or afterUid (place after that sibling record).';
     }
 
-    public function __invoke(int $uid, int $targetPid = -1, int $afterUid = 0): RecordMovedResult|ErrorResult
+    public function __invoke(int $uid, int $targetPid = -1, int $afterUid = 0): RecordMovedResult
     {
         return $this->run(
-            function () use ($uid, $targetPid, $afterUid): RecordMovedResult|ErrorResult {
+            function () use ($uid, $targetPid, $afterUid): RecordMovedResult {
                 $target = MoveTarget::resolve($targetPid, $afterUid);
-                if ($target instanceof ErrorResult) {
-                    return $target;
-                }
 
                 $this->dataHandlerService->moveRecord($this->config->tableName, $uid, $target);
 

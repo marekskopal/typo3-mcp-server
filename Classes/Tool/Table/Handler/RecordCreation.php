@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace MarekSkopal\MsMcpServer\Tool\Table\Handler;
 
 use MarekSkopal\MsMcpServer\Service\DataHandlerService;
+use MarekSkopal\MsMcpServer\Tool\Helper\FieldRejection;
 use MarekSkopal\MsMcpServer\Tool\Helper\JsonObjectParser;
-use MarekSkopal\MsMcpServer\Tool\Result\ErrorResult;
 use MarekSkopal\MsMcpServer\Tool\Result\RecordCreatedResult;
 use MarekSkopal\MsMcpServer\Tool\Table\TableToolConfig;
 
@@ -27,7 +27,7 @@ final class RecordCreation
         string $fields,
         int $pid,
         ?int $sysLanguageUid,
-    ): RecordCreatedResult|ErrorResult {
+    ): RecordCreatedResult {
         $data = JsonObjectParser::parse($fields, 'fields');
 
         $filteredData = array_intersect_key($data, array_flip($config->writableFields));
@@ -41,7 +41,7 @@ final class RecordCreation
         $ignoredFields = array_map('strval', array_values(array_diff(array_keys($data), array_keys($filteredData))));
 
         if ($filteredData === []) {
-            return new ErrorResult('No valid fields provided', ['ignoredFields' => $ignoredFields]);
+            throw FieldRejection::noValidFields($config->tableName, $ignoredFields);
         }
 
         $uid = $dataHandlerService->createRecord($config->tableName, $pid, $filteredData);

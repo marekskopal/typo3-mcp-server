@@ -6,8 +6,8 @@ namespace MarekSkopal\MsMcpServer\Tool\Pages;
 
 use MarekSkopal\MsMcpServer\Service\DataHandlerService;
 use MarekSkopal\MsMcpServer\Service\TcaSchemaService;
+use MarekSkopal\MsMcpServer\Tool\Helper\FieldRejection;
 use MarekSkopal\MsMcpServer\Tool\Helper\JsonObjectParser;
-use MarekSkopal\MsMcpServer\Tool\Result\ErrorResult;
 use MarekSkopal\MsMcpServer\Tool\Result\RecordUpdatedResult;
 use Mcp\Capability\Attribute\McpTool;
 
@@ -21,7 +21,7 @@ readonly class PagesUpdateTool
         name: 'pages_update',
         description: 'Update an existing page. Pass fields as a JSON object string with field names and their new values.',
     )]
-    public function execute(int $uid, string $fields): RecordUpdatedResult|ErrorResult
+    public function execute(int $uid, string $fields): RecordUpdatedResult
     {
         $data = JsonObjectParser::parse($fields, 'fields');
 
@@ -30,7 +30,7 @@ readonly class PagesUpdateTool
         $ignoredFields = array_values(array_diff(array_keys($data), array_keys($filteredData)));
 
         if ($filteredData === []) {
-            return new ErrorResult('No valid fields provided', ['ignoredFields' => $ignoredFields]);
+            throw FieldRejection::noValidFields('pages', $ignoredFields);
         }
 
         $this->dataHandlerService->updateRecord('pages', $uid, $filteredData);

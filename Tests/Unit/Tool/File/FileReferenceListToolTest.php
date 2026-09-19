@@ -7,8 +7,8 @@ namespace MarekSkopal\MsMcpServer\Tests\Unit\Tool\File;
 use MarekSkopal\MsMcpServer\Service\RecordService;
 use MarekSkopal\MsMcpServer\Service\TcaSchemaService;
 use MarekSkopal\MsMcpServer\Tool\File\FileReferenceListTool;
-use MarekSkopal\MsMcpServer\Tool\Result\ErrorResult;
 use MarekSkopal\MsMcpServer\Tool\Result\FileReferenceListResult;
+use Mcp\Exception\ToolCallException;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 
@@ -76,10 +76,11 @@ final class FileReferenceListToolTest extends TestCase
         $recordService->expects(self::never())->method('findFileReferences');
 
         $tool = new FileReferenceListTool($recordService, new TcaSchemaService());
-        $result = $tool->execute('tx_test', 100, 'title');
 
-        self::assertInstanceOf(ErrorResult::class, $result);
-        self::assertStringContainsString('not a file field', $result->error);
+        $this->expectException(ToolCallException::class);
+        $this->expectExceptionMessage('not a file field');
+
+        $tool->execute('tx_test', 100, 'title');
     }
 
     public function testExecuteThrowsExceptionOnError(): void

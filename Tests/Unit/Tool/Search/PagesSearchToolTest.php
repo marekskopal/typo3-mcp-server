@@ -6,11 +6,11 @@ namespace MarekSkopal\MsMcpServer\Tests\Unit\Tool\Search;
 
 use MarekSkopal\MsMcpServer\Service\RecordService;
 use MarekSkopal\MsMcpServer\Service\TcaSchemaService;
+use MarekSkopal\MsMcpServer\Tests\Unit\Support\JsonResult;
 use MarekSkopal\MsMcpServer\Tool\Search\PagesSearchTool;
 use Mcp\Exception\ToolCallException;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
-use const JSON_THROW_ON_ERROR;
 
 #[CoversClass(PagesSearchTool::class)]
 final class PagesSearchToolTest extends TestCase
@@ -95,7 +95,7 @@ final class PagesSearchToolTest extends TestCase
             ->willReturn(['records' => [['uid' => 1, 'title' => 'Hello World']], 'total' => 1]);
 
         $tool = new PagesSearchTool($recordService, new TcaSchemaService());
-        $result = json_decode($tool->execute('Hello'), true, 512, JSON_THROW_ON_ERROR);
+        $result = JsonResult::of($tool->execute('Hello'));
 
         self::assertSame(1, $result['total']);
     }

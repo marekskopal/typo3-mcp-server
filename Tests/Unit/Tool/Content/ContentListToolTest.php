@@ -6,10 +6,10 @@ namespace MarekSkopal\MsMcpServer\Tests\Unit\Tool\Content;
 
 use MarekSkopal\MsMcpServer\Service\RecordService;
 use MarekSkopal\MsMcpServer\Service\TcaSchemaService;
+use MarekSkopal\MsMcpServer\Tests\Unit\Support\JsonResult;
 use MarekSkopal\MsMcpServer\Tool\Content\ContentListTool;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
-use const JSON_THROW_ON_ERROR;
 
 #[CoversClass(ContentListTool::class)]
 final class ContentListToolTest extends TestCase
@@ -60,7 +60,7 @@ final class ContentListToolTest extends TestCase
             ->willReturn($expectedResult);
 
         $tool = new ContentListTool($recordService, new TcaSchemaService());
-        $result = json_decode($tool->execute(10), true, 512, JSON_THROW_ON_ERROR);
+        $result = JsonResult::of($tool->execute(10));
 
         self::assertSame(1, $result['total']);
         self::assertSame('Test Content', $result['records'][0]['header']);

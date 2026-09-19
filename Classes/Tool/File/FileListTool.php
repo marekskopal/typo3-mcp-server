@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace MarekSkopal\MsMcpServer\Tool\File;
 
 use MarekSkopal\MsMcpServer\Service\FileService;
+use MarekSkopal\MsMcpServer\Tool\Result\DirectoryListResult;
 use Mcp\Capability\Attribute\McpTool;
-use const JSON_THROW_ON_ERROR;
 
 readonly class FileListTool
 {
@@ -20,10 +20,10 @@ readonly class FileListTool
             . ' For a user confined to file mounts, listing the root "/" returns the mount folders,'
             . ' which are the only paths their file operations may descend from.',
     )]
-    public function execute(string $directoryPath = '/', int $storageUid = 1, int $limit = 20, int $offset = 0): string
+    public function execute(string $directoryPath = '/', int $storageUid = 1, int $limit = 20, int $offset = 0): DirectoryListResult
     {
         $result = $this->fileService->listDirectory($storageUid, $directoryPath, $limit, $offset);
 
-        return json_encode($result, JSON_THROW_ON_ERROR);
+        return new DirectoryListResult($result['files'], $result['directories'], $result['totalFiles'], $result['totalDirectories']);
     }
 }

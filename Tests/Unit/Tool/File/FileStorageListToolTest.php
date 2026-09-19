@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace MarekSkopal\MsMcpServer\Tests\Unit\Tool\File;
 
 use MarekSkopal\MsMcpServer\Service\FileService;
+use MarekSkopal\MsMcpServer\Tests\Unit\Support\JsonResult;
 use MarekSkopal\MsMcpServer\Tool\File\FileStorageListTool;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
-use const JSON_THROW_ON_ERROR;
 
 #[CoversClass(FileStorageListTool::class)]
 final class FileStorageListToolTest extends TestCase
@@ -30,7 +30,7 @@ final class FileStorageListToolTest extends TestCase
             ]);
 
         $tool = new FileStorageListTool($fileService);
-        $result = json_decode($tool->execute(), true, 512, JSON_THROW_ON_ERROR);
+        $result = JsonResult::of($tool->execute());
 
         self::assertFalse($result['storages'][0]['fullAccess']);
         self::assertSame('/user_upload/', $result['storages'][0]['mounts'][0]['path']);

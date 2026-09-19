@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace MarekSkopal\MsMcpServer\Tests\Unit\Tool\File;
 
 use MarekSkopal\MsMcpServer\Service\FileService;
+use MarekSkopal\MsMcpServer\Tests\Unit\Support\JsonResult;
 use MarekSkopal\MsMcpServer\Tool\File\DirectoryCreateTool;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
-use const JSON_THROW_ON_ERROR;
 
 #[CoversClass(DirectoryCreateTool::class)]
 final class DirectoryCreateToolTest extends TestCase
@@ -22,7 +22,7 @@ final class DirectoryCreateToolTest extends TestCase
             ->willReturn(['name' => 'newdir', 'identifier' => '/newdir/']);
 
         $tool = new DirectoryCreateTool($fileService);
-        $result = json_decode($tool->execute('newdir'), true, 512, JSON_THROW_ON_ERROR);
+        $result = JsonResult::of($tool->execute('newdir'));
 
         self::assertSame('newdir', $result['name']);
         self::assertSame('/newdir/', $result['identifier']);

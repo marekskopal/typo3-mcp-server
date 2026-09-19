@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace MarekSkopal\MsMcpServer\Tool\File;
 
 use MarekSkopal\MsMcpServer\Service\FileService;
+use MarekSkopal\MsMcpServer\Tool\Result\FileUploadedResult;
 use Mcp\Capability\Attribute\McpTool;
 use Mcp\Exception\ToolCallException;
-use const JSON_THROW_ON_ERROR;
 
 readonly class FileUploadTool
 {
@@ -26,11 +26,11 @@ readonly class FileUploadTool
         string $content = '',
         string $directoryPath = '/',
         int $storageUid = 1,
-    ): string {
+    ): FileUploadedResult {
         $fileContent = $this->resolveContent($base64Content, $content);
         $result = $this->fileService->uploadFile($storageUid, $directoryPath, $fileName, $fileContent);
 
-        return json_encode($result, JSON_THROW_ON_ERROR);
+        return new FileUploadedResult($result['uid'], $result['name'], $result['identifier'], $result['size'], $result['mimeType']);
     }
 
     private function resolveContent(string $base64Content, string $content): string

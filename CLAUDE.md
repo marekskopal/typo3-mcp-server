@@ -88,6 +88,8 @@ vendor/bin/typo3 mcp:server --user=admin
 - `Tool/Helper/RowField` — Internal helper for typed extraction of fields from DB rows (excluded from `mcp.tool` auto-discovery)
 - `Tool/Helper/MoveTarget` — Internal helper that translates the user-facing `targetPid`/`afterUid` pair into TYPO3 DataHandler's move/copy target convention (excluded from `mcp.tool` auto-discovery)
 - `Tool/Helper/UidListParser` — Parses the batch tools' comma-separated UID strings, capped at `MAX_UIDS = 500` so one call cannot enqueue an unbounded DataHandler pass
+- `Tool/Helper/FieldRejection` — Builds the one `ToolCallException` every writer throws when the writable-field filter leaves nothing, naming the table and the dropped fields. The filtering itself differs per tool (the create tools inject the language field), so only the refusal is shared — but it is the part a client reads, and it used to drift
+- `Tool/Result/*` — The typed results every tool returns; see **Tool Result Convention**
 - `Tool/Helper/JsonObjectParser` — Decodes and **validates** a tool's JSON-object parameter (`fields`, `search`). `JSON_THROW_ON_ERROR` guarantees valid JSON, not a JSON *object*, so use this rather than annotating the decode with `@var` — the annotation only suppresses PHPStan while a scalar still reaches `array_intersect_key()` and raises a `TypeError`.
 - `Tool/Helper/RegistrarToolRunner` — Execution wrapper for registrar (closure) tools, which bypass `ErrorHandlingProxy`. Brings them to parity: every call is audited to `sys_log` and raw exception messages are not relayed. Decode arguments **inside** the wrapped closure, or the failure escapes both guarantees.
 - `Tool/Search/SearchParamResolver` — Shared `search` / `orderBy` / `orderDirection` handling for all four search tools, so they cannot drift apart again. A value opening with `{` or `[` is read as JSON and parse failures are reported; anything else is a plain-text LIKE term on `$fallbackField` — `pages_search`/`content_search` pass `title`/`header`, `record_search`/`record_count` pass the table's `getLabelField()`, and when a table has none the term is rejected with an example of the JSON shape instead of a JSON syntax error.
@@ -122,12 +124,26 @@ vendor/bin/typo3 mcp:server --user=admin
 **SDK Workarounds:**
 - Tool classes must be `public: true` in Services.yaml because the SDK's `ReferenceHandler` calls `container->has()` which returns false for private TYPO3 services.
 
+## Tool Result Convention
+
+**Every tool returns a typed result object from `Classes/Tool/Result/` and signals failure by throwing `ToolCallException`.** No tool builds a JSON string by hand, and none encodes an error into a value it returns — an MCP client sees a `{"error": …}` body as a *successful* call, which an agent reads as data and does not retry.
+
+The line between the two:
+
+- **Throw `ToolCallException`** when the tool could not do what was asked: a malformed `fields`/`search` payload, an unknown table or a field the user may not read, a denied permission, or a **write** whose target does not exist (`*_delete`, `record_translate`, `workspace_publish`). `FieldRejection::noValidFields()` is the one message every writer uses when the writable-field filter leaves nothing.
+- **Return a result** for everything the tool did do, including a **read** that matched nothing: an empty `records` list, or `RecordNotFoundResult` (`found: false`) from the `*_get` tools and `permission_check_page`.
+
+The DTOs are serialized by the SDK with `json_encode`, so a public property name *is* a wire key. `RecordResult`, `RecordListResult`, `RecordCountResult`, `SiteLanguagesResult`, `WorkspaceListResult` and `WorkspaceResult` implement `JsonSerializable` to keep the payloads byte-identical to what the tools returned as strings before — `RecordListResult` omits `total` vs `hasMore` depending on the workspace, `RecordResult` keeps the record's fields at the top level. Do not "tidy" those shapes; they are the client contract.
+
+In tests, assert the serialized payload with `Tests/Unit/Support/JsonResult::of()` rather than on property names, so the wire shape stays covered.
+
 ## Adding a New Tool
 
 1. Create a class in `Classes/Tool/<Category>/` with a `#[McpTool]` attribute on the `execute` method
 2. Inject only the services you need (no `LoggerInterface` — error handling is automatic)
-3. The tool is auto-discovered via DI tags — no changes to `McpServerFactory` or `Services.yaml` needed
-4. Add a test in `Tests/Unit/Tool/<Category>/`
+3. Return a result object from `Classes/Tool/Result/` (reuse one before adding another) and throw `ToolCallException` on refusal — see **Tool Result Convention**. Never `json_encode` a return value.
+4. The tool is auto-discovered via DI tags — no changes to `McpServerFactory` or `Services.yaml` needed
+5. Add a test in `Tests/Unit/Tool/<Category>/`
 
 Example minimal tool:
 ```php
@@ -136,10 +152,13 @@ readonly class MyTool
     public function __construct(private RecordService $recordService) {}
 
     #[McpTool(name: 'my_tool', description: 'Does something useful.')]
-    public function execute(int $uid): string
+    public function execute(int $uid): RecordResult|RecordNotFoundResult
     {
         $record = $this->recordService->findByUid('pages', $uid, ['uid', 'title']);
-        return json_encode($record, JSON_THROW_ON_ERROR);
+
+        return $record === null
+            ? new RecordNotFoundResult('pages', $uid, 'Page not found')
+            : new RecordResult($record);
     }
 }
 ```
@@ -157,7 +176,7 @@ readonly class MyTool
 
 ## Testing
 
-954 unit tests covering:
+1033 unit tests covering:
 - All static MCP tools + batch tools (Pages/Content/File/Schema/Search/Translation/Cache/Permission/BackendUser/BackendGroup/Batch CRUD)
 - Dynamic tool registration and execution (DynamicToolRegistrar), including merged EXTCONF + discovered tables
 - OAuth classes (AuthorizationService incl. revocation, ClientRepository, PkceVerifier, OAuthTokenPair, RateLimitService)
@@ -169,7 +188,8 @@ readonly class MyTool
 - BackendUserBootstrap, McpServerFactory, McpServerMiddleware
 - Services (RecordService, DataHandlerService, FileService, StoragePermissionService, TcaSchemaService, MmRelationResolver, MmFieldNormalizer, BackendLayoutService, PermissionService, WorkspaceContextService, CacheService, SiteLanguageService, McpPathProvider)
 - Resources (SystemInfo, SiteConfiguration, TcaTables, BackendUser, TcaTableSchema, BackendLayout)
-- Prompts (all six), tool helpers (UidListParser, JsonObjectParser), TableToolFactory + TableToolConfig
+- Prompts (all six), tool helpers (UidListParser, JsonObjectParser, FieldRejection), TableToolFactory + TableToolConfig
+- Result DTOs whose serialization is the client contract (RecordResult, RecordListResult, RecordCountResult, RecordNotFoundResult)
 - CleanupExpiredTokensCommand
 
 Plus an **integration suite** under `Tests/Integration/` (`setup-typo3.sh` + `run-tests.mjs`) that drives the tools over `mcp:server` against a real TYPO3 and database, in both an admin and a non-admin (editor) scenario. It runs only in the `Integration Tests` GitHub Actions workflow — `vendor/bin/phpunit` does **not** exercise it. It is the only place that covers what unit tests structurally cannot: page/file mount containment for a real editor, workspace overlay behaviour (a record deleted in a workspace leaves a `DELETE_PLACEHOLDER` that only the overlay drops), and the MM relation round-trip through DataHandler. The latter runs against `Tests/Integration/Fixtures/mcp_mm_fixture`, a tiny extension the setup script installs as a path repository and registers via `EXTCONF` (`tx_mcpmmfixture_team` with a select MM `groups` and a group MM `partners`, prefixes `mm_team` / `mm_group`), so the test does not depend on a third-party table's TCA.

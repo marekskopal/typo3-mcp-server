@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace MarekSkopal\MsMcpServer\Tool\Helper;
 
-use MarekSkopal\MsMcpServer\Tool\Result\ErrorResult;
+use Mcp\Exception\ToolCallException;
 
 /**
  * Translates the user-facing (targetPid, afterUid) pair into the integer
@@ -16,17 +16,17 @@ use MarekSkopal\MsMcpServer\Tool\Result\ErrorResult;
  */
 class MoveTarget
 {
-    public static function resolve(int $targetPid, int $afterUid): int|ErrorResult
+    public static function resolve(int $targetPid, int $afterUid): int
     {
         $hasPid = $targetPid >= 0;
         $hasAfter = $afterUid > 0;
 
         if ($hasPid && $hasAfter) {
-            return new ErrorResult('Provide exactly one of targetPid or afterUid, not both.');
+            throw new ToolCallException('Provide exactly one of targetPid or afterUid, not both.');
         }
 
         if (!$hasPid && !$hasAfter) {
-            return new ErrorResult('Provide either targetPid (>= 0) or afterUid (> 0).');
+            throw new ToolCallException('Provide either targetPid (>= 0) or afterUid (> 0).');
         }
 
         return $hasAfter ? -$afterUid : $targetPid;

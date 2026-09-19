@@ -7,8 +7,8 @@ namespace MarekSkopal\MsMcpServer\Tests\Unit\Tool\File;
 use MarekSkopal\MsMcpServer\Service\DataHandlerService;
 use MarekSkopal\MsMcpServer\Service\TcaSchemaService;
 use MarekSkopal\MsMcpServer\Tool\File\FileReferenceAddTool;
-use MarekSkopal\MsMcpServer\Tool\Result\ErrorResult;
 use MarekSkopal\MsMcpServer\Tool\Result\FileReferenceAddedResult;
+use Mcp\Exception\ToolCallException;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 
@@ -55,10 +55,11 @@ final class FileReferenceAddToolTest extends TestCase
         $dataHandlerService->expects(self::never())->method('createFileReferences');
 
         $tool = new FileReferenceAddTool($dataHandlerService, new TcaSchemaService());
-        $result = $tool->execute('tx_test', 100, 'bogus', '42');
 
-        self::assertInstanceOf(ErrorResult::class, $result);
-        self::assertStringContainsString('not a file field', $result->error);
+        $this->expectException(ToolCallException::class);
+        $this->expectExceptionMessage('not a file field');
+
+        $tool->execute('tx_test', 100, 'bogus', '42');
     }
 
     public function testExecuteReturnsErrorForEmptyFileUids(): void
@@ -67,10 +68,11 @@ final class FileReferenceAddToolTest extends TestCase
         $dataHandlerService->expects(self::never())->method('createFileReferences');
 
         $tool = new FileReferenceAddTool($dataHandlerService, new TcaSchemaService());
-        $result = $tool->execute('tx_test', 100, 'image', '0,');
 
-        self::assertInstanceOf(ErrorResult::class, $result);
-        self::assertSame('No valid file UIDs provided', $result->error);
+        $this->expectException(ToolCallException::class);
+        $this->expectExceptionMessage('No valid file UIDs provided');
+
+        $tool->execute('tx_test', 100, 'image', '0,');
     }
 
     public function testExecuteParsesMultipleFileUids(): void

@@ -7,8 +7,8 @@ namespace MarekSkopal\MsMcpServer\Tests\Unit\Tool\Permission;
 use MarekSkopal\MsMcpServer\Service\PermissionService;
 use MarekSkopal\MsMcpServer\Service\RecordService;
 use MarekSkopal\MsMcpServer\Tool\Permission\PermissionCheckPageTool;
-use MarekSkopal\MsMcpServer\Tool\Result\ErrorResult;
 use MarekSkopal\MsMcpServer\Tool\Result\PagePermissionResult;
+use MarekSkopal\MsMcpServer\Tool\Result\RecordNotFoundResult;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 use TYPO3\CMS\Core\Type\Bitmask\Permission;
@@ -69,11 +69,12 @@ final class PermissionCheckPageToolTest extends TestCase
         $permissionService = $this->createStub(PermissionService::class);
 
         $tool = new PermissionCheckPageTool($permissionService, $recordService);
+
         $result = $tool->execute(999);
 
-        self::assertInstanceOf(ErrorResult::class, $result);
-        self::assertStringContainsString('Page not found', $result->error);
-        self::assertSame(999, $result->context['pageId']);
+        self::assertInstanceOf(RecordNotFoundResult::class, $result);
+        self::assertSame('Page not found', $result->message);
+        self::assertSame(999, $result->uid);
     }
 
     public function testExecuteReturnsPartialPermissions(): void

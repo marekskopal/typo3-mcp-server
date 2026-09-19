@@ -6,8 +6,9 @@ namespace MarekSkopal\MsMcpServer\Tool\Pages;
 
 use MarekSkopal\MsMcpServer\Service\RecordService;
 use MarekSkopal\MsMcpServer\Service\TcaSchemaService;
+use MarekSkopal\MsMcpServer\Tool\Result\RecordNotFoundResult;
+use MarekSkopal\MsMcpServer\Tool\Result\RecordResult;
 use Mcp\Capability\Attribute\McpTool;
-use const JSON_THROW_ON_ERROR;
 
 readonly class PagesGetTool
 {
@@ -15,8 +16,11 @@ readonly class PagesGetTool
     {
     }
 
-    #[McpTool(name: 'pages_get', description: 'Get a single page by its uid.')]
-    public function execute(int $uid): string
+    #[McpTool(
+        name: 'pages_get',
+        description: 'Get a single page by its uid.' . ' A uid that does not exist is reported as {"found": false}, not an error.',
+    )]
+    public function execute(int $uid): RecordResult|RecordNotFoundResult
     {
         $translationConfig = $this->tcaSchemaService->getTranslationConfig('pages');
         $fields = $this->tcaSchemaService->getReadFields('pages');
@@ -34,7 +38,7 @@ readonly class PagesGetTool
         $record = $this->recordService->findByUid('pages', $uid, $fields);
 
         if ($record === null) {
-            return json_encode(['error' => 'Page not found'], JSON_THROW_ON_ERROR);
+            return new RecordNotFoundResult('pages', $uid, 'Page not found');
         }
 
         $sysLanguageUid = $record[$languageField ?? ''] ?? -1;
@@ -47,9 +51,12 @@ readonly class PagesGetTool
             )
             && (int) $sysLanguageUid === 0
         ) {
-            $record['translations'] = $this->recordService->findTranslations('pages', $uid, $languageField, $transOrigPointerField);
+            return new RecordResult(
+                $record,
+                $this->recordService->findTranslations('pages', $uid, $languageField, $transOrigPointerField),
+            );
         }
 
-        return json_encode($record, JSON_THROW_ON_ERROR);
+        return new RecordResult($record);
     }
 }
