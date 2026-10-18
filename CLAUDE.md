@@ -51,8 +51,9 @@ vendor/bin/typo3 mcp:server --user=admin
 - `OAuth/DynamicRegistrationPolicy` — Reads the `dynamicClientRegistrationEnabled` setting; when off, `OAuthMiddleware` answers `/mcp/oauth/register` with 403 and drops `registration_endpoint` from the RFC 8414 metadata. The consent screen always shows the redirect target host and flags `dynamically_registered` clients as unverified; `ClientRepository::normalizeClientName()` strips control/format characters from registrant-supplied names
 - `OAuth/OAuthContinuationCookie` — HMAC-signed cookie that carries the relative authorize URL across the `/typo3/login` round-trip; signed with `$GLOBALS['TYPO3_CONF_VARS']['SYS']['encryptionKey']`, 600s TTL, `HttpOnly; SameSite=Lax; Secure` when on HTTPS
 - `Authentication/BackendUserBootstrap` — Bootstraps a `BackendUserAuthentication` from a be_users record and gives it an anonymous, never-persisted session (`initializeSession()`). Core code reached from DataHandler hooks assumes one: EXT:redirects reacts to a slug change with `BackendUtility::setUpdateSignal()`, which hashes the session id in `getModuleData(…, 'ses')`. Core skips that on CLI only, so over HTTP a `pages_update` with a new slug wrote the row and then died in the hook.
-- `Server/McpServerFactory` — Builds the MCP Server instance; tools/resources/prompts are auto-discovered via DI tags, no hardcoded registration needed. Wires `DatabaseSessionStore` so MCP sessions survive container restarts.
+- `Server/McpServerFactory` — Builds the MCP Server instance; tools/resources/prompts are auto-discovered via DI tags, no hardcoded registration needed. Wires `DatabaseSessionStore` so MCP sessions survive container restarts, and `Typo3SessionLock` (`setSessionLock()`, opt-in in the SDK) so parallel requests of one session are serialized.
 - `Server/Session/DatabaseSessionStore` — `Mcp\Server\Session\SessionStoreInterface` implementation backed by `tx_msmcpserver_mcp_session`. Bumps `last_activity` on read/exists for sliding TTL.
+- `Server/Session/Typo3SessionLock` — `Mcp\Server\Session\SessionLockInterface` over TYPO3's `LockFactory` (exclusive + non-blocking, polled until a 30 s timeout; the SDK answers a timeout with 503). Used instead of the SDK's `SymfonyLockSessionLock` because symfony/lock is not part of a TYPO3 install. Its strategies only work within one machine. A new instance per `create()`, since it tracks the locks it holds. `mcp/sdk` 0.8 had no lock and sent responses through the session queue, so parallel tool calls on one session got each other's responses (#32).
 - `Server/ErrorHandlingContainer` — Decorating PSR-11 container that wraps tool/resource instances with centralized error handling
 - `Server/ErrorHandlingProxy` — Proxy that catches `\Throwable` from tool/resource methods, logs it, and converts to `ToolCallException`/`ResourceReadException`
 - `Service/DataHandlerService` — Wraps TYPO3 DataHandler for create/update/delete operations (single and batch). `createRecord`/`updateRecord`/`updateRecords` run the field data through `MmFieldNormalizer` first, so every writer (generated tools, `pages_*`/`content_*`, `record_update_batch`) accepts MM fields in the same shapes. Every `process_datamap()`/`process_cmdmap()` goes through `run()`: DataHandler's `errorLog` (TYPO3's own editor-facing refusals) is relayed as a `ToolCallException`, and a `\Throwable` from a hook becomes a `ToolCallException` naming the exception class and code and warning that the change may already have been applied — hooks run after the row is written. The raw message goes to the injected `LoggerInterface` only, since it can embed SQL.
@@ -180,7 +181,7 @@ readonly class MyTool
 
 ## Testing
 
-1097 unit tests covering:
+1105 unit tests covering:
 - All static MCP tools + batch tools (Pages/Content/File/Schema/Search/Translation/Cache/Permission/BackendUser/BackendGroup/Batch CRUD)
 - Dynamic tool registration and execution (DynamicToolRegistrar), including merged EXTCONF + discovered tables
 - OAuth classes (AuthorizationService incl. revocation, ClientRepository, PkceVerifier, OAuthTokenPair, RateLimitService)
@@ -189,7 +190,7 @@ readonly class MyTool
 - ExtensionTableController (discover, toggle, edit, update)
 - ExtensionTableDiscoveryService (TCA scanning, label/prefix generation, system table filtering)
 - DiscoveredTableRepository (findAll, findEnabled, findByUid, insertIfNew, update, setEnabled)
-- BackendUserBootstrap, McpServerFactory, McpServerMiddleware
+- BackendUserBootstrap, McpServerFactory, McpServerMiddleware, DatabaseSessionStore, Typo3SessionLock
 - Services (RecordService, DataHandlerService, FileService, StoragePermissionService, TcaSchemaService, MmRelationResolver, MmFieldNormalizer, BackendLayoutService, PermissionService, TypoScriptCompilerService, WorkspaceContextService, CacheService, SiteLanguageService, McpPathProvider)
 - Resources (SystemInfo, SiteConfiguration, TcaTables, BackendUser, TcaTableSchema, BackendLayout)
 - Prompts (all six), tool helpers (UidListParser, JsonObjectParser, FieldRejection, ExplicitFields), TableToolFactory + TableToolConfig

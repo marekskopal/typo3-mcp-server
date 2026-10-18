@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Fixed
+- **Parallel tool calls on one MCP session get their own responses.** `mcp/sdk` 0.8 sent a Streamable HTTP response through the session's outgoing queue, which every request read, cleared and saved back without a lock. Two `tools/call` requests on the same `Mcp-Session-Id` (Claude Code sends these routinely) could therefore receive each other's response, or the same one twice, and the client waited for its own until the tool timeout (#32). `mcp/sdk` is raised to `^0.9`: a POST is now answered with its own responses, and `Session::save()` writes only the keys it changed. On top of that, the server now enables the SDK's per-session lock with `Typo3SessionLock`, which serializes the requests of one session through TYPO3's `LockFactory`. Different sessions still run in parallel. A request that waits more than 30 s for the lock gets `503` with a JSON-RPC error. TYPO3's lock strategies work within one machine. On a multi-node setup the SDK's per-key session merge still applies, but requests of one session are not serialized across nodes.
+- **An empty JSON object in a tool result stays `{}` in `structuredContent`.** The SDK decoded the result into PHP arrays, so an empty object went out as `[]`, which clients that prefer `structuredContent` (Claude Code among them) read as an array. Fixed by the same SDK upgrade.
+
 ## [1.4.0] - 2026-09-19
 
 ### Added
