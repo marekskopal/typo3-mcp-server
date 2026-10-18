@@ -15,9 +15,9 @@ jobs:
       matrix:
         include:
           - php: '8.3'
-            typo3: '^13.4.35'
+            typo3: '^13.4.36'
           - php: '8.4'
-            typo3: '^14.3.7'
+            typo3: '^14.3.9'
 
     timeout-minutes: 15
 
