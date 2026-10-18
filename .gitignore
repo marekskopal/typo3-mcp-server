@@ -9,3 +9,4 @@ composer.lock
 Tests/Integration/node_modules/
 Tests/Integration/package-lock.json
 /SECURITY_AUDIT.md
+/.env
