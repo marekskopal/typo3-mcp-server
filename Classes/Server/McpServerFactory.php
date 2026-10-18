@@ -26,7 +26,7 @@ use TYPO3\CMS\Core\Locking\LockFactory;
 
 readonly class McpServerFactory
 {
-    public const string VERSION = '1.4.0';
+    public const string VERSION = '1.4.1';
 
     private const int DEFAULT_SESSION_LIFETIME = 86400;
 

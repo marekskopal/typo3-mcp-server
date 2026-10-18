@@ -338,6 +338,8 @@ Configurable via **Settings > Extension Configuration > ms_mcp_server**:
 |---------|---------|-------------|
 | `sessionLifetime` | 86400 (1 day) | MCP session idle lifetime in seconds (sliding TTL — any activity extends it); idle sessions are removed by `mcp:cleanup` |
 
+Concurrent requests on one MCP session, such as parallel tool calls, run one at a time, serialized through TYPO3's locking API (`LockFactory`). Different sessions still run in parallel. A request that waits more than 30 seconds for its session gets `503`, which clients retry. TYPO3's lock strategies work within one machine, so on a multi-node setup the requests of one session are not serialized across nodes.
+
 ### Audit Logging
 
 Every tool, resource and prompt invocation can be written to `sys_log` with the user, timing, arguments (redacted to size-capped scalars) and the affected table/record.

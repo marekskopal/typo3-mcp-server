@@ -4,10 +4,7 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
-
-### Security
-- **Raised the TYPO3 requirement to the latest security releases.** `typo3/cms-*` now requires `^13.4.36 || ^14.3.9`, and `ext_emconf.php` requires `13.4.36-14.4.99` (it had been left at `13.4.24`). 14.3.9 fixes TYPO3-CORE-SA-2026-024 (CVE-2026-109162, Form Framework file uploads ignoring a custom `saveToFileMount`). 13.4.36 ships the security update of `enshrined/svg-sanitize`. Neither flaw is reachable through MCP, but a fresh `composer install` of this extension could otherwise land on an affected core. The `CI` and `Integration Tests` matrix legs are pinned to the same versions.
+## [1.4.1] - 2026-10-18
 
 ### Changed
 - Raised the dev tool floors to their current releases (PHPStan 2.3, phpstan-phpunit 2.1, PHPUnit 12.5, shipmonk/phpstan-rules 4.4, slevomat/coding-standard 8.31, dg/bypass-finals 1.11).
@@ -15,6 +12,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 ### Fixed
 - **Parallel tool calls on one MCP session get their own responses.** `mcp/sdk` 0.8 sent a Streamable HTTP response through the session's outgoing queue, which every request read, cleared and saved back without a lock. Two `tools/call` requests on the same `Mcp-Session-Id` (Claude Code sends these routinely) could therefore receive each other's response, or the same one twice, and the client waited for its own until the tool timeout (#32). `mcp/sdk` is raised to `^0.9`: a POST is now answered with its own responses, and `Session::save()` writes only the keys it changed. On top of that, the server now enables the SDK's per-session lock with `Typo3SessionLock`, which serializes the requests of one session through TYPO3's `LockFactory`. Different sessions still run in parallel. A request that waits more than 30 s for the lock gets `503` with a JSON-RPC error. TYPO3's lock strategies work within one machine. On a multi-node setup the SDK's per-key session merge still applies, but requests of one session are not serialized across nodes.
 - **An empty JSON object in a tool result stays `{}` in `structuredContent`.** The SDK decoded the result into PHP arrays, so an empty object went out as `[]`, which clients that prefer `structuredContent` (Claude Code among them) read as an array. Fixed by the same SDK upgrade.
+
+### Security
+- **Raised the TYPO3 requirement to the latest security releases.** `typo3/cms-*` now requires `^13.4.36 || ^14.3.9`, and `ext_emconf.php` requires `13.4.36-14.4.99` (it had been left at `13.4.24`). 14.3.9 fixes TYPO3-CORE-SA-2026-024 (CVE-2026-109162, Form Framework file uploads ignoring a custom `saveToFileMount`). 13.4.36 ships the security update of `enshrined/svg-sanitize`. Neither flaw is reachable through MCP, but a fresh `composer install` of this extension could otherwise land on an affected core. The `CI` and `Integration Tests` matrix legs are pinned to the same versions.
 
 ## [1.4.0] - 2026-09-19
 
