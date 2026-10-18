@@ -77,6 +77,7 @@ use Psr\Log\NullLogger;
 use TYPO3\CMS\Backend\View\BackendLayoutView;
 use TYPO3\CMS\Core\Cache\CacheManager;
 use TYPO3\CMS\Core\Configuration\ExtensionConfiguration;
+use TYPO3\CMS\Core\Locking\LockFactory;
 use TYPO3\CMS\Core\Core\ApplicationContext;
 use TYPO3\CMS\Core\Core\Environment;
 use TYPO3\CMS\Core\Database\ConnectionPool;
@@ -230,6 +231,7 @@ final class McpServerFactoryTest extends TestCase
             $logger,
             $auditLogger,
             $sessionRepository,
+            new LockFactory(),
             $extensionConfiguration,
             $tools,
             $resources,

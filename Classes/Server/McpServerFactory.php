@@ -7,6 +7,7 @@ namespace MarekSkopal\MsMcpServer\Server;
 use MarekSkopal\MsMcpServer\Logging\AuditLogger;
 use MarekSkopal\MsMcpServer\Repository\McpSessionRepository;
 use MarekSkopal\MsMcpServer\Server\Session\DatabaseSessionStore;
+use MarekSkopal\MsMcpServer\Server\Session\Typo3SessionLock;
 use MarekSkopal\MsMcpServer\Tool\Dynamic\DynamicToolRegistrar;
 use MarekSkopal\MsMcpServer\Tool\Redirect\RedirectToolRegistrar;
 use MarekSkopal\MsMcpServer\Tool\Scheduler\SchedulerToolRegistrar;
@@ -21,6 +22,7 @@ use Psr\Container\ContainerInterface;
 use Psr\Log\LoggerInterface;
 use ReflectionMethod;
 use TYPO3\CMS\Core\Configuration\ExtensionConfiguration;
+use TYPO3\CMS\Core\Locking\LockFactory;
 
 readonly class McpServerFactory
 {
@@ -45,6 +47,7 @@ readonly class McpServerFactory
         private LoggerInterface $logger,
         private AuditLogger $auditLogger,
         private McpSessionRepository $sessionRepository,
+        private LockFactory $lockFactory,
         ExtensionConfiguration $extensionConfiguration,
         private iterable $tools,
         private iterable $resources,
@@ -67,6 +70,9 @@ readonly class McpServerFactory
             ->setServerInfo('TYPO3 MCP Server', self::VERSION)
             ->setContainer($errorHandlingContainer)
             ->setSession($sessionStore)
+            // Serialize concurrent requests of one session (parallel tool calls), so none of them
+            // overwrites what another saved. A new instance per server: the lock tracks what it holds.
+            ->setSessionLock(new Typo3SessionLock($this->lockFactory))
             ->setPaginationLimit(500);
 
         foreach ($this->tools as $tool) {
