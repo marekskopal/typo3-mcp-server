@@ -113,7 +113,8 @@ final class McpServerFactoryTest extends TestCase
 
     public function testCreateReturnsServerInstance(): void
     {
-        $server = new McpServerFactory(...$this->factoryArguments())->create(42);
+        $factory = new McpServerFactory(...$this->factoryArguments());
+        $server = $factory->create(42);
 
         self::assertInstanceOf(Server::class, $server);
     }
