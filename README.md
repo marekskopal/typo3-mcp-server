@@ -510,7 +510,7 @@ orderBy: "title", orderDirection: "DESC"
 | Tool | Description |
 |------|-------------|
 | `site_languages` | List available languages for a site. Pass any page ID belonging to the site. |
-| `record_translate` | Create a translation of a record. Source must be in default language. Uses TYPO3 connected mode. |
+| `record_translate` | Create a translation of a record. Source must be in default language. Uses TYPO3 connected mode. Optional `fields` (JSON object) sets the translated values in the same run, so a page's slug is built from the translated title. |
 
 ### Batch Operations
 

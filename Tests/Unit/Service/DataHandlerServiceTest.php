@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace MarekSkopal\MsMcpServer\Tests\Unit\Service;
 
+use MarekSkopal\MsMcpServer\DataHandling\LocalizationFieldOverrideHook;
 use MarekSkopal\MsMcpServer\Service\DataHandlerService;
 use MarekSkopal\MsMcpServer\Service\MmFieldNormalizer;
 use MarekSkopal\MsMcpServer\Service\TcaSchemaService;
@@ -124,12 +125,88 @@ final class DataHandlerServiceTest extends TestCase
         }
     }
 
-    private function createService(?LoggerInterface $logger = null): DataHandlerService
+    public function testLocalizeRecordAppliesTranslatedFieldsInTheSameRun(): void
+    {
+        // #37: the translated title has to reach the NEW page core's localize creates, or its slug is
+        // generated from "[Translate to Czech:] Features" and a later fix leaves redirects behind.
+        $this->setUpPagesTca();
+        $hook = new LocalizationFieldOverrideHook();
+        $nestedRecord = ['title' => '[Translate to Czech:] Features', 'hidden' => 1, 'sys_language_uid' => 1, 'l10n_parent' => 12];
+
+        $dataHandler = $this->createMock(DataHandler::class);
+        $dataHandler->expects(self::once())->method('start')->with([], ['pages' => [12 => ['localize' => 1]]]);
+        $dataHandler->expects(self::once())->method('process_cmdmap')->willReturnCallback(
+            static function () use ($hook, &$nestedRecord, $dataHandler): void {
+                $hook->processDatamap_preProcessFieldArray($nestedRecord, 'pages', 'NEW1', $dataHandler);
+                // @phpstan-ignore property.internal
+                $dataHandler->copyMappingArray = ['pages' => [12 => 40]];
+            },
+        );
+        $dataHandler->expects(self::never())->method('process_datamap');
+        GeneralUtility::addInstance(DataHandler::class, $dataHandler);
+
+        $newUid = $this->createService(hook: $hook)->localizeRecord('pages', 12, 1, ['title' => 'Funkce', 'hidden' => 0]);
+
+        self::assertSame(40, $newUid);
+        self::assertSame('Funkce', $nestedRecord['title']);
+        self::assertSame(0, $nestedRecord['hidden']);
+    }
+
+    public function testLocalizeRecordFallsBackToAnUpdateWhenTheNewRecordWasNotReached(): void
+    {
+        $this->setUpPagesTca();
+        $hook = new LocalizationFieldOverrideHook();
+
+        $localize = $this->createStub(DataHandler::class);
+        $localize->method('process_cmdmap')->willReturnCallback(static function () use ($localize): void {
+            // @phpstan-ignore property.internal
+            $localize->copyMappingArray = ['pages' => [12 => 40]];
+        });
+        $update = $this->createMock(DataHandler::class);
+        $update->expects(self::once())->method('start')->with(['pages' => [40 => ['title' => 'Funkce']]], []);
+        $update->expects(self::once())->method('process_datamap');
+        GeneralUtility::addInstance(DataHandler::class, $localize);
+        GeneralUtility::addInstance(DataHandler::class, $update);
+
+        self::assertSame(40, $this->createService(hook: $hook)->localizeRecord('pages', 12, 1, ['title' => 'Funkce']));
+        self::assertFalse($hook->release('pages', 12, 1), 'overrides must not outlive the call');
+    }
+
+    public function testLocalizeRecordReleasesOverridesWhenDataHandlerFails(): void
+    {
+        $this->setUpPagesTca();
+        $hook = new LocalizationFieldOverrideHook();
+
+        $dataHandler = $this->createStub(DataHandler::class);
+        $dataHandler->errorLog = ['Localization failed'];
+        GeneralUtility::addInstance(DataHandler::class, $dataHandler);
+
+        try {
+            $this->createService(hook: $hook)->localizeRecord('pages', 12, 1, ['title' => 'Funkce']);
+            self::fail('Expected a ToolCallException');
+        } catch (ToolCallException $e) {
+            self::assertStringContainsString('Localization failed', $e->getMessage());
+        }
+
+        self::assertFalse($hook->release('pages', 12, 1));
+    }
+
+    private function setUpPagesTca(): void
+    {
+        $GLOBALS['TCA']['pages'] = [
+            'ctrl' => ['languageField' => 'sys_language_uid', 'transOrigPointerField' => 'l10n_parent'],
+            'columns' => ['title' => ['config' => ['type' => 'input']], 'hidden' => ['config' => ['type' => 'check']]],
+        ];
+    }
+
+    private function createService(?LoggerInterface $logger = null, ?LocalizationFieldOverrideHook $hook = null): DataHandlerService
     {
         return new DataHandlerService(
             $this->createStub(SiteFinder::class),
             new MmFieldNormalizer(new TcaSchemaService()),
             $logger ?? new NullLogger(),
+            new TcaSchemaService(),
+            $hook ?? new LocalizationFieldOverrideHook(),
         );
     }
 }

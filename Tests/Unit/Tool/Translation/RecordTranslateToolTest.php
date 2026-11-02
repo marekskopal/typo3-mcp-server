@@ -7,6 +7,7 @@ namespace MarekSkopal\MsMcpServer\Tests\Unit\Tool\Translation;
 use MarekSkopal\MsMcpServer\Service\DataHandlerService;
 use MarekSkopal\MsMcpServer\Service\RecordService;
 use MarekSkopal\MsMcpServer\Service\TcaSchemaService;
+use MarekSkopal\MsMcpServer\Tests\Unit\Support\JsonResult;
 use MarekSkopal\MsMcpServer\Tool\Result\RecordTranslatedResult;
 use MarekSkopal\MsMcpServer\Tool\Translation\RecordTranslateTool;
 use Mcp\Exception\ToolCallException;
@@ -36,7 +37,7 @@ final class RecordTranslateToolTest extends TestCase
         $dataHandlerService = $this->createMock(DataHandlerService::class);
         $dataHandlerService->expects(self::once())
             ->method('localizeRecord')
-            ->with('pages', 1, 2)
+            ->with('pages', 1, 2, [])
             ->willReturn(99);
 
         $tool = new RecordTranslateTool($dataHandlerService, $recordService, new TcaSchemaService());
@@ -145,6 +146,81 @@ final class RecordTranslateToolTest extends TestCase
         $this->expectExceptionMessage('Translation already exists');
 
         $tool->execute('tt_content', 42, 1);
+    }
+
+    public function testExecutePassesTheWritableTranslatedFieldsToTheLocalizeRun(): void
+    {
+        $this->setUpPagesTca();
+        $GLOBALS['TCA']['pages']['columns'] = [
+            'title' => ['config' => ['type' => 'input']],
+            'slug' => ['config' => ['type' => 'slug']],
+            'hidden' => ['config' => ['type' => 'check']],
+            'sys_language_uid' => ['config' => ['type' => 'language']],
+            'l10n_parent' => ['config' => ['type' => 'select']],
+        ];
+
+        $recordService = $this->createStub(RecordService::class);
+        $recordService->method('findByUid')->willReturn(['uid' => 12, 'sys_language_uid' => 0]);
+
+        $dataHandlerService = $this->createMock(DataHandlerService::class);
+        $dataHandlerService->expects(self::once())
+            ->method('localizeRecord')
+            ->with('pages', 12, 1, ['title' => 'Funkce', 'hidden' => 0])
+            ->willReturn(40);
+
+        $tool = new RecordTranslateTool($dataHandlerService, $recordService, new TcaSchemaService());
+        $result = $tool->execute(
+            'pages',
+            12,
+            1,
+            '{"title": "Funkce", "hidden": 0, "sys_language_uid": 2, "l10n_parent": 7, "pid": 1, "nope": 1}',
+        );
+
+        self::assertSame(
+            [
+                'uid' => 40,
+                'table' => 'pages',
+                'targetLanguageId' => 1,
+                'updated' => ['title', 'hidden'],
+                'ignoredFields' => ['sys_language_uid', 'l10n_parent', 'pid', 'nope'],
+            ],
+            JsonResult::of($result),
+        );
+    }
+
+    public function testExecuteRejectsFieldsWithNothingWritable(): void
+    {
+        $this->setUpPagesTca();
+
+        $recordService = $this->createStub(RecordService::class);
+        $recordService->method('findByUid')->willReturn(['uid' => 12, 'sys_language_uid' => 0]);
+
+        $dataHandlerService = $this->createMock(DataHandlerService::class);
+        $dataHandlerService->expects(self::never())->method('localizeRecord');
+
+        $tool = new RecordTranslateTool($dataHandlerService, $recordService, new TcaSchemaService());
+
+        $this->expectException(ToolCallException::class);
+        $this->expectExceptionMessage('Ignored, not writable: nope');
+
+        $tool->execute('pages', 12, 1, '{"nope": 1}');
+    }
+
+    public function testExecuteRejectsAFieldsValueThatIsNotAnObject(): void
+    {
+        $this->setUpPagesTca();
+
+        $recordService = $this->createStub(RecordService::class);
+        $recordService->method('findByUid')->willReturn(['uid' => 12, 'sys_language_uid' => 0]);
+
+        $dataHandlerService = $this->createMock(DataHandlerService::class);
+        $dataHandlerService->expects(self::never())->method('localizeRecord');
+
+        $tool = new RecordTranslateTool($dataHandlerService, $recordService, new TcaSchemaService());
+
+        $this->expectException(ToolCallException::class);
+
+        $tool->execute('pages', 12, 1, '"Funkce"');
     }
 
     private function setUpPagesTca(): void
