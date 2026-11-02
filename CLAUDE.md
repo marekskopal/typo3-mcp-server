@@ -72,7 +72,7 @@ vendor/bin/typo3 mcp:server --user=admin
 - `Service/BackendLayoutService` — Resolves the effective BackendLayout for a page via BackendLayoutView, returns structured DTOs with column positions and grid structure
 - `Tool/Pages/*` — CRUD tools for pages table (use `#[McpTool]` attributes)
 - `Tool/Content/*` — CRUD tools for tt_content table (use `#[McpTool]` attributes)
-- `Tool/File/*` — File management tools (storage/mount list, list, search, get info, upload, upload from URL, copy, delete, move, rename, directory create/delete/move/rename, file reference add/list/remove). Non-admins are confined to their filemounts; `file_storage_list` reports the valid roots and `file_list` on `/` returns the mount folders.
+- `Tool/File/*` — File management tools (storage/mount list, list, search, get info, upload, upload from URL, copy, delete, move, rename, directory create/delete/move/rename, file reference add/list/remove — `file_reference_add` takes an optional `metadata` with the references' own values, one object for all or a per-file list keyed by sys_file uid). Non-admins are confined to their filemounts; `file_storage_list` reports the valid roots and `file_list` on `/` returns the mount folders.
 - `Tool/Schema/TableSchemaTool` — TCA field introspection for any table
 - `Tool/Search/RecordSearchTool` — Search records in any table by field values with operators (eq, neq, like, gt, gte, lt, lte, in, null, notNull) and sorting
 - `Tool/Search/RecordCountTool` — Count records without fetching them, with optional pid and search condition filtering
@@ -183,7 +183,7 @@ readonly class MyTool
 
 ## Testing
 
-1132 unit tests covering:
+1139 unit tests covering:
 - All static MCP tools + batch tools (Pages/Content/File/Schema/Search/Translation/Cache/Permission/BackendUser/BackendGroup/Batch CRUD)
 - Dynamic tool registration and execution (DynamicToolRegistrar), including merged EXTCONF + discovered tables
 - OAuth classes (AuthorizationService incl. revocation, ClientRepository, PkceVerifier, OAuthTokenPair, RateLimitService)

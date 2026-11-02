@@ -485,18 +485,33 @@ class IntegrationTestRunner {
                 this.skipped.push({ tool: t, reason: 'sys_file UID not found' });
             }
         } else {
+            // #39: the reference's own values are written with it, no update per reference afterwards.
             const added = await this.testTool('file_reference_add', {
                 table: 'tt_content',
                 uid: contentUid,
-                fileUids: String(fileUid),
+                fileUids: '',
                 fieldName: 'image',
+                metadata: JSON.stringify([{ uid: fileUid, alternative: 'MCP alt text', title: 'MCP title' }]),
             });
 
-            await this.testTool('file_reference_list', {
+            const listed = await this.testTool('file_reference_list', {
                 table: 'tt_content',
                 uid: contentUid,
                 fieldName: 'image',
             });
+
+            const tool = 'file_reference_add (metadata)';
+            const reference = (listed?.references ?? []).find((r) => Number(r.uid) === added?.referenceUids?.[0]);
+            if (reference?.alternative === 'MCP alt text' && reference?.title === 'MCP title') {
+                this.passed.push({ tool });
+                pass(`${tool}: alternative and title set with the reference`);
+            } else {
+                const why = reference
+                    ? `alternative="${reference.alternative}" title="${reference.title}"`
+                    : 'created reference not found in file_reference_list';
+                this.failed.push({ tool, error: why });
+                fail(tool, why);
+            }
 
             const refUid = added?.referenceUids?.[0];
             if (refUid) {

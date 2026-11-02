@@ -125,6 +125,26 @@ final class DataHandlerServiceTest extends TestCase
         }
     }
 
+    public function testCreateFileReferencesWritesTheMetadataButKeepsTheRelationColumns(): void
+    {
+        $dataHandler = $this->createMock(DataHandler::class);
+        $dataHandler->expects(self::once())->method('start')->with(self::callback(
+            static function (array $datamap): bool {
+                $references = array_values($datamap['sys_file_reference'] ?? []);
+
+                return count($references) === 2
+                    && $references[0]['alternative'] === 'Hall'
+                    && $references[0]['uid_local'] === 2
+                    && $references[0]['uid_foreign'] === 100
+                    && !isset($references[1]['alternative'])
+                    && $references[1]['uid_local'] === 3;
+            },
+        ), []);
+        GeneralUtility::addInstance(DataHandler::class, $dataHandler);
+
+        $this->createService()->createFileReferences('tt_content', 100, 'image', [2, 3], [0 => ['alternative' => 'Hall', 'uid_foreign' => 9]]);
+    }
+
     public function testLocalizeRecordAppliesTranslatedFieldsInTheSameRun(): void
     {
         // #37: the translated title has to reach the NEW page core's localize creates, or its slug is

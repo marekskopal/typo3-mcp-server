@@ -259,10 +259,17 @@ readonly class DataHandlerService
 
     /**
      * @param list<int> $fileUids sys_file UIDs to attach
+     * @param array<int, array<string, mixed>> $referenceFields extra sys_file_reference values (alternative, title, …)
+     *     per entry of $fileUids, by index; the relation columns are always set here and cannot be overridden
      * @return list<int> UIDs of the created sys_file_reference records
      */
-    public function createFileReferences(string $table, int $recordUid, string $fieldName, array $fileUids): array
-    {
+    public function createFileReferences(
+        string $table,
+        int $recordUid,
+        string $fieldName,
+        array $fileUids,
+        array $referenceFields = [],
+    ): array {
         $newIds = [];
         $datamap = [];
 
@@ -270,14 +277,14 @@ readonly class DataHandlerService
             $newId = 'NEW_ref_' . bin2hex(random_bytes(4));
             $newIds[] = $newId;
 
-            $datamap['sys_file_reference'][$newId] = [
+            $datamap['sys_file_reference'][$newId] = array_merge($referenceFields[$index] ?? [], [
                 'uid_local' => $fileUid,
                 'uid_foreign' => $recordUid,
                 'tablenames' => $table,
                 'fieldname' => $fieldName,
                 'sorting_foreign' => $index + 1,
                 'pid' => 0,
-            ];
+            ]);
         }
 
         $datamap[$table][$recordUid] = [
