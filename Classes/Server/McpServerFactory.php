@@ -18,6 +18,7 @@ use Mcp\Capability\Attribute\McpResource;
 use Mcp\Capability\Attribute\McpResourceTemplate;
 use Mcp\Capability\Attribute\McpTool;
 use Mcp\Server;
+use Mcp\Server\Builder;
 use Psr\Container\ContainerInterface;
 use Psr\Log\LoggerInterface;
 use ReflectionMethod;
@@ -66,7 +67,7 @@ readonly class McpServerFactory
         $handlerTypes = $this->buildHandlerTypeMap();
         $errorHandlingContainer = new ErrorHandlingContainer($this->container, $this->logger, $this->auditLogger, $handlerTypes);
 
-        $builder = Server::builder()
+        $builder = $this->newBuilder()
             ->setServerInfo('TYPO3 MCP Server', self::VERSION)
             ->setContainer($errorHandlingContainer)
             ->setSession($sessionStore)
@@ -77,7 +78,18 @@ readonly class McpServerFactory
 
         foreach ($this->tools as $tool) {
             $attribute = $this->getMethodAttribute($tool, McpTool::class);
-            $builder->addTool([$tool::class, 'execute'], $attribute?->name);
+            // Hand over the whole attribute: given only a name, the SDK falls back to the method's
+            // docblock for the description, and `execute` has none — the client got a bare schema (#36).
+            $builder->addTool(
+                handler: [$tool::class, 'execute'],
+                name: $attribute?->name,
+                title: $attribute?->title,
+                description: $attribute?->description,
+                annotations: $attribute?->annotations,
+                icons: $attribute?->icons,
+                meta: $attribute?->meta,
+                outputSchema: $attribute?->outputSchema,
+            );
         }
 
         $this->dynamicToolRegistrar->register($builder);
@@ -93,6 +105,13 @@ readonly class McpServerFactory
                     handler: [$resource::class, 'execute'],
                     uri: $attribute->uri,
                     name: $attribute->name,
+                    title: $attribute->title,
+                    description: $attribute->description,
+                    mimeType: $attribute->mimeType,
+                    size: $attribute->size,
+                    annotations: $attribute->annotations,
+                    icons: $attribute->icons,
+                    meta: $attribute->meta,
                 );
                 continue;
             }
@@ -106,15 +125,33 @@ readonly class McpServerFactory
                 handler: [$resource::class, 'execute'],
                 uriTemplate: $templateAttribute->uriTemplate,
                 name: $templateAttribute->name,
+                title: $templateAttribute->title,
+                description: $templateAttribute->description,
+                mimeType: $templateAttribute->mimeType,
+                annotations: $templateAttribute->annotations,
+                meta: $templateAttribute->meta,
             );
         }
 
         foreach ($this->prompts as $prompt) {
             $attribute = $this->getMethodAttribute($prompt, McpPrompt::class);
-            $builder->addPrompt([$prompt::class, 'execute'], $attribute?->name);
+            $builder->addPrompt(
+                handler: [$prompt::class, 'execute'],
+                name: $attribute?->name,
+                title: $attribute?->title,
+                description: $attribute?->description,
+                icons: $attribute?->icons,
+                meta: $attribute?->meta,
+            );
         }
 
         return $builder->build();
+    }
+
+    /** Seam for tests, which hand the builder a registry they can read back. */
+    protected function newBuilder(): Builder
+    {
+        return Server::builder();
     }
 
     /**
