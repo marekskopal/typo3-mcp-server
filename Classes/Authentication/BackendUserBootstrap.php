@@ -9,6 +9,7 @@ use TYPO3\CMS\Core\Authentication\BackendUserAuthentication;
 use TYPO3\CMS\Core\Database\ConnectionPool;
 use TYPO3\CMS\Core\Localization\LanguageServiceFactory;
 use TYPO3\CMS\Core\Utility\ExtensionManagementUtility;
+use TYPO3\CMS\Core\Utility\GeneralUtility;
 
 readonly class BackendUserBootstrap
 {
@@ -55,8 +56,7 @@ readonly class BackendUserBootstrap
             throw new \RuntimeException('Backend user not found', 1712000010);
         }
 
-        $backendUser = new BackendUserAuthentication();
-        $this->initializeSession($backendUser);
+        $backendUser = $this->createBackendUser();
         // @phpstan-ignore property.internal
         $backendUser->user = $userRow;
         // @phpstan-ignore method.internal
@@ -70,6 +70,22 @@ readonly class BackendUserBootstrap
 
         $GLOBALS['BE_USER'] = $backendUser;
         $GLOBALS['LANG'] = $this->languageServiceFactory->createFromUserPreferences($backendUser);
+
+        return $backendUser;
+    }
+
+    /**
+     * A user object with a logger and a session, ready for `user` to be set.
+     *
+     * Built with makeInstance() rather than `new`: BackendUserAuthentication is LoggerAware and only
+     * makeInstance() injects the logger. `writeUC()` logs unconditionally, and the same redirects
+     * slug hook reaches it through `pushModuleData()` — with `new`, `pages_update` with a new slug
+     * wrote the row and then died on "Call to a member function debug() on null" (#35).
+     */
+    public function createBackendUser(): BackendUserAuthentication
+    {
+        $backendUser = GeneralUtility::makeInstance(BackendUserAuthentication::class);
+        $this->initializeSession($backendUser);
 
         return $backendUser;
     }

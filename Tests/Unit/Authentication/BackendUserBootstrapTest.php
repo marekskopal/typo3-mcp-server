@@ -8,6 +8,7 @@ use Doctrine\DBAL\Result;
 use MarekSkopal\MsMcpServer\Authentication\BackendUserBootstrap;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\LoggerInterface;
 use TYPO3\CMS\Core\Authentication\BackendUserAuthentication;
 use TYPO3\CMS\Core\Database\ConnectionPool;
 use TYPO3\CMS\Core\Database\Query\Expression\ExpressionBuilder;
@@ -167,6 +168,42 @@ final class BackendUserBootstrapTest extends TestCase
             self::assertNull($backendUser->getModuleData('BackendUtility::getUpdateSignal', 'ses'));
             $backendUser->pushModuleData('BackendUtility::getUpdateSignal', ['x' => 1], true);
             self::assertSame(['x' => 1], $backendUser->getModuleData('BackendUtility::getUpdateSignal', 'ses'));
+        } finally {
+            GeneralUtility::purgeInstances();
+            unset($GLOBALS['TYPO3_CONF_VARS'], $GLOBALS['EXEC_TIME']);
+        }
+    }
+
+    /**
+     * writeUC() logs before anything else, and the redirects slug hook reaches it via
+     * setUpdateSignal() → pushModuleData(). A user built with `new` has no logger, so a slug
+     * change over HTTP died on "debug() on null" after the row was written (#35).
+     */
+    public function testCreateBackendUserInjectsLoggerAndSession(): void
+    {
+        $GLOBALS['TYPO3_CONF_VARS']['SYS']['encryptionKey'] = str_repeat('a', 96);
+        $GLOBALS['TYPO3_CONF_VARS']['SYS']['session']['BE'] = [
+            'backend' => DatabaseSessionBackend::class,
+            'options' => ['table' => 'be_sessions'],
+        ];
+        $GLOBALS['TYPO3_CONF_VARS']['BE']['sessionTimeout'] = 28800;
+        $GLOBALS['TYPO3_CONF_VARS']['BE']['lockIP'] = 0;
+        $GLOBALS['TYPO3_CONF_VARS']['BE']['lockIPv6'] = 0;
+        $GLOBALS['TYPO3_CONF_VARS']['BE']['lifetime'] = 0;
+        $GLOBALS['TYPO3_CONF_VARS']['LOG'] = [];
+        $GLOBALS['EXEC_TIME'] = time();
+
+        try {
+            $bootstrap = new BackendUserBootstrap(
+                $this->createStub(ConnectionPool::class),
+                $this->createStub(LanguageServiceFactory::class),
+            );
+
+            $backendUser = $bootstrap->createBackendUser();
+
+            $logger = new \ReflectionProperty($backendUser, 'logger');
+            self::assertInstanceOf(LoggerInterface::class, $logger->getValue($backendUser));
+            self::assertInstanceOf(UserSession::class, $backendUser->getSession());
         } finally {
             GeneralUtility::purgeInstances();
             unset($GLOBALS['TYPO3_CONF_VARS'], $GLOBALS['EXEC_TIME']);
