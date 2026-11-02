@@ -69,7 +69,9 @@ use MarekSkopal\MsMcpServer\Tool\Search\RecordCountTool;
 use MarekSkopal\MsMcpServer\Tool\Search\RecordSearchTool;
 use MarekSkopal\MsMcpServer\Tool\Translation\RecordTranslateTool;
 use MarekSkopal\MsMcpServer\Tool\Translation\SiteLanguagesTool;
+use Mcp\Capability\Registry;
 use Mcp\Server;
+use Mcp\Server\Builder;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 use Psr\Container\ContainerInterface;
@@ -110,6 +112,58 @@ final class McpServerFactoryTest extends TestCase
     }
 
     public function testCreateReturnsServerInstance(): void
+    {
+        $server = new McpServerFactory(...$this->factoryArguments())->create(42);
+
+        self::assertInstanceOf(Server::class, $server);
+    }
+
+    /**
+     * The SDK falls back to the handler's docblock when no description is passed, and the `execute`
+     * methods have none — so dropping the attribute's description sent bare schemas to the client (#36).
+     */
+    public function testAttributeDescriptionsReachTheRegistry(): void
+    {
+        $registry = new Registry();
+        $factory = new readonly class ($registry, ...$this->factoryArguments()) extends McpServerFactory {
+            public function __construct(private Registry $registry, mixed ...$arguments)
+            {
+                parent::__construct(...$arguments);
+            }
+
+            protected function newBuilder(): Builder
+            {
+                return parent::newBuilder()->setRegistry($this->registry);
+            }
+        };
+        $factory->create(42);
+
+        $tools = $registry->getTools()->references;
+        self::assertNotEmpty($tools);
+        foreach ($tools as $name => $tool) {
+            self::assertNotEmpty($tool->description, 'Tool without description: ' . $name);
+        }
+
+        self::assertSame(
+            'Get a single page by its uid. A uid that does not exist is reported as {"found": false}, not an error.',
+            $registry->getTool('pages_get')->tool->description,
+        );
+
+        $prompts = $registry->getPrompts()->references;
+        self::assertNotEmpty($prompts);
+        foreach ($prompts as $name => $prompt) {
+            self::assertNotEmpty($prompt->description, 'Prompt without description: ' . $name);
+        }
+
+        $resources = $registry->getResources()->references;
+        self::assertNotEmpty($resources);
+        foreach ($resources as $uri => $resource) {
+            self::assertNotEmpty($resource->description, 'Resource without description: ' . $uri);
+        }
+    }
+
+    /** @return list<mixed> */
+    private function factoryArguments(): array
     {
         $connectionPool = $this->createStub(ConnectionPool::class);
         $storageRepository = $this->createStub(StorageRepository::class);
@@ -221,7 +275,7 @@ final class McpServerFactoryTest extends TestCase
         $extensionConfiguration = $this->createStub(ExtensionConfiguration::class);
         $extensionConfiguration->method('get')->willReturn(['sessionLifetime' => 86400]);
 
-        $factory = new McpServerFactory(
+        return [
             $container,
             $dynamicToolRegistrar,
             $redirectToolRegistrar,
@@ -236,10 +290,7 @@ final class McpServerFactoryTest extends TestCase
             $tools,
             $resources,
             $prompts,
-        );
-        $server = $factory->create(42);
-
-        self::assertInstanceOf(Server::class, $server);
+        ];
     }
 
     /**
