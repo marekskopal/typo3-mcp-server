@@ -475,11 +475,39 @@ class IntegrationTestRunner {
         await this.testTool('site_languages', { pageId: pageUid ?? 1 });
 
         if (pageUid) {
-            await this.testTool('record_translate', {
+            // #37: the translated values go into the record localize creates, so the slug is built from
+            // the translated title, not from "[Translate to German:] …", and needs no follow-up update.
+            const translated = await this.testTool('record_translate', {
                 table: 'pages',
                 uid: pageUid,
                 targetLanguageId: 1,
+                fields: JSON.stringify({ title: 'MCP Uebersetzte Seite', hidden: 0 }),
             });
+
+            const page = translated?.uid ? await this.callToolSafe('pages_get', { uid: translated.uid }) : null;
+            const tool = 'record_translate (fields in the same run)';
+            if (page?.title === undefined) {
+                this.failed.push({ tool, error: 'could not read the translated page back' });
+                fail(tool, 'could not read the translated page back');
+            } else {
+                const problems = [];
+                if (page.title !== 'MCP Uebersetzte Seite') {
+                    problems.push(`title is "${page.title}"`);
+                }
+                if (page.slug !== undefined && !String(page.slug).includes('mcp-uebersetzte-seite')) {
+                    problems.push(`slug "${page.slug}" was not built from the translated title`);
+                }
+                if (translated.updated?.includes('hidden') && Number(page.hidden) !== 0) {
+                    problems.push('page came out hidden');
+                }
+                if (problems.length === 0) {
+                    this.passed.push({ tool });
+                    pass(`${tool}: title${page.slug !== undefined ? `, slug ${page.slug}` : ''} set at creation`);
+                } else {
+                    this.failed.push({ tool, error: problems.join('; ') });
+                    fail(tool, problems.join('; '));
+                }
+            }
         }
     }
 

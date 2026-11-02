@@ -50,6 +50,11 @@ services:
   MarekSkopal\MsMcpServer\DataHandling\BackendUserPasswordChangeHook:
     public: true
 
+  # Shared and public: DataHandler resolves hooks via makeInstance(), which must hand back the
+  # instance DataHandlerService registered the pending overrides with.
+  MarekSkopal\MsMcpServer\DataHandling\LocalizationFieldOverrideHook:
+    public: true
+
   MarekSkopal\MsMcpServer\Command\CleanupExpiredTokensCommand:
     tags:
       - name: 'console.command'

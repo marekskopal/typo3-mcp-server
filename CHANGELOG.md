@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+- **`record_translate` takes the translated values in the same call.** A new optional `fields` argument (a JSON object, filtered to the table's writable fields like the update tools; the language and translation pointer fields are dropped) is applied to the record core's `localize` creates, in the same DataHandler run. Before, a translated page got its slug from the prefixed title (`/translate-to-czech-features`), came out hidden and carried `[Translate to …:]` in its texts, so every translation needed a follow-up update, and changing the slug then left EXT:redirects' redirects behind for a slug that was never public. The values now reach the new record before its slug is generated, through the `LocalizationFieldOverrideHook` DataHandler hook. The result lists the applied fields in `updated` and the dropped ones in `ignoredFields` (#37).
+
 ## [1.4.2] - 2026-11-02
 
 ### Fixed

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace MarekSkopal\MsMcpServer\Service;
 
+use MarekSkopal\MsMcpServer\DataHandling\LocalizationFieldOverrideHook;
 use Mcp\Exception\ToolCallException;
 use Psr\Http\Message\ServerRequestInterface;
 use Psr\Log\LoggerInterface;
@@ -19,6 +20,8 @@ readonly class DataHandlerService
         private SiteFinder $siteFinder,
         private MmFieldNormalizer $mmFieldNormalizer,
         private LoggerInterface $logger,
+        private TcaSchemaService $tcaSchemaService = new TcaSchemaService(),
+        private LocalizationFieldOverrideHook $localizationFieldOverrideHook = new LocalizationFieldOverrideHook(),
     ) {
     }
 
@@ -208,11 +211,19 @@ readonly class DataHandlerService
     /**
      * Create a translation of an existing record using TYPO3 localize command (connected mode).
      *
+     * `$fields` are the translated values. They go into the record `localize` creates, in the same
+     * DataHandler run (see LocalizationFieldOverrideHook), so a page's slug is generated from the
+     * translated title instead of the "[Translate to …:]" one and no redirect is left behind for it.
+     * Should the hook not have reached the new record, they are written with a plain update instead.
+     *
+     * @param array<string, mixed> $fields
      * @return int The uid of the new translated record
      */
-    public function localizeRecord(string $table, int $uid, int $targetLanguageId): int
+    public function localizeRecord(string $table, int $uid, int $targetLanguageId, array $fields = []): int
     {
+        $fields = $this->mmFieldNormalizer->normalize($table, $fields);
         $originalRequest = $table === 'pages' ? $this->ensureSiteContext($uid) : null;
+        $overridesRegistered = $fields !== [] && $this->registerLocalizationOverrides($table, $uid, $targetLanguageId, $fields);
 
         try {
             $dataHandler = GeneralUtility::makeInstance(DataHandler::class);
@@ -229,13 +240,20 @@ readonly class DataHandlerService
             if (!is_int($newUid) && !is_string($newUid)) {
                 throw new \RuntimeException('Localize command did not return a new record uid', 1712000030);
             }
-
-            return (int) $newUid;
         } finally {
+            // Released on failure too: a pending override must never reach an unrelated later run.
+            $overridesUnapplied = $overridesRegistered
+                && $this->localizationFieldOverrideHook->release($table, $uid, $targetLanguageId);
             if ($originalRequest !== null) {
                 $GLOBALS['TYPO3_REQUEST'] = $originalRequest;
             }
         }
+
+        if ($fields !== [] && (!$overridesRegistered || $overridesUnapplied)) {
+            $this->updateRecord($table, (int) $newUid, $fields);
+        }
+
+        return (int) $newUid;
     }
 
     /**
@@ -284,6 +302,26 @@ readonly class DataHandlerService
         }
 
         return $referenceUids;
+    }
+
+    /** @param array<string, mixed> $fields */
+    private function registerLocalizationOverrides(string $table, int $uid, int $targetLanguageId, array $fields): bool
+    {
+        $translationConfig = $this->tcaSchemaService->getTranslationConfig($table);
+        if ($translationConfig['languageField'] === null || $translationConfig['transOrigPointerField'] === null) {
+            return false;
+        }
+
+        $this->localizationFieldOverrideHook->register(
+            $table,
+            $uid,
+            $targetLanguageId,
+            $translationConfig['languageField'],
+            $translationConfig['transOrigPointerField'],
+            $fields,
+        );
+
+        return true;
     }
 
     private function ensureSiteContext(int $pageId): ?ServerRequestInterface
