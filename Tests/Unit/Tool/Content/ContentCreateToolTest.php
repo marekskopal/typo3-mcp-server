@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace MarekSkopal\MsMcpServer\Tests\Unit\Tool\Content;
 
 use MarekSkopal\MsMcpServer\Service\DataHandlerService;
+use MarekSkopal\MsMcpServer\Service\RecordService;
 use MarekSkopal\MsMcpServer\Service\TcaSchemaService;
 use MarekSkopal\MsMcpServer\Tool\Content\ContentCreateTool;
 use MarekSkopal\MsMcpServer\Tool\Result\RecordCreatedResult;
@@ -52,11 +53,41 @@ final class ContentCreateToolTest extends TestCase
             )
             ->willReturn(100);
 
-        $tool = new ContentCreateTool($dataHandlerService, new TcaSchemaService());
+        $tool = new ContentCreateTool($dataHandlerService, new TcaSchemaService(), $this->createStub(RecordService::class));
         $result = $tool->execute(10, json_encode(['CType' => 'text', 'header' => 'My Header'], JSON_THROW_ON_ERROR));
 
         self::assertInstanceOf(RecordCreatedResult::class, $result);
         self::assertSame(100, $result->uid);
+    }
+
+    public function testExecuteAppendsToTheEndOfThePageByDefault(): void
+    {
+        $recordService = $this->createStub(RecordService::class);
+        $recordService->method('findLastSortedUid')->willReturn(57);
+
+        $dataHandlerService = $this->createMock(DataHandlerService::class);
+        $dataHandlerService->expects(self::once())
+            ->method('createRecord')
+            ->with('tt_content', -57, ['CType' => 'text', 'header' => 'Steps'])
+            ->willReturn(101);
+
+        $tool = new ContentCreateTool($dataHandlerService, new TcaSchemaService(), $recordService);
+        $tool->execute(10, json_encode(['CType' => 'text', 'header' => 'Steps'], JSON_THROW_ON_ERROR));
+    }
+
+    public function testExecutePlacesAfterTheGivenRecord(): void
+    {
+        $recordService = $this->createStub(RecordService::class);
+        $recordService->method('findByUid')->willReturn(['uid' => 33, 'pid' => 10]);
+
+        $dataHandlerService = $this->createMock(DataHandlerService::class);
+        $dataHandlerService->expects(self::once())
+            ->method('createRecord')
+            ->with('tt_content', -33, self::anything())
+            ->willReturn(101);
+
+        $tool = new ContentCreateTool($dataHandlerService, new TcaSchemaService(), $recordService);
+        $tool->execute(10, json_encode(['CType' => 'text', 'header' => 'Hero'], JSON_THROW_ON_ERROR), afterUid: 33);
     }
 
     public function testExecuteCreatesContentWithAllParams(): void
@@ -76,7 +107,7 @@ final class ContentCreateToolTest extends TestCase
             )
             ->willReturn(200);
 
-        $tool = new ContentCreateTool($dataHandlerService, new TcaSchemaService());
+        $tool = new ContentCreateTool($dataHandlerService, new TcaSchemaService(), $this->createStub(RecordService::class));
         $result = $tool->execute(5, json_encode([
             'CType' => 'html',
             'header' => 'My Header',
@@ -105,7 +136,7 @@ final class ContentCreateToolTest extends TestCase
             )
             ->willReturn(300);
 
-        $tool = new ContentCreateTool($dataHandlerService, new TcaSchemaService());
+        $tool = new ContentCreateTool($dataHandlerService, new TcaSchemaService(), $this->createStub(RecordService::class));
         $result = $tool->execute(10, json_encode([
             'CType' => 'list',
             'header' => 'News Plugin',
@@ -124,7 +155,7 @@ final class ContentCreateToolTest extends TestCase
             ->method('createRecord')
             ->willReturn(100);
 
-        $tool = new ContentCreateTool($dataHandlerService, new TcaSchemaService());
+        $tool = new ContentCreateTool($dataHandlerService, new TcaSchemaService(), $this->createStub(RecordService::class));
         $result = $tool->execute(10, json_encode(['header' => 'Test', 'unknown_field' => 'x'], JSON_THROW_ON_ERROR));
 
         self::assertInstanceOf(RecordCreatedResult::class, $result);
@@ -139,7 +170,7 @@ final class ContentCreateToolTest extends TestCase
             ->method('createRecord')
             ->willReturn(100);
 
-        $tool = new ContentCreateTool($dataHandlerService, new TcaSchemaService());
+        $tool = new ContentCreateTool($dataHandlerService, new TcaSchemaService(), $this->createStub(RecordService::class));
         $result = $tool->execute(10, json_encode(['header' => 'Test'], JSON_THROW_ON_ERROR));
 
         self::assertInstanceOf(RecordCreatedResult::class, $result);
@@ -153,7 +184,7 @@ final class ContentCreateToolTest extends TestCase
         $dataHandlerService->expects(self::never())
             ->method('createRecord');
 
-        $tool = new ContentCreateTool($dataHandlerService, new TcaSchemaService());
+        $tool = new ContentCreateTool($dataHandlerService, new TcaSchemaService(), $this->createStub(RecordService::class));
 
         $this->expectException(ToolCallException::class);
         $this->expectExceptionMessage('No valid fields provided');
@@ -177,7 +208,7 @@ final class ContentCreateToolTest extends TestCase
             )
             ->willReturn(100);
 
-        $tool = new ContentCreateTool($dataHandlerService, new TcaSchemaService());
+        $tool = new ContentCreateTool($dataHandlerService, new TcaSchemaService(), $this->createStub(RecordService::class));
         $result = $tool->execute(10, json_encode(['header' => 'Test'], JSON_THROW_ON_ERROR), -1);
 
         self::assertInstanceOf(RecordCreatedResult::class, $result);
@@ -200,7 +231,7 @@ final class ContentCreateToolTest extends TestCase
             )
             ->willReturn(100);
 
-        $tool = new ContentCreateTool($dataHandlerService, new TcaSchemaService());
+        $tool = new ContentCreateTool($dataHandlerService, new TcaSchemaService(), $this->createStub(RecordService::class));
         $tool->execute(10, json_encode(['header' => 'Test'], JSON_THROW_ON_ERROR));
     }
 
@@ -211,7 +242,7 @@ final class ContentCreateToolTest extends TestCase
             ->method('createRecord')
             ->willThrowException(new \RuntimeException('DataHandler error'));
 
-        $tool = new ContentCreateTool($dataHandlerService, new TcaSchemaService());
+        $tool = new ContentCreateTool($dataHandlerService, new TcaSchemaService(), $this->createStub(RecordService::class));
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('DataHandler error');

@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace MarekSkopal\MsMcpServer\Tool\Content;
 
 use MarekSkopal\MsMcpServer\Service\DataHandlerService;
+use MarekSkopal\MsMcpServer\Service\RecordService;
 use MarekSkopal\MsMcpServer\Service\TcaSchemaService;
+use MarekSkopal\MsMcpServer\Tool\Helper\CreatePosition;
 use MarekSkopal\MsMcpServer\Tool\Helper\FieldRejection;
 use MarekSkopal\MsMcpServer\Tool\Helper\JsonObjectParser;
 use MarekSkopal\MsMcpServer\Tool\Result\RecordCreatedResult;
@@ -13,16 +15,26 @@ use Mcp\Capability\Attribute\McpTool;
 
 readonly class ContentCreateTool
 {
-    public function __construct(private DataHandlerService $dataHandlerService, private TcaSchemaService $tcaSchemaService,)
-    {
+    public function __construct(
+        private DataHandlerService $dataHandlerService,
+        private TcaSchemaService $tcaSchemaService,
+        private RecordService $recordService,
+    ) {
     }
 
     #[McpTool(
         name: 'content_create',
         description: 'Create a new content element on a page. Pass fields as a JSON object string.'
-            . ' Use sysLanguageUid to set the language (0 = default, -1 = all languages).',
+            . ' Use sysLanguageUid to set the language (0 = default, -1 = all languages).'
+            . CreatePosition::DESCRIPTION,
     )]
-    public function execute(int $pid, string $fields, int $sysLanguageUid = 0): RecordCreatedResult
+    public function execute(
+        int $pid,
+        string $fields,
+        int $sysLanguageUid = 0,
+        int $afterUid = 0,
+        string $position = CreatePosition::BOTTOM,
+    ): RecordCreatedResult
     {
         $data = JsonObjectParser::parse($fields, 'fields');
 
@@ -42,7 +54,8 @@ readonly class ContentCreateTool
             throw FieldRejection::noValidFields('tt_content', $ignoredFields);
         }
 
-        $uid = $this->dataHandlerService->createRecord('tt_content', $pid, $filteredData);
+        $target = CreatePosition::resolve($this->recordService, 'tt_content', $pid, $afterUid, $position);
+        $uid = $this->dataHandlerService->createRecord('tt_content', $target, $filteredData);
 
         return new RecordCreatedResult($uid, $ignoredFields);
     }

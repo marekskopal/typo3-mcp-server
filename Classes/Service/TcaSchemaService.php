@@ -60,6 +60,17 @@ readonly class TcaSchemaService
     }
 
     /**
+     * The table's manual sort field (TCA `ctrl.sortby`): the order the page tree, the menu and the page
+     * module show. Null when the table is unknown or not manually sorted.
+     */
+    public function getSortByField(string $tableName): ?string
+    {
+        $tca = $this->getTca($tableName);
+
+        return $tca === null ? null : $this->getSortField($tca);
+    }
+
+    /**
      * The table's label field (TCA `ctrl.label`), which the search tools LIKE-match a plain-text
      * `search` term against. Null when the table is unknown or declares none.
      */

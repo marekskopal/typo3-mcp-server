@@ -48,7 +48,8 @@ readonly class DataHandlerService
         $fields = $this->mmFieldNormalizer->normalize($table, $fields);
         $fields['pid'] = $pid;
 
-        $originalRequest = $table === 'pages' ? $this->ensureSiteContext($pid) : null;
+        // A negative pid places the page after that sibling, which is in the same site.
+        $originalRequest = $table === 'pages' ? $this->ensureSiteContext(abs($pid)) : null;
 
         try {
             $dataHandler = GeneralUtility::makeInstance(DataHandler::class);

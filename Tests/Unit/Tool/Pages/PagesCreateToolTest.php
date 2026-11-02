@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace MarekSkopal\MsMcpServer\Tests\Unit\Tool\Pages;
 
 use MarekSkopal\MsMcpServer\Service\DataHandlerService;
+use MarekSkopal\MsMcpServer\Service\RecordService;
 use MarekSkopal\MsMcpServer\Service\TcaSchemaService;
 use MarekSkopal\MsMcpServer\Tool\Pages\PagesCreateTool;
 use MarekSkopal\MsMcpServer\Tool\Result\RecordCreatedResult;
@@ -50,7 +51,7 @@ final class PagesCreateToolTest extends TestCase
         $dataHandlerService = $this->createMock(DataHandlerService::class);
         $dataHandlerService->expects(self::never())->method('createRecord');
 
-        $tool = new PagesCreateTool($dataHandlerService, new TcaSchemaService());
+        $tool = new PagesCreateTool($dataHandlerService, new TcaSchemaService(), $this->createStub(RecordService::class));
 
         $this->expectException(ToolCallException::class);
         $this->expectExceptionMessage('fields must be a JSON object, got a number.');
@@ -63,7 +64,7 @@ final class PagesCreateToolTest extends TestCase
         $dataHandlerService = $this->createMock(DataHandlerService::class);
         $dataHandlerService->expects(self::never())->method('createRecord');
 
-        $tool = new PagesCreateTool($dataHandlerService, new TcaSchemaService());
+        $tool = new PagesCreateTool($dataHandlerService, new TcaSchemaService(), $this->createStub(RecordService::class));
 
         $this->expectException(ToolCallException::class);
         $this->expectExceptionMessage('fields must be a JSON object, but is not valid JSON');
@@ -83,7 +84,7 @@ final class PagesCreateToolTest extends TestCase
             )
             ->willReturn(123);
 
-        $tool = new PagesCreateTool($dataHandlerService, new TcaSchemaService());
+        $tool = new PagesCreateTool($dataHandlerService, new TcaSchemaService(), $this->createStub(RecordService::class));
         $result = $tool->execute(5, json_encode(['title' => 'New Page', 'doktype' => 1], JSON_THROW_ON_ERROR));
 
         self::assertInstanceOf(RecordCreatedResult::class, $result);
@@ -109,7 +110,7 @@ final class PagesCreateToolTest extends TestCase
             )
             ->willReturn(789);
 
-        $tool = new PagesCreateTool($dataHandlerService, new TcaSchemaService());
+        $tool = new PagesCreateTool($dataHandlerService, new TcaSchemaService(), $this->createStub(RecordService::class));
         $result = $tool->execute(1, json_encode([
             'title' => 'Full Page',
             'doktype' => 1,
@@ -135,7 +136,7 @@ final class PagesCreateToolTest extends TestCase
             )
             ->willReturn(100);
 
-        $tool = new PagesCreateTool($dataHandlerService, new TcaSchemaService());
+        $tool = new PagesCreateTool($dataHandlerService, new TcaSchemaService(), $this->createStub(RecordService::class));
         $result = $tool->execute(0, json_encode(['title' => 'Page', 'invalid_field' => 'x'], JSON_THROW_ON_ERROR));
 
         self::assertInstanceOf(RecordCreatedResult::class, $result);
@@ -150,7 +151,7 @@ final class PagesCreateToolTest extends TestCase
             ->method('createRecord')
             ->willReturn(100);
 
-        $tool = new PagesCreateTool($dataHandlerService, new TcaSchemaService());
+        $tool = new PagesCreateTool($dataHandlerService, new TcaSchemaService(), $this->createStub(RecordService::class));
         $result = $tool->execute(0, json_encode(['title' => 'Page'], JSON_THROW_ON_ERROR));
 
         self::assertInstanceOf(RecordCreatedResult::class, $result);
@@ -163,7 +164,7 @@ final class PagesCreateToolTest extends TestCase
         $dataHandlerService->expects(self::never())
             ->method('createRecord');
 
-        $tool = new PagesCreateTool($dataHandlerService, new TcaSchemaService());
+        $tool = new PagesCreateTool($dataHandlerService, new TcaSchemaService(), $this->createStub(RecordService::class));
 
         $this->expectException(ToolCallException::class);
         $this->expectExceptionMessage('No valid fields provided');
@@ -187,7 +188,7 @@ final class PagesCreateToolTest extends TestCase
             )
             ->willReturn(100);
 
-        $tool = new PagesCreateTool($dataHandlerService, new TcaSchemaService());
+        $tool = new PagesCreateTool($dataHandlerService, new TcaSchemaService(), $this->createStub(RecordService::class));
         $result = $tool->execute(0, json_encode(['title' => 'Test'], JSON_THROW_ON_ERROR), -1);
 
         self::assertInstanceOf(RecordCreatedResult::class, $result);
@@ -201,7 +202,7 @@ final class PagesCreateToolTest extends TestCase
             ->method('createRecord')
             ->willThrowException(new \RuntimeException('DataHandler error'));
 
-        $tool = new PagesCreateTool($dataHandlerService, new TcaSchemaService());
+        $tool = new PagesCreateTool($dataHandlerService, new TcaSchemaService(), $this->createStub(RecordService::class));
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('DataHandler error');

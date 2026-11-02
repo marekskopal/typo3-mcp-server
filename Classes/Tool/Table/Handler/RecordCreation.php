@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace MarekSkopal\MsMcpServer\Tool\Table\Handler;
 
 use MarekSkopal\MsMcpServer\Service\DataHandlerService;
+use MarekSkopal\MsMcpServer\Service\RecordService;
+use MarekSkopal\MsMcpServer\Tool\Helper\CreatePosition;
 use MarekSkopal\MsMcpServer\Tool\Helper\FieldRejection;
 use MarekSkopal\MsMcpServer\Tool\Helper\JsonObjectParser;
 use MarekSkopal\MsMcpServer\Tool\Result\RecordCreatedResult;
@@ -23,10 +25,13 @@ final class RecordCreation
     /** @param int|null $sysLanguageUid the language to write, or null for a table without translations */
     public static function run(
         DataHandlerService $dataHandlerService,
+        RecordService $recordService,
         TableToolConfig $config,
         string $fields,
         int $pid,
         ?int $sysLanguageUid,
+        int $afterUid,
+        string $position,
     ): RecordCreatedResult {
         $data = JsonObjectParser::parse($fields, 'fields');
 
@@ -44,7 +49,8 @@ final class RecordCreation
             throw FieldRejection::noValidFields($config->tableName, $ignoredFields);
         }
 
-        $uid = $dataHandlerService->createRecord($config->tableName, $pid, $filteredData);
+        $target = CreatePosition::resolve($recordService, $config->tableName, $pid, $afterUid, $position);
+        $uid = $dataHandlerService->createRecord($config->tableName, $target, $filteredData);
 
         return new RecordCreatedResult($uid, $ignoredFields);
     }

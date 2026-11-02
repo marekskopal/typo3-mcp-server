@@ -249,7 +249,7 @@ final class DynamicToolRegistrarTest extends TestCase
         $auditLogger = $this->createMock(AuditLogger::class);
         $auditLogger->expects(self::once())
             ->method('logFailure')
-            ->with('item_create', 'tool', ['{"title":"Broken"', 10, 0], self::anything(), self::anything(), self::TABLE, 0);
+            ->with('item_create', 'tool', ['{"title":"Broken"', 10, 0, 0, 'bottom'], self::anything(), self::anything(), self::TABLE, 0);
         $auditLogger->expects(self::never())->method('logSuccess');
 
         $dataHandlerService = $this->createMock(DataHandlerService::class);

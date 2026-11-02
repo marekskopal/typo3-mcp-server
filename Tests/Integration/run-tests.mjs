@@ -261,7 +261,49 @@ class IntegrationTestRunner {
             }
         }
 
+        await this.testCreatePositions(pid);
+
         return { contentUid };
+    }
+
+    /**
+     * #38: create tools append by default, honour position "top" and afterUid, and content_list
+     * returns the page-module order (TCA sortby), not uid order.
+     */
+    async testCreatePositions(pid) {
+        const tool = 'content_create (position) + content_list (sorting)';
+        const create = async (header, extra = {}) => (await this.callToolSafe('content_create', {
+            pid,
+            fields: JSON.stringify({ CType: 'text', header }),
+            ...extra,
+        }))?.uid;
+
+        const a = await create('Position A');
+        const b = await create('Position B');
+        const c = await create('Position C', { position: 'top' });
+        const d = a ? await create('Position D', { afterUid: a }) : undefined;
+        const created = [a, b, c, d];
+
+        if (created.some((uid) => !uid)) {
+            this.failed.push({ tool, error: `could not create the records: ${JSON.stringify(created)}` });
+            fail(tool, 'could not create the records');
+        } else {
+            const list = await this.callToolSafe('content_list', { pid, limit: 500 });
+            const order = (list?.records ?? []).map((r) => Number(r.uid)).filter((uid) => created.includes(uid));
+            const expected = [c, a, d, b];
+            if (JSON.stringify(order) === JSON.stringify(expected)) {
+                this.passed.push({ tool });
+                pass(`${tool}: top, appended and afterUid records listed in page order`);
+            } else {
+                const why = `expected ${JSON.stringify(expected)} (C, A, D, B), got ${JSON.stringify(order)}`;
+                this.failed.push({ tool, error: why });
+                fail(tool, why);
+            }
+        }
+
+        for (const uid of created.filter(Boolean)) {
+            await this.callToolSafe('content_delete', { uid });
+        }
     }
 
     async testSearchOperations(pageUid) {
