@@ -1,0 +1,81 @@
+name: Publish to TER
+
+# Publishes a GitHub release to the TYPO3 Extension Repository (extensions.typo3.org).
+# Requires the repository secret TYPO3_API_TOKEN: a TER access token with the
+# extension:read and extension:write scopes for ms_mcp_server.
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing release tag to publish, e.g. v1.4.2'
+        required: true
+
+concurrency:
+  group: ter-publish
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  EXTENSION_KEY: ms_mcp_server
+
+jobs:
+  publish:
+    name: Publish to TER
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve tag and version
+        id: version
+        env:
+          TAG: ${{ github.event.release.tag_name || inputs.tag }}
+        run: |
+          if ! [[ "$TAG" =~ ^v?[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Tag '$TAG' is not a plain vX.Y.Z version; TER only accepts X.Y.Z."
+            exit 1
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.version.outputs.tag }}
+
+      - name: Check ext_emconf.php matches the tag
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          if ! grep -Eq "'version' => '${VERSION//./\\.}'" ext_emconf.php; then
+            echo "::error::ext_emconf.php does not declare version $VERSION. Bump it before tagging."
+            exit 1
+          fi
+
+      # git archive honours the export-ignore rules in .gitattributes, so TER gets exactly
+      # what Packagist ships: no tests, no CI or tool config.
+      - name: Export the extension
+        run: |
+          mkdir -p "$RUNNER_TEMP/$EXTENSION_KEY"
+          git archive HEAD | tar -x -C "$RUNNER_TEMP/$EXTENSION_KEY"
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          coverage: none
+          tools: typo3/tailor
+
+      - name: Publish
+        env:
+          TYPO3_API_TOKEN: ${{ secrets.TYPO3_API_TOKEN }}
+          VERSION: ${{ steps.version.outputs.version }}
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          if [ -z "$TYPO3_API_TOKEN" ]; then
+            echo "::error::The TYPO3_API_TOKEN secret is not set."
+            exit 1
+          fi
+          tailor ter:publish "$VERSION" "$EXTENSION_KEY" \
+            --path="$RUNNER_TEMP/$EXTENSION_KEY" \
+            --comment="Release notes: https://github.com/${GITHUB_REPOSITORY}/releases/tag/${TAG}"
