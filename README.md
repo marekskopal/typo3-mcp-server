@@ -399,9 +399,9 @@ The **System > MCP Server** backend module provides:
 
 | Tool | Description |
 |------|-------------|
-| `pages_list` | List child pages with pagination. Supports language filtering and field selection. |
+| `pages_list` | List child pages in page-tree order with pagination. Supports language filtering and field selection. |
 | `pages_get` | Get a single page with all readable fields. |
-| `pages_create` | Create a new page. Pass fields as JSON, set language with `sysLanguageUid`. |
+| `pages_create` | Create a new page. Pass fields as JSON, set language with `sysLanguageUid`. New records go to the end of the page; `position: "top"` puts them first, `afterUid` after a given record. |
 | `pages_update` | Update page fields. Pass a JSON object with field names and new values. |
 | `pages_delete` | Delete a page by UID. Supports `dryRun`. |
 | `pages_copy` | Copy a page. Set `includeSubpages: true` to copy the entire subtree. |
@@ -415,9 +415,9 @@ The **System > MCP Server** backend module provides:
 
 | Tool | Description |
 |------|-------------|
-| `content_list` | List content elements on a page with pagination and language filtering. |
+| `content_list` | List content elements on a page in sorting order, with pagination and language filtering. |
 | `content_get` | Get a single content element with all readable fields. |
-| `content_create` | Create a content element. Pass fields as JSON, set language with `sysLanguageUid`. |
+| `content_create` | Create a content element. Pass fields as JSON, set language with `sysLanguageUid`. New records go to the end of the page; `position: "top"` puts them first, `afterUid` after a given record. |
 | `content_update` | Update content element fields. |
 | `content_delete` | Delete a content element by UID. Supports `dryRun`. |
 | `content_move` | Move a content element to a new position. |

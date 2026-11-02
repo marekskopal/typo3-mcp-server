@@ -87,8 +87,8 @@ readonly class TableToolFactory
     public function create(TableToolConfig $config): AbstractTableToolHandler
     {
         return $config->isTranslatable()
-            ? new TranslatableCreateHandler($config, $this->auditLogger, $this->logger, $this->dataHandlerService)
-            : new CreateHandler($config, $this->auditLogger, $this->logger, $this->dataHandlerService);
+            ? new TranslatableCreateHandler($config, $this->auditLogger, $this->logger, $this->dataHandlerService, $this->recordService)
+            : new CreateHandler($config, $this->auditLogger, $this->logger, $this->dataHandlerService, $this->recordService);
     }
 
     public function update(TableToolConfig $config): UpdateHandler

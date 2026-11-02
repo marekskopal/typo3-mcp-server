@@ -31,6 +31,7 @@ readonly class RecordService
         private WorkspaceContextService $workspaceContext,
         private PermissionService $permissionService,
         private MmRelationResolver $mmRelationResolver,
+        private TcaSchemaService $tcaSchemaService = new TcaSchemaService(),
     ) {
     }
 
@@ -67,6 +68,46 @@ readonly class RecordService
         }
 
         return $this->mmRelationResolver->resolve($table, $overlaid, $fields);
+    }
+
+    /**
+     * The uid of the record that comes last on a page in the table's TCA `sortby` order, for placing a
+     * new record after it. Only default-language and all-language records count: a translation is not
+     * a position of its own. Null when the table is not manually sorted or the page has no records.
+     *
+     * Not filtered by page permissions: the uid only becomes DataHandler's insert target, it is never
+     * returned to the client, and DataHandler checks the user's right to create on that page itself.
+     */
+    public function findLastSortedUid(string $table, int $pid): ?int
+    {
+        $sortByField = $this->tcaSchemaService->getSortByField($table);
+        if ($sortByField === null) {
+            return null;
+        }
+
+        $queryBuilder = $this->connectionPool->getQueryBuilderForTable($table);
+        $queryBuilder->getRestrictions()->removeAll();
+        $this->workspaceContext->applyRestriction($queryBuilder, $table);
+
+        $queryBuilder
+            ->select('uid')
+            ->from($table)
+            ->where($queryBuilder->expr()->eq('pid', $queryBuilder->createNamedParameter($pid, ParameterType::INTEGER)))
+            ->orderBy($sortByField, 'DESC')
+            ->addOrderBy('uid', 'DESC')
+            ->setMaxResults(1);
+
+        $languageField = $this->tcaSchemaService->getTranslationConfig($table)['languageField'];
+        if ($languageField !== null) {
+            $queryBuilder->andWhere($queryBuilder->expr()->in(
+                $languageField,
+                $queryBuilder->createNamedParameter([0, -1], ArrayParameterType::INTEGER),
+            ));
+        }
+
+        $uid = $queryBuilder->executeQuery()->fetchOne();
+
+        return is_int($uid) || is_string($uid) ? (int) $uid : null;
     }
 
     /**
@@ -160,7 +201,14 @@ readonly class RecordService
             );
         }
 
-        $queryBuilder->orderBy('uid', 'ASC');
+        // The order the page tree, the menu and the page module show; uid only breaks ties.
+        $sortByField = $this->tcaSchemaService->getSortByField($table);
+        if ($sortByField !== null) {
+            $queryBuilder->orderBy($sortByField, 'ASC');
+            $queryBuilder->addOrderBy('uid', 'ASC');
+        } else {
+            $queryBuilder->orderBy('uid', 'ASC');
+        }
 
         if ($this->overlayApplies($table)) {
             return $this->paginateOverlaid($queryBuilder, $table, $limit, $offset, $fields);

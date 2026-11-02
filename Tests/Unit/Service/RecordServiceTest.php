@@ -1556,6 +1556,153 @@ final class RecordServiceTest extends TestCase
         self::assertSame(2, $result['total']);
     }
 
+    public function testFindByPidOrdersByTheTableSortFieldThenUid(): void
+    {
+        // #38: pages_list/content_list must show the order of the page tree and the page module, not uid order.
+        $GLOBALS['TCA']['pages'] = ['ctrl' => ['sortby' => 'sorting'], 'columns' => []];
+
+        try {
+            $ordering = $this->captureFindByPidOrdering();
+        } finally {
+            unset($GLOBALS['TCA']);
+        }
+
+        self::assertSame([['sorting', 'ASC'], ['uid', 'ASC']], $ordering);
+    }
+
+    public function testFindByPidOrdersByUidWhenTheTableIsNotManuallySorted(): void
+    {
+        $GLOBALS['TCA']['pages'] = ['ctrl' => [], 'columns' => []];
+
+        try {
+            $ordering = $this->captureFindByPidOrdering();
+        } finally {
+            unset($GLOBALS['TCA']);
+        }
+
+        self::assertSame([['uid', 'ASC']], $ordering);
+    }
+
+    public function testFindLastSortedUidReturnsTheLastDefaultLanguageRecordInSortOrder(): void
+    {
+        $GLOBALS['TCA']['tt_content'] = ['ctrl' => ['sortby' => 'sorting', 'languageField' => 'sys_language_uid'], 'columns' => []];
+
+        $ordering = [];
+        $languageConstraint = false;
+        $result = $this->createStub(Result::class);
+        $result->method('fetchOne')->willReturn('57');
+
+        $queryBuilder = $this->createQueryBuilderStub();
+        $queryBuilder->method('select')->willReturnSelf();
+        $queryBuilder->method('from')->willReturnSelf();
+        $queryBuilder->method('where')->willReturnSelf();
+        $queryBuilder->method('setMaxResults')->willReturnSelf();
+        $queryBuilder->method('orderBy')->willReturnCallback(
+            static function (string $field, string $direction) use (&$ordering, $queryBuilder): QueryBuilder {
+                $ordering[] = [$field, $direction];
+
+                return $queryBuilder;
+            },
+        );
+        $queryBuilder->method('addOrderBy')->willReturnCallback(
+            static function (string $field, string $direction) use (&$ordering, $queryBuilder): QueryBuilder {
+                $ordering[] = [$field, $direction];
+
+                return $queryBuilder;
+            },
+        );
+        $queryBuilder->method('andWhere')->willReturnCallback(
+            static function () use (&$languageConstraint, $queryBuilder): QueryBuilder {
+                $languageConstraint = true;
+
+                return $queryBuilder;
+            },
+        );
+        $queryBuilder->method('executeQuery')->willReturn($result);
+
+        $connectionPool = $this->createStub(ConnectionPool::class);
+        $connectionPool->method('getQueryBuilderForTable')->willReturn($queryBuilder);
+
+        try {
+            $service = new RecordService($connectionPool, new WorkspaceContextService(), $this->createAllowingPermissionService(), $this->createMmRelationResolver());
+            $uid = $service->findLastSortedUid('tt_content', 10);
+        } finally {
+            unset($GLOBALS['TCA']);
+        }
+
+        self::assertSame(57, $uid);
+        self::assertSame([['sorting', 'DESC'], ['uid', 'DESC']], $ordering);
+        self::assertTrue($languageConstraint, 'translations must not count as a position of their own');
+    }
+
+    public function testFindLastSortedUidIsNullForATableWithoutSortField(): void
+    {
+        $GLOBALS['TCA']['sys_redirect'] = ['ctrl' => [], 'columns' => []];
+
+        $connectionPool = $this->createMock(ConnectionPool::class);
+        $connectionPool->expects(self::never())->method('getQueryBuilderForTable');
+
+        try {
+            $service = new RecordService($connectionPool, new WorkspaceContextService(), $this->createAllowingPermissionService(), $this->createMmRelationResolver());
+            self::assertNull($service->findLastSortedUid('sys_redirect', 0));
+        } finally {
+            unset($GLOBALS['TCA']);
+        }
+    }
+
+    /** @return list<array{string, string}> the orderBy/addOrderBy calls of findByPid's list query */
+    private function captureFindByPidOrdering(): array
+    {
+        $ordering = [];
+
+        $countResult = $this->createStub(Result::class);
+        $countResult->method('fetchOne')->willReturn(0);
+        $listResult = $this->createStub(Result::class);
+        $listResult->method('fetchAllAssociative')->willReturn([]);
+
+        $countQueryBuilder = $this->createQueryBuilderStub();
+        $countQueryBuilder->method('count')->willReturnSelf();
+        $countQueryBuilder->method('from')->willReturnSelf();
+        $countQueryBuilder->method('where')->willReturnSelf();
+        $countQueryBuilder->method('executeQuery')->willReturn($countResult);
+
+        $listQueryBuilder = $this->createQueryBuilderStub();
+        $listQueryBuilder->method('select')->willReturnSelf();
+        $listQueryBuilder->method('from')->willReturnSelf();
+        $listQueryBuilder->method('where')->willReturnSelf();
+        $listQueryBuilder->method('setMaxResults')->willReturnSelf();
+        $listQueryBuilder->method('setFirstResult')->willReturnSelf();
+        $listQueryBuilder->method('orderBy')->willReturnCallback(
+            static function (string $field, string $direction) use (&$ordering, $listQueryBuilder): QueryBuilder {
+                $ordering[] = [$field, $direction];
+
+                return $listQueryBuilder;
+            },
+        );
+        $listQueryBuilder->method('addOrderBy')->willReturnCallback(
+            static function (string $field, string $direction) use (&$ordering, $listQueryBuilder): QueryBuilder {
+                $ordering[] = [$field, $direction];
+
+                return $listQueryBuilder;
+            },
+        );
+        $listQueryBuilder->method('executeQuery')->willReturn($listResult);
+
+        $callCount = 0;
+        $connectionPool = $this->createStub(ConnectionPool::class);
+        $connectionPool->method('getQueryBuilderForTable')
+            ->willReturnCallback(function () use (&$callCount, $listQueryBuilder, $countQueryBuilder): QueryBuilder {
+                $callCount++;
+
+                return $callCount === 1 ? $listQueryBuilder : $countQueryBuilder;
+            });
+
+        $service = new RecordService($connectionPool, new WorkspaceContextService(), $this->createAllowingPermissionService(), $this->createMmRelationResolver());
+        $service->findByPid('pages', 0, 20, 0, ['uid', 'title']);
+
+        return $ordering;
+    }
+
     private function createAllowingPermissionService(): PermissionService
     {
         $permissionService = $this->createStub(PermissionService::class);

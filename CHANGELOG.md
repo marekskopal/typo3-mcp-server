@@ -8,6 +8,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ### Added
 - **`record_translate` takes the translated values in the same call.** A new optional `fields` argument (a JSON object, filtered to the table's writable fields like the update tools; the language and translation pointer fields are dropped) is applied to the record core's `localize` creates, in the same DataHandler run. Before, a translated page got its slug from the prefixed title (`/translate-to-czech-features`), came out hidden and carried `[Translate to …:]` in its texts, so every translation needed a follow-up update, and changing the slug then left EXT:redirects' redirects behind for a slug that was never public. The values now reach the new record before its slug is generated, through the `LocalizationFieldOverrideHook` DataHandler hook. The result lists the applied fields in `updated` and the dropped ones in `ignoredFields` (#37).
+- **Create tools take a position.** `pages_create`, `content_create` and the generated `<prefix>_create` tools accept `afterUid` (place the new record after that one, as the move tools do) and `position` (`bottom` or `top`) (#38).
+
+### Changed
+- **New records go to the end of the page by default.** The create tools passed a positive pid to DataHandler, which puts the new record first, so a page built element by element came out in reverse order and every element had to be moved afterwards. They now place it after the record that is currently last in the table's `sortby` order (translations do not count). Pass `position: "top"` for the old behaviour. A negative `pid` still means "after the record with this uid" (#38).
+
+### Fixed
+- **List tools return records in page order.** `pages_list`, `content_list` and the generated `<prefix>_list` tools ordered by uid, so they did not show the order of the page tree, the menu or the page module. They now order by the table's TCA `sortby` field, then uid; tables without one keep uid order (#38).
 
 ## [1.4.2] - 2026-11-02
 
