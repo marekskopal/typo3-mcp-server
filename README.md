@@ -458,7 +458,7 @@ unrestricted access to every storage.
 
 | Tool | Description |
 |------|-------------|
-| `file_reference_add` | Attach files to a record's image/media field. Pass sys_file UIDs from upload results. |
+| `file_reference_add` | Attach files to a record's image/media field. Pass sys_file UIDs from upload results. Optional `metadata` sets the references' `alternative`, `title`, `description`, `crop`, … in the same call: one object for all files, or a list of `{"uid": <sys_file uid>, …}` per file. |
 | `file_reference_list` | List file references for a record field. Returns reference UIDs and metadata. |
 | `file_reference_remove` | Remove file references by UID. Detaches files but does not delete them. |
 
