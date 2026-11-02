@@ -201,7 +201,8 @@ final class BackendUserBootstrapTest extends TestCase
 
             $backendUser = $bootstrap->createBackendUser();
 
-            self::assertInstanceOf(LoggerInterface::class, new \ReflectionProperty($backendUser, 'logger')->getValue($backendUser));
+            $logger = new \ReflectionProperty($backendUser, 'logger');
+            self::assertInstanceOf(LoggerInterface::class, $logger->getValue($backendUser));
             self::assertInstanceOf(UserSession::class, $backendUser->getSession());
         } finally {
             GeneralUtility::purgeInstances();
