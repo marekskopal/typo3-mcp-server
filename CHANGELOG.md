@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.4.2] - 2026-11-02
+
+### Fixed
+- **Tools, prompts and resources reach the client with their descriptions.** `McpServerFactory` passed only the attribute's `name` to the SDK builder. Without a description the SDK falls back to the handler's docblock, and the `execute` methods have none, so every `#[McpTool]` tool (`pages_*`, `content_*`, `file_*`, `record_*`, `cache_clear`, `table_schema`, …), every prompt and every resource was listed without a description, and agents had to guess what goes into parameters such as `fields`. The registrar-generated tools were unaffected. The factory now hands over every field of the attribute (#36).
+- **Changing a page's slug over HTTP no longer fails after the row is written.** The bootstrapped backend user was created with `new BackendUserAuthentication()`, which leaves its logger unset (only `makeInstance()` injects it). EXT:redirects' slug hook reaches `writeUC()` through `setUpdateSignal()` → `pushModuleData()`, and `writeUC()` logs first, so `pages_update` with a new `slug` saved the row and the redirects, then died with `Call to a member function debug() on null`, and the rest of the slug rebuild for subpages did not run. The user is now built with `makeInstance()` (#35).
+
 ## [1.4.1] - 2026-10-18
 
 ### Changed
