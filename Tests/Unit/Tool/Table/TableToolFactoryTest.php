@@ -13,6 +13,7 @@ use MarekSkopal\MsMcpServer\Tool\Table\Handler\CreateHandler;
 use MarekSkopal\MsMcpServer\Tool\Table\Handler\ListHandler;
 use MarekSkopal\MsMcpServer\Tool\Table\Handler\TranslatableCreateHandler;
 use MarekSkopal\MsMcpServer\Tool\Table\Handler\TranslatableListHandler;
+use MarekSkopal\MsMcpServer\Tests\Unit\Support\JsonResult;
 use MarekSkopal\MsMcpServer\Tool\Table\TableToolConfig;
 use MarekSkopal\MsMcpServer\Tool\Table\TableToolFactory;
 use Mcp\Exception\ToolCallException;
@@ -58,6 +59,41 @@ final class TableToolFactoryTest extends TestCase
         self::assertStringContainsString('an empty list clears the relation', $factory->updateBatch($config)->description());
         self::assertStringContainsString('returned as lists of related UIDs', $factory->get($config)->description());
         self::assertStringContainsString('returned as lists of related UIDs', $factory->list($config)->description());
+    }
+
+    public function testGetListsInlineChildrenAndNamesTheFields(): void
+    {
+        // #41: msfaq_question_get left out the question's answers; they were only found by listing the folder.
+        $config = new TableToolConfig(
+            tableName: 'tx_demo_thing',
+            label: 'Thing',
+            prefix: 'thing',
+            listFields: ['uid', 'pid', 'title'],
+            readFields: ['uid', 'pid', 'title'],
+            writableFields: ['title'],
+            inlineFields: ['answers'],
+        );
+
+        $recordService = $this->createMock(RecordService::class);
+        $recordService->method('findByUid')->willReturn(['uid' => 7, 'pid' => 1, 'title' => 'Q']);
+        $recordService->expects(self::once())
+            ->method('findInlineChildren')
+            ->with('tx_demo_thing', ['uid' => 7, 'pid' => 1, 'title' => 'Q'])
+            ->willReturn(['answers' => [12, 11]]);
+
+        $handler = $this->factory(recordService: $recordService)->get($config);
+
+        self::assertSame(['uid' => 7, 'pid' => 1, 'title' => 'Q', 'answers' => [12, 11]], JsonResult::of($handler(7)));
+        self::assertStringContainsString('Inline child records (answers) are listed as UID lists', $handler->description());
+    }
+
+    public function testGetWithoutInlineFieldsDoesNotLookForChildren(): void
+    {
+        $recordService = $this->createMock(RecordService::class);
+        $recordService->method('findByUid')->willReturn(['uid' => 7, 'pid' => 1, 'title' => 'Q']);
+        $recordService->expects(self::never())->method('findInlineChildren');
+
+        ($this->factory(recordService: $recordService)->get($this->config()))(7);
     }
 
     /** Without MM fields the descriptions read exactly as before. */

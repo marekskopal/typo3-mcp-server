@@ -82,6 +82,7 @@ readonly class DynamicToolRegistrar
             languageField: $translationConfig['languageField'],
             transOrigPointerField: $translationConfig['transOrigPointerField'],
             mmFields: array_keys($this->tcaSchemaService->getMMFields($tableName)),
+            inlineFields: array_keys($this->tcaSchemaService->getInlineFields($tableName)),
         );
     }
 

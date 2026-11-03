@@ -166,7 +166,14 @@ class IntegrationTestRunner {
         await this.testTool('table_schema', { tableName: 'tt_content' });
         await this.testTool('permission_check_table', { tableName: 'pages' });
         await this.testTool('permission_check_page', { pageId: 1 });
-        await this.testTool('permission_check_summary', {});
+        const summary = await this.testTool('permission_check_summary', {});
+        // #41: an admin's empty group grants used to come back as empty lists, which read as "no access".
+        if (summary?.isAdmin) {
+            this.check('permission_check_summary: admin gets "*" for tables and languages',
+                JSON.stringify(summary.tablesSelect) === '["*"]' && JSON.stringify(summary.tablesModify) === '["*"]'
+                    && JSON.stringify(summary.allowedLanguages) === '["*"]',
+                `got ${JSON.stringify(summary)}`);
+        }
     }
 
     async testPageOperations() {
@@ -1224,6 +1231,7 @@ class IntegrationTestRunner {
             }
 
             await this.testFlexFormObject(teamUid);
+            await this.testInlineChildren(teamUid, pid);
 
             await this.testTool('mm_team_delete', { uid: teamUid });
         }
@@ -1269,6 +1277,44 @@ class IntegrationTestRunner {
         settings = await read();
         this.check('flex field: rejected write left the values unchanged',
             settings?.sDEF?.['settings.color'] === 'red', `got ${JSON.stringify(settings)}`);
+    }
+
+    /** #41: <prefix>_get lists the record's inline children (the fixture team's `members`) as a UID list. */
+    async testInlineChildren(teamUid, pid) {
+        const m1 = (await this.callToolSafe('mm_group_create', {
+            pid, fields: JSON.stringify({ title: 'Member 1', parent_team: teamUid }),
+        }))?.uid;
+        const m2 = (await this.callToolSafe('mm_group_create', {
+            pid, fields: JSON.stringify({ title: 'Member 2', parent_team: teamUid }),
+        }))?.uid;
+
+        const got = await this.callToolSafe('mm_team_get', { uid: teamUid });
+        const members = [...(got?.members ?? [])].sort((a, b) => a - b);
+        this.check('<prefix>_get: inline children listed as a UID list',
+            m1 && m2 && JSON.stringify(members) === JSON.stringify([m1, m2].sort((a, b) => a - b)),
+            `created ${JSON.stringify([m1, m2])}, got ${JSON.stringify(got?.members)}`);
+
+        for (const uid of [m1, m2].filter(Boolean)) {
+            await this.callToolSafe('mm_group_delete', { uid });
+        }
+    }
+
+    /** #41: record_create for a table without its own create tool (sys_category). */
+    async testRecordCreate(pid) {
+        const created = await this.testTool('record_create', {
+            tableName: 'sys_category',
+            pid,
+            fields: JSON.stringify({ title: 'MCP Category' }),
+        });
+        const uid = created?.uid;
+        const found = uid ? await this.callToolSafe('record_search', {
+            tableName: 'sys_category', search: JSON.stringify({ uid: { eq: uid } }),
+        }) : null;
+        this.check('record_create: sys_category record created and readable',
+            found?.records?.[0]?.title === 'MCP Category', `got ${JSON.stringify(found ?? created)}`);
+        if (uid) {
+            await this.callToolSafe('record_delete_batch', { tableName: 'sys_category', uids: String(uid) });
+        }
     }
 
     async cleanupRecords(pageUid, childUid, contentUid) {
@@ -1472,6 +1518,7 @@ class IntegrationTestRunner {
         await this.testFileReferences(contentUid);
         await this.testTranslation(pageUid);
         await this.testBatchOperations(pageUid);
+        await this.testRecordCreate(pageUid ?? 1);
         await this.testCache();
         await this.testBackendUserAndGroupOperations();
         await this.testConditionalTools();

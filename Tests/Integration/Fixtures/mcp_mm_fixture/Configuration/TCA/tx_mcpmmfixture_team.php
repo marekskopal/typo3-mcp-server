@@ -35,7 +35,7 @@ return [
         ],
     ],
     'types' => [
-        '0' => ['showitem' => 'title, groups, partners, settings, hidden'],
+        '0' => ['showitem' => 'title, groups, partners, settings, members, hidden'],
     ],
     'columns' => [
         'hidden' => [
@@ -64,6 +64,14 @@ return [
                 'ds' => (new Typo3Version())->getMajorVersion() >= 14
                     ? $settingsDataStructure
                     : ['default' => $settingsDataStructure],
+            ],
+        ],
+        'members' => [
+            'label' => 'Members',
+            'config' => [
+                'type' => 'inline',
+                'foreign_table' => 'tx_mcpmmfixture_group',
+                'foreign_field' => 'parent_team',
             ],
         ],
         'partners' => [

@@ -36,7 +36,8 @@ final readonly class GetHandler extends AbstractTableToolHandler
     public function description(): string
     {
         return 'Get a single ' . $this->config->subject() . ' by its uid.'
-            . ' A uid that does not exist is reported as {"found": false}, not an error.' . $this->config->mmReadHint();
+            . ' A uid that does not exist is reported as {"found": false}, not an error.' . $this->config->mmReadHint()
+            . $this->config->inlineReadHint();
     }
 
     public function __invoke(int $uid): RecordResult|RecordNotFoundResult
@@ -51,6 +52,10 @@ final readonly class GetHandler extends AbstractTableToolHandler
                         $uid,
                         $this->config->subjectSentenceStart() . ' not found',
                     );
+                }
+
+                if ($this->config->inlineFields !== []) {
+                    $record += $this->recordService->findInlineChildren($this->config->tableName, $record);
                 }
 
                 return new RecordResult($record, $this->findTranslations($uid, $record));

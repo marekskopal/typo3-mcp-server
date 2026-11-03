@@ -14,7 +14,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 - **FlexForm fields are objects, not XML.** `pi_flexform` (and any other TCA `flex` column) is read as `{"<sheet>": {"<field>": value}}` by every read tool, and written the same way or flat (`{"settings.templateLayout": "split"}`, resolved against the record's data structure). Every name is checked against the data structure, so a typo is refused with the available fields instead of being stored, and only the fields named change: DataHandler merges them into the stored values. A section field keeps its native array. XML strings are still accepted on write (#40).
 
+- **`record_create` creates a record in any table.** The `record_*_batch` tools worked on any table, but there was no way to create a record in one without its own create tool, such as `sys_category` for grouping FAQ questions. It takes the same `fields`, `sysLanguageUid`, `position` and `afterUid` as `content_create` (#41).
+- **`<prefix>_get` lists inline children.** A record's inline (IRRE) child records, e.g. an FAQ question's `answers`, come back as a UID list under their field name, read through core's `RelationHandler`. Children in a table the user may not read are left out (#41).
+
 ### Changed
+- **`permission_check_summary` no longer reads as "no access" for an admin.** `tablesSelect`, `tablesModify` and `allowedLanguages` are `["*"]` and `webmounts` is `[0]`, the page tree root; they came back empty, because an admin's group grants usually are (#41).
 - **FlexForm fields are returned as objects.** Clients that parsed the XML out of `pi_flexform` get the decoded object instead (#40).
 - **New records go to the end of the page by default.** The create tools passed a positive pid to DataHandler, which puts the new record first, so a page built element by element came out in reverse order and every element had to be moved afterwards. They now place it after the record that is currently last in the table's `sortby` order (translations do not count). Pass `position: "top"` for the old behaviour. A negative `pid` still means "after the record with this uid" (#38).
 
