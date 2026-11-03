@@ -155,10 +155,12 @@ final class PermissionServiceTest extends TestCase
         $service = new PermissionService();
         $result = $service->getPermissionSummary();
 
+        // #41: an admin's empty group grants used to read as "no access".
         self::assertTrue($result['isAdmin']);
-        self::assertSame([], $result['tablesSelect']);
-        self::assertSame([], $result['tablesModify']);
-        self::assertSame([], $result['allowedLanguages']);
+        self::assertSame(['*'], $result['tablesSelect']);
+        self::assertSame(['*'], $result['tablesModify']);
+        self::assertSame(['*'], $result['allowedLanguages']);
+        self::assertSame([0], $result['webmounts']);
         self::assertSame(['addFile' => true, 'readFile' => true, 'writeFile' => true], $result['filePermissions']);
     }
 

@@ -28,5 +28,10 @@ return [
             'label' => 'Title',
             'config' => ['type' => 'input', 'size' => 30, 'max' => 255, 'required' => true],
         ],
+        // The team a group belongs to as an inline child (tx_mcpmmfixture_team.members), for #41.
+        'parent_team' => [
+            'label' => 'Parent team',
+            'config' => ['type' => 'number', 'default' => 0],
+        ],
     ],
 ];

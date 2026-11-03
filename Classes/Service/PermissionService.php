@@ -18,6 +18,9 @@ use TYPO3\CMS\Core\Utility\GeneralUtility;
 
 readonly class PermissionService
 {
+    /** What the permission summary lists for an admin, who is not restricted to any table or language. */
+    public const string ALL = '*';
+
     private const int WEBMOUNT_DEPTH = 99;
 
     /** @return array{table: string, canSelect: bool, canModify: bool} */
@@ -58,10 +61,32 @@ readonly class PermissionService
         ];
     }
 
-    /** @return array{isAdmin: bool, tablesSelect: list<string>, tablesModify: list<string>, allowedLanguages: list<int>, filePermissions: array<string, bool>, webmounts: list<int>, filemounts: list<int>} */
+    /**
+     * An admin's group grants are usually empty, because an admin needs none; reported as such they read as
+     * "no access" (#41). For an admin the table and language lists are therefore ["*"] and the web mounts
+     * [0], the page tree root, which is what core's own returnWebmounts() answers for one.
+     *
+     * @return array{isAdmin: bool, tablesSelect: list<string>, tablesModify: list<string>, allowedLanguages: list<int|string>, filePermissions: array<string, bool>, webmounts: list<int>, filemounts: list<int>}
+     */
     public function getPermissionSummary(): array
     {
         $backendUser = $this->getBackendUser();
+
+        if ($backendUser->isAdmin()) {
+            /** @var array<string, bool> $adminFilePermissions */
+            $adminFilePermissions = $backendUser->getFilePermissions();
+
+            return [
+                'isAdmin' => true,
+                'tablesSelect' => [self::ALL],
+                'tablesModify' => [self::ALL],
+                'allowedLanguages' => [self::ALL],
+                'filePermissions' => $adminFilePermissions,
+                'webmounts' => [0],
+                // @phpstan-ignore property.internal
+                'filemounts' => $this->parseIntList($this->getGroupDataString($backendUser->groupData, 'filemounts')),
+            ];
+        }
 
         // @phpstan-ignore property.internal
         $groupData = $backendUser->groupData;

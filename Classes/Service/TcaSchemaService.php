@@ -59,6 +59,12 @@ readonly class TcaSchemaService
         ];
     }
 
+    /** Whether the table is defined in TCA at all. */
+    public function hasTable(string $tableName): bool
+    {
+        return $this->getTca($tableName) !== null;
+    }
+
     /**
      * The table's manual sort field (TCA `ctrl.sortby`): the order the page tree, the menu and the page
      * module show. Null when the table is unknown or not manually sorted.
@@ -286,6 +292,39 @@ readonly class TcaSchemaService
             $config = is_array($columnConfig) ? ($columnConfig['config'] ?? null) : null;
             if (is_string($fieldName) && is_array($config) && ($config['type'] ?? null) === 'flex') {
                 $fields[] = $fieldName;
+            }
+        }
+
+        return $fields;
+    }
+
+    /**
+     * The table's inline (IRRE) columns with a `foreign_table` that the current user may read, keyed by
+     * name with their TCA config. File fields (type `file`) are not inline columns here.
+     *
+     * @return array<string, array<mixed>>
+     */
+    public function getInlineFields(string $tableName): array
+    {
+        $tca = $this->getTca($tableName);
+        $columns = $tca === null ? null : ($tca['columns'] ?? null);
+        if (!is_array($columns)) {
+            return [];
+        }
+
+        $fields = [];
+        foreach ($columns as $fieldName => $columnConfig) {
+            if (!is_string($fieldName) || !is_array($columnConfig)) {
+                continue;
+            }
+
+            $config = $columnConfig['config'] ?? null;
+            if (!is_array($config) || ($config['type'] ?? null) !== 'inline' || !is_string($config['foreign_table'] ?? null)) {
+                continue;
+            }
+
+            if ($this->isAccessibleField($tableName, $fieldName, $columnConfig)) {
+                $fields[$fieldName] = $config;
             }
         }
 

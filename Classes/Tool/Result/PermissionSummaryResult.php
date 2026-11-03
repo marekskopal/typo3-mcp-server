@@ -7,9 +7,9 @@ namespace MarekSkopal\MsMcpServer\Tool\Result;
 readonly class PermissionSummaryResult
 {
     /**
-     * @param list<string> $tablesSelect
-     * @param list<string> $tablesModify
-     * @param list<int> $allowedLanguages
+     * @param list<string> $tablesSelect ["*"] for an admin
+     * @param list<string> $tablesModify ["*"] for an admin
+     * @param list<int|string> $allowedLanguages ["*"] for an admin
      * @param array<string, bool> $filePermissions
      * @param list<int> $webmounts
      * @param list<int> $filemounts

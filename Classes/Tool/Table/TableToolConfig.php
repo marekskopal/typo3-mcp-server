@@ -25,6 +25,8 @@ final readonly class TableToolConfig
      *                     scheduler's rows are "tasks", and "Scheduler task record" reads wrong
      * @param list<string> $mmFields the many-to-many relation fields among the table's columns; they are
      *                               read and written as UID lists, and the tool text says so
+     * @param list<string> $inlineFields the inline (IRRE) fields whose child records the get tool lists as UID
+     *                                   lists; named in its description
      */
     public function __construct(
         public string $tableName,
@@ -37,6 +39,7 @@ final readonly class TableToolConfig
         public ?string $transOrigPointerField = null,
         public string $noun = 'record',
         public array $mmFields = [],
+        public array $inlineFields = [],
     ) {
     }
 
@@ -81,6 +84,16 @@ final readonly class TableToolConfig
         }
 
         return ' Many-to-many relation fields (' . implode(', ', $readable) . ') are returned as lists of related UIDs.';
+    }
+
+    /** Sentence for the get description naming the inline fields listed with the record; empty without any. */
+    public function inlineReadHint(): string
+    {
+        if ($this->inlineFields === []) {
+            return '';
+        }
+
+        return ' Inline child records (' . implode(', ', $this->inlineFields) . ') are listed as UID lists under their field name.';
     }
 
     /**

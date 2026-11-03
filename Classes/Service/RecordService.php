@@ -33,6 +33,7 @@ readonly class RecordService
         private MmRelationResolver $mmRelationResolver,
         private TcaSchemaService $tcaSchemaService = new TcaSchemaService(),
         private ?FlexFormFieldConverter $flexFormFieldConverter = null,
+        private ?InlineRelationResolver $inlineRelationResolver = null,
     ) {
     }
 
@@ -69,6 +70,21 @@ readonly class RecordService
         }
 
         return $this->present($table, $this->mmRelationResolver->resolve($table, $overlaid, $fields));
+    }
+
+    /**
+     * The record's inline child records as UID lists per field (#41). Separate from findByUid() so only
+     * the single-record tools pay the extra query per inline field.
+     *
+     * @param array<string, mixed> $row a row as findByUid() returns it
+     * @return array<string, list<int>>
+     */
+    public function findInlineChildren(string $table, array $row): array
+    {
+        $resolver = $this->inlineRelationResolver
+            ?? new InlineRelationResolver($this->tcaSchemaService, $this->workspaceContext, $this->permissionService);
+
+        return $resolver->childUids($table, $row);
     }
 
     /**

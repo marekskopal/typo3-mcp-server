@@ -512,15 +512,18 @@ orderBy: "title", orderDirection: "DESC"
 | `site_languages` | List available languages for a site. Pass any page ID belonging to the site. |
 | `record_translate` | Create a translation of a record. Source must be in default language. Uses TYPO3 connected mode. Optional `fields` (JSON object) sets the translated values in the same run, so a page's slug is built from the translated title. |
 
+`record_translate` copies the source record and localizes its inline children and file references with it. A record **without** children or files can also be translated in one call by creating it directly in the target language with its translation pointer: `content_create` with `sysLanguageUid: 1` and `fields: {"l18n_parent": 42, "header": "…"}` (`l10n_parent` on most other tables, `record_create` for any table).
+
 ### Batch Operations
 
 | Tool | Description |
 |------|-------------|
+| `record_create` | Create a record in any table, e.g. `sys_category`, for tables without their own create tool. Same `fields`, `sysLanguageUid`, `position` and `afterUid` as `content_create`. |
 | `record_delete_batch` | Delete multiple records by comma-separated UIDs. Single atomic DataHandler operation. |
 | `record_update_batch` | Update same fields on multiple records (e.g., `{"hidden":1}` on UIDs `1,2,3`). |
 | `record_move_batch` | Move multiple records to a target position. |
 
-All batch tools work on any TCA table.
+`record_create` and all batch tools work on any TCA table; TYPO3's DataHandler decides whether the user may write it.
 
 **Dry-run mode.** The destructive tools take `dryRun: true`, which returns exactly what *would* change — the affected UIDs, the ones skipped as non-existent, and for updates the fields that would be written and the ones that would be ignored — without touching the database. The response carries `"dryRun": true`, and single-record deletes additionally report `"deleted": false`, so a preview cannot be mistaken for a completed change.
 
@@ -551,7 +554,7 @@ Tools for inspecting the authenticated backend user's effective permissions.
 |------|-------------|
 | `permission_check_table` | Check whether the current user can read (select) and/or write (modify) a specific table. |
 | `permission_check_page` | Check what the current user can do on a page: show, edit, delete, create subpages, edit content. |
-| `permission_check_summary` | Summary of the current user's permissions: admin status, allowed tables for read/write, languages, file permissions, web/file mounts. |
+| `permission_check_summary` | Summary of the current user's permissions: admin status, allowed tables for read/write, languages, file permissions, web/file mounts. For an admin the table and language lists are `["*"]` and the web mounts `[0]`. |
 
 **Admin-only tables.** A table TCA marks `ctrl.adminOnly` (`sys_template` among them) is withheld from a non-admin on every read path — `record_search`, `record_count`, `table_schema`, the schema resources and the dedicated tools alike — regardless of their `tables_select` grant. This matches core, which hides such a table from the list module and refuses a non-admin's write in DataHandler.
 
@@ -642,7 +645,7 @@ Each registered table generates 9 tools. For `tx_news_domain_model_news` registe
 | Tool | Description |
 |------|-------------|
 | `news_list` | List news records by page ID |
-| `news_get` | Get a single news record |
+| `news_get` | Get a single news record, with the UIDs of its inline (IRRE) child records under their field name |
 | `news_create` | Create a new news record |
 | `news_update` | Update news record fields |
 | `news_delete` | Delete a news record |
@@ -661,7 +664,7 @@ A `select` or `group` column with an `MM` table (for example `tx_msdarts_domain_
 - **Write** (`<prefix>_create`, `<prefix>_update`, `<prefix>_update_batch`, `record_update_batch`): pass a JSON array of UIDs (`"groups": [20, 21]`) or the comma-separated string DataHandler takes (`"groups": "20,21"`). An empty array or string clears the relation. A non-integer entry is rejected with an error naming the field before anything is written. For a `group` field allowing several tables use the `table_uid` form; bare integers are accepted when exactly one table is allowed. DataHandler writes the MM rows itself.
 - **Search**: MM fields are not usable as `record_search` / `record_count` conditions and are rejected with an error (see [Schema and Search](#schema-and-search)).
 
-The `create` / `update` tool descriptions mark these fields as `groups (uid list)`. `inline` relations, file fields (`file` / `sys_file_reference`, see [File References](#file-references)) and `category` fields are unaffected, as are `select` / `group` fields **without** an MM table, which keep their raw column value.
+The `create` / `update` tool descriptions mark these fields as `groups (uid list)`. `inline` relations (which `<prefix>_get` lists as child UIDs, read-only), file fields (`file` / `sys_file_reference`, see [File References](#file-references)) and `category` fields are unaffected, as are `select` / `group` fields **without** an MM table, which keep their raw column value.
 
 ## Resources Reference
 

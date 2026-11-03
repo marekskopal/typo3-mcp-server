@@ -18,7 +18,8 @@ readonly class PermissionCheckSummaryTool
         name: 'permission_check_summary',
         description: 'Get a summary of the current user\'s permissions: admin status, allowed tables for reading and writing,'
             . ' allowed languages, file permissions, and mount points.'
-            . ' For admin users, table/language lists may be empty as admins have unrestricted access.',
+            . ' For an admin, who has unrestricted access, tablesSelect, tablesModify and allowedLanguages are ["*"]'
+            . ' and webmounts is [0], the page tree root.',
     )]
     public function execute(): PermissionSummaryResult
     {
