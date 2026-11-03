@@ -29,6 +29,12 @@ parameters:
             message: '#\$beUserUid of method .*revokeByBackendUser\(\) expects int, mixed given#'
             path: Classes/EventListener/PasswordResetTokenRevocationListener.php
             reportUnmatched: false
+        # FlexFormTools takes the TCA as a trailing argument on v14 only, where it is required to resolve the default
+        # data structure; v13 has no such parameter and ignores the extra argument at runtime. Inert on v14 legs.
+        -
+            identifier: arguments.count
+            path: Classes/Service/FlexFormFieldConverter.php
+            reportUnmatched: false
         -
             identifier: parameter.internalClass
             message: '#BackendLayoutView#'

@@ -416,9 +416,9 @@ The **System > MCP Server** backend module provides:
 | Tool | Description |
 |------|-------------|
 | `content_list` | List content elements on a page in sorting order, with pagination and language filtering. |
-| `content_get` | Get a single content element with all readable fields. |
+| `content_get` | Get a single content element with all readable fields. `pi_flexform` comes back as an object, `{"<sheet>": {"<field>": value}}`. |
 | `content_create` | Create a content element. Pass fields as JSON, set language with `sysLanguageUid`. New records go to the end of the page; `position: "top"` puts them first, `afterUid` after a given record. |
-| `content_update` | Update content element fields. |
+| `content_update` | Update content element fields. `pi_flexform` takes an object (sheet-keyed or flat `{"settings.x": …}`), checked against the plugin's FlexForm; only the fields named change. XML is still accepted. |
 | `content_delete` | Delete a content element by UID. Supports `dryRun`. |
 | `content_move` | Move a content element to a new position. |
 | `content_copy` | Copy a content element to a new position. |

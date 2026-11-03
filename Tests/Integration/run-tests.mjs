@@ -1223,11 +1223,52 @@ class IntegrationTestRunner {
                 this.check('group MM field: partners round-trips as a UID list', false, 'could not create partner team');
             }
 
+            await this.testFlexFormObject(teamUid);
+
             await this.testTool('mm_team_delete', { uid: teamUid });
         }
 
         await this.testTool('mm_group_delete', { uid: gA });
         await this.callToolSafe('mm_group_delete', { uid: gB });
+    }
+
+    /**
+     * #40: a FlexForm field is written and read as an object, checked against the record's data structure,
+     * and a partial object only changes the fields it names (the fixture team's two-sheet `settings`).
+     */
+    async testFlexFormObject(teamUid) {
+        const read = async () => (await this.callToolSafe('mm_team_get', { uid: teamUid }))?.settings;
+
+        await this.testTool('mm_team_update', {
+            uid: teamUid,
+            fields: JSON.stringify({ settings: { 'settings.color': 'red' } }),
+        });
+        let settings = await read();
+        this.check('flex field: flat object written, read back as sheets',
+            settings?.sDEF?.['settings.color'] === 'red', `got ${JSON.stringify(settings)}`);
+
+        await this.callToolSafe('mm_team_update', {
+            uid: teamUid,
+            fields: JSON.stringify({ settings: { options: { 'settings.size': 'L' } } }),
+        });
+        settings = await read();
+        this.check('flex field: sheet-keyed partial update keeps the other values',
+            settings?.sDEF?.['settings.color'] === 'red' && settings?.options?.['settings.size'] === 'L',
+            `got ${JSON.stringify(settings)}`);
+
+        try {
+            await this.callTool('mm_team_update', {
+                uid: teamUid,
+                fields: JSON.stringify({ settings: { 'settings.colour': 'blue' } }),
+            });
+            this.check('flex field: unknown name rejected', false, 'typo was accepted');
+        } catch (e) {
+            this.check('flex field: unknown name rejected',
+                e.message.includes('settings.colour') && e.message.includes('sDEF.settings.color'), `got "${e.message}"`);
+        }
+        settings = await read();
+        this.check('flex field: rejected write left the values unchanged',
+            settings?.sDEF?.['settings.color'] === 'red', `got ${JSON.stringify(settings)}`);
     }
 
     async cleanupRecords(pageUid, childUid, contentUid) {
