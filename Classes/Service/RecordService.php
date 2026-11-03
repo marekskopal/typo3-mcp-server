@@ -32,6 +32,7 @@ readonly class RecordService
         private PermissionService $permissionService,
         private MmRelationResolver $mmRelationResolver,
         private TcaSchemaService $tcaSchemaService = new TcaSchemaService(),
+        private ?FlexFormFieldConverter $flexFormFieldConverter = null,
     ) {
     }
 
@@ -67,7 +68,7 @@ readonly class RecordService
             return null;
         }
 
-        return $this->mmRelationResolver->resolve($table, $overlaid, $fields);
+        return $this->present($table, $this->mmRelationResolver->resolve($table, $overlaid, $fields));
     }
 
     /**
@@ -224,7 +225,7 @@ readonly class RecordService
             ->fetchAllAssociative();
 
         return [
-            'records' => $this->mmRelationResolver->resolveMany($table, $records, $fields),
+            'records' => $this->presentMany($table, $this->mmRelationResolver->resolveMany($table, $records, $fields)),
             'total' => (int) $totalResult,
         ];
     }
@@ -302,7 +303,7 @@ readonly class RecordService
             ->fetchAllAssociative();
 
         return [
-            'records' => $this->mmRelationResolver->resolveMany($table, $records, $fields),
+            'records' => $this->presentMany($table, $this->mmRelationResolver->resolveMany($table, $records, $fields)),
             'total' => (int) $totalResult,
         ];
     }
@@ -559,7 +560,10 @@ readonly class RecordService
         $scan = $this->scanOverlaid($queryBuilder, $table, $offset + $limit + 1);
 
         return [
-            'records' => $this->mmRelationResolver->resolveMany($table, array_slice($scan['records'], $offset, $limit), $fields),
+            'records' => $this->presentMany(
+                $table,
+                $this->mmRelationResolver->resolveMany($table, array_slice($scan['records'], $offset, $limit), $fields),
+            ),
             'hasMore' => count($scan['records']) > $offset + $limit,
             'workspaceOverlay' => sprintf(
                 'Records are overlaid for workspace %d. An exact total is not available here'
@@ -672,5 +676,27 @@ readonly class RecordService
             ],
             $rows,
         );
+    }
+
+    /**
+     * A row as it leaves the service: FlexForm XML becomes an object (#40).
+     *
+     * @param array<string, mixed> $row
+     * @return array<string, mixed>
+     */
+    private function present(string $table, array $row): array
+    {
+        return $this->flexFormFieldConverter?->toWire($table, $row) ?? $row;
+    }
+
+    /**
+     * @param list<array<string, mixed>> $rows
+     * @return list<array<string, mixed>>
+     */
+    private function presentMany(string $table, array $rows): array
+    {
+        return $this->flexFormFieldConverter === null
+            ? $rows
+            : array_map(fn (array $row): array => $this->present($table, $row), $rows);
     }
 }

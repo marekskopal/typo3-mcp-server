@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace MarekSkopal\MsMcpServer\Tool\Content;
 
 use MarekSkopal\MsMcpServer\Service\DataHandlerService;
+use MarekSkopal\MsMcpServer\Service\FlexFormFieldConverter;
 use MarekSkopal\MsMcpServer\Service\RecordService;
 use MarekSkopal\MsMcpServer\Service\TcaSchemaService;
 use MarekSkopal\MsMcpServer\Tool\Helper\CreatePosition;
@@ -26,7 +27,8 @@ readonly class ContentCreateTool
         name: 'content_create',
         description: 'Create a new content element on a page. Pass fields as a JSON object string.'
             . ' Use sysLanguageUid to set the language (0 = default, -1 = all languages).'
-            . CreatePosition::DESCRIPTION,
+            . CreatePosition::DESCRIPTION
+            . FlexFormFieldConverter::HINT,
     )]
     public function execute(
         int $pid,

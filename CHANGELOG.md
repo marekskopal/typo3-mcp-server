@@ -12,7 +12,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 - **`file_reference_add` sets the references' own values with them.** A new optional `metadata` argument is either one JSON object applied to every reference created (`{"alternative": "Team photo"}`) or a list with one object per file, matched by sys_file uid (`[{"uid": 2, "alternative": "Hall", "title": "Main hall"}]`); with the list form `fileUids` may be left empty. Values are filtered to the writable `sys_file_reference` fields, and the relation columns cannot be overridden. Before, alt text, title, caption and crop needed one `record_update_batch` per reference afterwards. The result lists the fields written in `updated` and the dropped ones in `ignoredFields` (#39).
 
+- **FlexForm fields are objects, not XML.** `pi_flexform` (and any other TCA `flex` column) is read as `{"<sheet>": {"<field>": value}}` by every read tool, and written the same way or flat (`{"settings.templateLayout": "split"}`, resolved against the record's data structure). Every name is checked against the data structure, so a typo is refused with the available fields instead of being stored, and only the fields named change: DataHandler merges them into the stored values. A section field keeps its native array. XML strings are still accepted on write (#40).
+
 ### Changed
+- **FlexForm fields are returned as objects.** Clients that parsed the XML out of `pi_flexform` get the decoded object instead (#40).
 - **New records go to the end of the page by default.** The create tools passed a positive pid to DataHandler, which puts the new record first, so a page built element by element came out in reverse order and every element had to be moved afterwards. They now place it after the record that is currently last in the table's `sortby` order (translations do not count). Pass `position: "top"` for the old behaviour. A negative `pid` still means "after the record with this uid" (#38).
 
 ### Fixed

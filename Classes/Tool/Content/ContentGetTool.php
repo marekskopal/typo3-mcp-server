@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace MarekSkopal\MsMcpServer\Tool\Content;
 
+use MarekSkopal\MsMcpServer\Service\FlexFormFieldConverter;
 use MarekSkopal\MsMcpServer\Service\RecordService;
 use MarekSkopal\MsMcpServer\Service\TcaSchemaService;
 use MarekSkopal\MsMcpServer\Tool\Result\RecordNotFoundResult;
@@ -18,7 +19,8 @@ readonly class ContentGetTool
 
     #[McpTool(
         name: 'content_get',
-        description: 'Get a single content element by its uid.' . ' A uid that does not exist is reported as {"found": false}, not an error.',
+        description: 'Get a single content element by its uid.' . ' A uid that does not exist is reported as {"found": false}, not an error.'
+            . FlexFormFieldConverter::HINT,
     )]
     public function execute(int $uid): RecordResult|RecordNotFoundResult
     {

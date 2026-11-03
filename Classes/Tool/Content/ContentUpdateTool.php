@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace MarekSkopal\MsMcpServer\Tool\Content;
 
 use MarekSkopal\MsMcpServer\Service\DataHandlerService;
+use MarekSkopal\MsMcpServer\Service\FlexFormFieldConverter;
 use MarekSkopal\MsMcpServer\Service\TcaSchemaService;
 use MarekSkopal\MsMcpServer\Tool\Helper\FieldRejection;
 use MarekSkopal\MsMcpServer\Tool\Helper\JsonObjectParser;
@@ -19,7 +20,8 @@ readonly class ContentUpdateTool
 
     #[McpTool(
         name: 'content_update',
-        description: 'Update an existing content element. Pass fields as a JSON object string with field names and their new values.',
+        description: 'Update an existing content element. Pass fields as a JSON object string with field names and their new values.'
+            . FlexFormFieldConverter::HINT,
     )]
     public function execute(int $uid, string $fields): RecordUpdatedResult
     {

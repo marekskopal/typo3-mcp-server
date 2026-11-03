@@ -267,6 +267,46 @@ readonly class TcaSchemaService
         return array_key_exists($fieldName, $this->getMMFields($tableName));
     }
 
+    /**
+     * The table's FlexForm columns (TCA type `flex`), which the read and write paths convert between
+     * stored XML and a JSON object (FlexFormFieldConverter).
+     *
+     * @return list<string>
+     */
+    public function getFlexFields(string $tableName): array
+    {
+        $tca = $this->getTca($tableName);
+        $columns = $tca === null ? null : ($tca['columns'] ?? null);
+        if (!is_array($columns)) {
+            return [];
+        }
+
+        $fields = [];
+        foreach ($columns as $fieldName => $columnConfig) {
+            $config = is_array($columnConfig) ? ($columnConfig['config'] ?? null) : null;
+            if (is_string($fieldName) && is_array($config) && ($config['type'] ?? null) === 'flex') {
+                $fields[] = $fieldName;
+            }
+        }
+
+        return $fields;
+    }
+
+    /**
+     * A column's TCA `config`, or an empty array when the table or column is unknown.
+     *
+     * @return array<mixed>
+     */
+    public function getFieldConfig(string $tableName, string $fieldName): array
+    {
+        $tca = $this->getTca($tableName);
+        $columns = $tca === null ? null : ($tca['columns'] ?? null);
+        $column = is_array($columns) ? ($columns[$fieldName] ?? null) : null;
+        $config = is_array($column) ? ($column['config'] ?? null) : null;
+
+        return is_array($config) ? $config : [];
+    }
+
     /** @return list<string> Field names that are file reference fields (TCA type 'file' or inline with sys_file_reference). */
     public function getFileFields(string $tableName): array
     {

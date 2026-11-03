@@ -8,6 +8,7 @@ use MarekSkopal\MsMcpServer\DataHandling\LocalizationFieldOverrideHook;
 use Mcp\Exception\ToolCallException;
 use Psr\Http\Message\ServerRequestInterface;
 use Psr\Log\LoggerInterface;
+use TYPO3\CMS\Backend\Utility\BackendUtility;
 use TYPO3\CMS\Core\Authentication\BackendUserAuthentication;
 use TYPO3\CMS\Core\DataHandling\DataHandler;
 use TYPO3\CMS\Core\Exception\SiteNotFoundException;
@@ -22,6 +23,7 @@ readonly class DataHandlerService
         private LoggerInterface $logger,
         private TcaSchemaService $tcaSchemaService = new TcaSchemaService(),
         private LocalizationFieldOverrideHook $localizationFieldOverrideHook = new LocalizationFieldOverrideHook(),
+        private ?FlexFormFieldConverter $flexFormFieldConverter = null,
     ) {
     }
 
@@ -46,6 +48,7 @@ readonly class DataHandlerService
     {
         $newId = 'NEW' . bin2hex(random_bytes(8));
         $fields = $this->mmFieldNormalizer->normalize($table, $fields);
+        $fields = $this->convertFlexForms($table, $fields, null, $pid);
         $fields['pid'] = $pid;
 
         // A negative pid places the page after that sibling, which is in the same site.
@@ -74,6 +77,7 @@ readonly class DataHandlerService
     public function updateRecord(string $table, int $uid, array $fields): void
     {
         $fields = $this->mmFieldNormalizer->normalize($table, $fields);
+        $fields = $this->convertFlexForms($table, $fields, $uid);
         $originalRequest = $table === 'pages' ? $this->ensureSiteContext($uid) : null;
 
         try {
@@ -164,7 +168,8 @@ readonly class DataHandlerService
         $fields = $this->mmFieldNormalizer->normalize($table, $fields);
         $datamap = [];
         foreach ($uids as $uid) {
-            $datamap[$uid] = $fields;
+            // A FlexForm object is resolved against each record's own data structure.
+            $datamap[$uid] = $this->convertFlexForms($table, $fields, $uid);
         }
 
         $dataHandler = GeneralUtility::makeInstance(DataHandler::class);
@@ -223,6 +228,8 @@ readonly class DataHandlerService
     public function localizeRecord(string $table, int $uid, int $targetLanguageId, array $fields = []): int
     {
         $fields = $this->mmFieldNormalizer->normalize($table, $fields);
+        // The translation has the type, and so the FlexForm data structure, of its source record.
+        $fields = $this->convertFlexForms($table, $fields, $uid);
         $originalRequest = $table === 'pages' ? $this->ensureSiteContext($uid) : null;
         $overridesRegistered = $fields !== [] && $this->registerLocalizationOverrides($table, $uid, $targetLanguageId, $fields);
 
@@ -310,6 +317,24 @@ readonly class DataHandlerService
         }
 
         return $referenceUids;
+    }
+
+    /**
+     * FlexForm values given as objects become DataHandler's flex array, validated against the record's data
+     * structure (#40). The stored record is only read when there is such a value.
+     *
+     * @param array<string, mixed> $fields
+     * @return array<string, mixed>
+     */
+    private function convertFlexForms(string $table, array $fields, ?int $uid, int $pid = 0): array
+    {
+        if ($this->flexFormFieldConverter === null || !$this->flexFormFieldConverter->hasObjectValues($table, $fields)) {
+            return $fields;
+        }
+
+        $row = $uid !== null ? (BackendUtility::getRecordWSOL($table, $uid) ?? []) : ['pid' => $pid];
+
+        return $this->flexFormFieldConverter->toDataHandler($table, $fields, $row);
     }
 
     /** @param array<string, mixed> $fields */
