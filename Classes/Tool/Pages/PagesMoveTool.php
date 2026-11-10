@@ -7,7 +7,7 @@ namespace MarekSkopal\MsMcpServer\Tool\Pages;
 use MarekSkopal\MsMcpServer\Service\DataHandlerService;
 use MarekSkopal\MsMcpServer\Tool\Helper\MoveTarget;
 use MarekSkopal\MsMcpServer\Tool\Result\RecordMovedResult;
-use Mcp\Capability\Attribute\McpTool;
+use Mcp\Server\Capability\Attribute\McpTool;
 
 readonly class PagesMoveTool
 {

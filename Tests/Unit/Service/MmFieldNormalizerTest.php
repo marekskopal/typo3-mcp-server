@@ -6,7 +6,7 @@ namespace MarekSkopal\MsMcpServer\Tests\Unit\Service;
 
 use MarekSkopal\MsMcpServer\Service\MmFieldNormalizer;
 use MarekSkopal\MsMcpServer\Service\TcaSchemaService;
-use Mcp\Exception\ToolCallException;
+use Mcp\Server\Exception\ToolCallException;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;

@@ -8,7 +8,7 @@ use MarekSkopal\MsMcpServer\Service\DataHandlerService;
 use MarekSkopal\MsMcpServer\Service\RecordService;
 use MarekSkopal\MsMcpServer\Tool\Batch\RecordDeleteBatchTool;
 use MarekSkopal\MsMcpServer\Tool\Result\BatchRecordsDeletedResult;
-use Mcp\Exception\ToolCallException;
+use Mcp\Server\Exception\ToolCallException;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 

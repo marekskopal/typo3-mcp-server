@@ -40,7 +40,7 @@ vendor/bin/typo3 mcp:server --user=admin
 **OAuth Flow:** `/.well-known/oauth-authorization-server/mcp` (RFC 8414 path-insert) → `OAuthMiddleware` handles `/mcp/oauth/authorize`, `/mcp/oauth/token`, `/mcp/oauth/register`, `/mcp/oauth/revoke` endpoints. Uses PKCE (S256), dynamic client registration (RFC 7591), token revocation (RFC 7009), protected resource metadata (RFC 9728), and IP-based rate limiting (configurable per-endpoint, 429 Too Many Requests with Retry-After). Authentication is delegated to TYPO3's real backend login: an unauthenticated `authorize` GET sets an HMAC-signed `mcp_oauth_continuation` cookie carrying the authorize URL and 302s to `/typo3/login`; the same middleware is also registered in the backend stack and bounces `/typo3/main` post-login back to the authorize endpoint, where a single-click consent screen renders outside the backend shell (so the localhost-callback 302 isn't subject to the backend's CSP).
 
 **Key classes (all in `Classes/`):**
-- `Middleware/McpServerMiddleware` — PSR-15 middleware intercepting `/mcp` requests, handles auth and delegates to MCP SDK
+- `Middleware/McpServerMiddleware` — PSR-15 middleware intercepting `/mcp` requests, handles auth and delegates to MCP SDK. Sets `StreamableHttpTransport::PRINCIPAL_ATTRIBUTE` to `be_users:<uid>` so the SDK binds each session to the backend user that opened it (on top of `DatabaseSessionStore`'s own ownership check), and rewrites the SDK's "Session not found" 404 to a 401 for every method but `DELETE`
 - `Middleware/OAuthMiddleware` — Handles OAuth 2.1 flows (authorize, token, register, revoke, metadata) with IP-based rate limiting
 - `OAuth/AuthorizationService` — Creates auth codes, exchanges codes for tokens, validates access tokens, refreshes tokens, revokes tokens. Token lifetimes are configurable via extension settings.
 - `OAuth/ClientRepository` — Manages OAuth clients (find, validate redirect URIs, register)
@@ -186,7 +186,7 @@ readonly class MyTool
 
 ## Testing
 
-1161 unit tests covering:
+1163 unit tests covering:
 - All static MCP tools + batch tools (Pages/Content/File/Schema/Search/Translation/Cache/Permission/BackendUser/BackendGroup/Batch CRUD)
 - Dynamic tool registration and execution (DynamicToolRegistrar), including merged EXTCONF + discovered tables
 - OAuth classes (AuthorizationService incl. revocation, ClientRepository, PkceVerifier, OAuthTokenPair, RateLimitService)

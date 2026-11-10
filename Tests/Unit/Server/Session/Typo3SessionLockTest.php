@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace MarekSkopal\MsMcpServer\Tests\Unit\Server\Session;
 
 use MarekSkopal\MsMcpServer\Server\Session\Typo3SessionLock;
-use Mcp\Exception\SessionLockException;
-use Mcp\Exception\SessionLockTimeoutException;
+use Mcp\Server\Exception\SessionLockException;
+use Mcp\Server\Exception\SessionLockTimeoutException;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Uid\Uuid;

@@ -12,6 +12,8 @@ use MarekSkopal\MsMcpServer\OAuth\ClientRepository;
 use MarekSkopal\MsMcpServer\OAuth\PkceVerifier;
 use MarekSkopal\MsMcpServer\Server\McpServerFactory;
 use MarekSkopal\MsMcpServer\Service\McpPathProvider;
+use Mcp\Server\Server;
+use Mcp\Server\Session\InMemorySessionStore;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 use Psr\Http\Message\ResponseFactoryInterface;
@@ -26,6 +28,9 @@ use TYPO3\CMS\Core\Database\ConnectionPool;
 use TYPO3\CMS\Core\Database\Query\Expression\ExpressionBuilder;
 use TYPO3\CMS\Core\Database\Query\QueryBuilder;
 use TYPO3\CMS\Core\Database\Query\Restriction\QueryRestrictionContainerInterface;
+use TYPO3\CMS\Core\Http\ResponseFactory;
+use TYPO3\CMS\Core\Http\ServerRequest;
+use TYPO3\CMS\Core\Http\StreamFactory;
 
 #[CoversClass(McpServerMiddleware::class)]
 final class McpServerMiddlewareTest extends TestCase
@@ -319,6 +324,98 @@ final class McpServerMiddlewareTest extends TestCase
             '{"jsonrpc":"2.0","id":1,"error":{"code":-32601,"message":"Method not found"}}',
         );
         self::assertFalse($reflection->invoke($middleware, $methodNotFound));
+    }
+
+    public function testSessionIsBoundToTheBackendUserThatOpenedIt(): void
+    {
+        $middleware = $this->createMiddlewareOverRealServer();
+
+        $initialize = $middleware->process(
+            $this->createMcpRequest('POST', 'token-user-1', null, [
+                'jsonrpc' => '2.0',
+                'id' => 1,
+                'method' => 'initialize',
+                'params' => [
+                    'protocolVersion' => '2025-06-18',
+                    'capabilities' => new \stdClass(),
+                    'clientInfo' => ['name' => 'test', 'version' => '1.0'],
+                ],
+            ]),
+            $this->createStub(RequestHandlerInterface::class),
+        );
+        self::assertSame(200, $initialize->getStatusCode());
+        $sessionId = $initialize->getHeaderLine('Mcp-Session-Id');
+        self::assertNotSame('', $sessionId);
+
+        $ping = ['jsonrpc' => '2.0', 'id' => 2, 'method' => 'ping'];
+
+        $ownPing = $middleware->process(
+            $this->createMcpRequest('POST', 'token-user-1', $sessionId, $ping),
+            $this->createStub(RequestHandlerInterface::class),
+        );
+        self::assertSame(200, $ownPing->getStatusCode());
+
+        // Another backend user's valid token cannot use the session; answered like an unknown session.
+        $foreignPing = $middleware->process(
+            $this->createMcpRequest('POST', 'token-user-2', $sessionId, $ping),
+            $this->createStub(RequestHandlerInterface::class),
+        );
+        self::assertSame(401, $foreignPing->getStatusCode());
+    }
+
+    public function testDeleteOfUnknownSessionKeepsSdk404(): void
+    {
+        $response = $this->createMiddlewareOverRealServer()->process(
+            $this->createMcpRequest('DELETE', 'token-user-1', '0193b1f2-6c3e-7d4a-8b5c-9d0e1f2a3b4c', null),
+            $this->createStub(RequestHandlerInterface::class),
+        );
+
+        self::assertSame(404, $response->getStatusCode());
+    }
+
+    /** One shared session store, as the database store is across requests. */
+    private function createMiddlewareOverRealServer(): McpServerMiddleware
+    {
+        $authorizationService = $this->createStub(AuthorizationService::class);
+        $authorizationService->method('validateAccessToken')->willReturnCallback(
+            static fn(string $token): int => $token === 'token-user-1' ? 1 : 2,
+        );
+
+        $sessionStore = new InMemorySessionStore();
+        $mcpServerFactory = $this->createStub(McpServerFactory::class);
+        $mcpServerFactory->method('create')->willReturnCallback(
+            static fn(): Server => Server::builder()
+                ->setServerInfo('test', '1.0')
+                ->setSession($sessionStore)
+                ->build(),
+        );
+
+        return new McpServerMiddleware(
+            $authorizationService,
+            $this->createStub(BackendUserBootstrap::class),
+            $mcpServerFactory,
+            $this->createPathProvider(),
+            new ResponseFactory(),
+            new StreamFactory(),
+        );
+    }
+
+    /** @param array<string, mixed>|null $message */
+    private function createMcpRequest(string $method, string $token, ?string $sessionId, ?array $message): ServerRequestInterface
+    {
+        $headers = [
+            'Authorization' => 'Bearer ' . $token,
+            'Content-Type' => 'application/json',
+            'Accept' => 'application/json, text/event-stream',
+            'MCP-Protocol-Version' => '2025-06-18',
+        ];
+        if ($sessionId !== null) {
+            $headers['Mcp-Session-Id'] = $sessionId;
+        }
+
+        $body = (new StreamFactory())->createStream($message === null ? '' : json_encode($message, JSON_THROW_ON_ERROR));
+
+        return new ServerRequest('https://example.com/mcp', $method, $body, $headers);
     }
 
     private function makeResponse(int $status, string $body): ResponseInterface

@@ -11,8 +11,8 @@ use MarekSkopal\MsMcpServer\Tool\Helper\CreatePosition;
 use MarekSkopal\MsMcpServer\Tool\Helper\FieldRejection;
 use MarekSkopal\MsMcpServer\Tool\Helper\JsonObjectParser;
 use MarekSkopal\MsMcpServer\Tool\Result\RecordCreatedResult;
-use Mcp\Capability\Attribute\McpTool;
-use Mcp\Exception\ToolCallException;
+use Mcp\Server\Capability\Attribute\McpTool;
+use Mcp\Server\Exception\ToolCallException;
 
 /**
  * Creates a record in any TCA table, the counterpart of the record_*_batch tools. Tables that are not

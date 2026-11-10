@@ -8,7 +8,7 @@ use MarekSkopal\MsMcpServer\DataHandling\LocalizationFieldOverrideHook;
 use MarekSkopal\MsMcpServer\Service\DataHandlerService;
 use MarekSkopal\MsMcpServer\Service\MmFieldNormalizer;
 use MarekSkopal\MsMcpServer\Service\TcaSchemaService;
-use Mcp\Exception\ToolCallException;
+use Mcp\Server\Exception\ToolCallException;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;

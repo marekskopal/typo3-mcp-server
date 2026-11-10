@@ -7,8 +7,8 @@ namespace MarekSkopal\MsMcpServer\Tool\TypoScript;
 use MarekSkopal\MsMcpServer\Service\PermissionService;
 use MarekSkopal\MsMcpServer\Service\TypoScriptCompilerService;
 use MarekSkopal\MsMcpServer\Tool\Result\TypoScriptRootlineResult;
-use Mcp\Capability\Attribute\McpTool;
-use Mcp\Exception\ToolCallException;
+use Mcp\Server\Capability\Attribute\McpTool;
+use Mcp\Server\Exception\ToolCallException;
 
 readonly class TypoScriptRootlineTool
 {

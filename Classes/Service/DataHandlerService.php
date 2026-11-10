@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace MarekSkopal\MsMcpServer\Service;
 
 use MarekSkopal\MsMcpServer\DataHandling\LocalizationFieldOverrideHook;
-use Mcp\Exception\ToolCallException;
+use Mcp\Server\Exception\ToolCallException;
 use Psr\Http\Message\ServerRequestInterface;
 use Psr\Log\LoggerInterface;
 use TYPO3\CMS\Backend\Utility\BackendUtility;

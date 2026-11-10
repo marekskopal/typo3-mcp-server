@@ -8,7 +8,7 @@ use MarekSkopal\MsMcpServer\Service\PermissionService;
 use MarekSkopal\MsMcpServer\Service\RecordService;
 use MarekSkopal\MsMcpServer\Tool\Result\PagePermissionResult;
 use MarekSkopal\MsMcpServer\Tool\Result\RecordNotFoundResult;
-use Mcp\Capability\Attribute\McpTool;
+use Mcp\Server\Capability\Attribute\McpTool;
 
 readonly class PermissionCheckPageTool
 {

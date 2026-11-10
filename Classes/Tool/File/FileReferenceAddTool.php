@@ -8,8 +8,8 @@ use MarekSkopal\MsMcpServer\Service\DataHandlerService;
 use MarekSkopal\MsMcpServer\Service\TcaSchemaService;
 use MarekSkopal\MsMcpServer\Tool\Helper\FieldRejection;
 use MarekSkopal\MsMcpServer\Tool\Result\FileReferenceAddedResult;
-use Mcp\Capability\Attribute\McpTool;
-use Mcp\Exception\ToolCallException;
+use Mcp\Server\Capability\Attribute\McpTool;
+use Mcp\Server\Exception\ToolCallException;
 use const JSON_THROW_ON_ERROR;
 
 readonly class FileReferenceAddTool

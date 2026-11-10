@@ -6,8 +6,8 @@ namespace MarekSkopal\MsMcpServer\Tests\Unit\Server;
 
 use MarekSkopal\MsMcpServer\Logging\AuditLogger;
 use MarekSkopal\MsMcpServer\Server\ErrorHandlingProxy;
-use Mcp\Exception\PromptGetException;
-use Mcp\Exception\ToolCallException;
+use Mcp\Server\Exception\PromptGetException;
+use Mcp\Server\Exception\ToolCallException;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;

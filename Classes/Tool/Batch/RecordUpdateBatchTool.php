@@ -10,8 +10,8 @@ use MarekSkopal\MsMcpServer\Service\TcaSchemaService;
 use MarekSkopal\MsMcpServer\Tool\Helper\JsonObjectParser;
 use MarekSkopal\MsMcpServer\Tool\Helper\UidListParser;
 use MarekSkopal\MsMcpServer\Tool\Result\BatchRecordsUpdatedResult;
-use Mcp\Capability\Attribute\McpTool;
-use Mcp\Exception\ToolCallException;
+use Mcp\Server\Capability\Attribute\McpTool;
+use Mcp\Server\Exception\ToolCallException;
 
 readonly class RecordUpdateBatchTool
 {

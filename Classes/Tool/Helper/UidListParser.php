@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace MarekSkopal\MsMcpServer\Tool\Helper;
 
-use Mcp\Exception\ToolCallException;
+use Mcp\Server\Exception\ToolCallException;
 
 /**
  * Parses the comma-separated UID strings used by the batch tools into a list of positive

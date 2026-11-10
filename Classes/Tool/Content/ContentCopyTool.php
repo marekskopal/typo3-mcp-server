@@ -7,7 +7,7 @@ namespace MarekSkopal\MsMcpServer\Tool\Content;
 use MarekSkopal\MsMcpServer\Service\DataHandlerService;
 use MarekSkopal\MsMcpServer\Tool\Helper\MoveTarget;
 use MarekSkopal\MsMcpServer\Tool\Result\RecordCopiedResult;
-use Mcp\Capability\Attribute\McpTool;
+use Mcp\Server\Capability\Attribute\McpTool;
 
 readonly class ContentCopyTool
 {

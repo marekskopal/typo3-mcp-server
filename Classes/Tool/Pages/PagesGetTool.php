@@ -8,7 +8,7 @@ use MarekSkopal\MsMcpServer\Service\RecordService;
 use MarekSkopal\MsMcpServer\Service\TcaSchemaService;
 use MarekSkopal\MsMcpServer\Tool\Result\RecordNotFoundResult;
 use MarekSkopal\MsMcpServer\Tool\Result\RecordResult;
-use Mcp\Capability\Attribute\McpTool;
+use Mcp\Server\Capability\Attribute\McpTool;
 
 readonly class PagesGetTool
 {

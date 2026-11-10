@@ -9,7 +9,7 @@ use MarekSkopal\MsMcpServer\Resource\Result\BackendLayoutColumnResult;
 use MarekSkopal\MsMcpServer\Resource\Result\BackendLayoutResult;
 use MarekSkopal\MsMcpServer\Resource\Result\BackendLayoutStructureResult;
 use MarekSkopal\MsMcpServer\Service\BackendLayoutService;
-use Mcp\Exception\ResourceReadException;
+use Mcp\Server\Exception\ResourceReadException;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 use ReflectionMethod;

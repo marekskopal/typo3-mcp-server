@@ -6,7 +6,7 @@ namespace MarekSkopal\MsMcpServer\Resource;
 
 use MarekSkopal\MsMcpServer\Resource\Result\SystemInfoResult;
 use MarekSkopal\MsMcpServer\Service\PermissionService;
-use Mcp\Capability\Attribute\McpResource;
+use Mcp\Server\Capability\Attribute\McpResource;
 use TYPO3\CMS\Core\Core\Environment;
 use TYPO3\CMS\Core\Information\Typo3Version;
 use const JSON_THROW_ON_ERROR;

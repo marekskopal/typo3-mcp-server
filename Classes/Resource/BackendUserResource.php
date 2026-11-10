@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace MarekSkopal\MsMcpServer\Resource;
 
 use MarekSkopal\MsMcpServer\Resource\Result\BackendUserResult;
-use Mcp\Capability\Attribute\McpResource;
+use Mcp\Server\Capability\Attribute\McpResource;
 use TYPO3\CMS\Core\Authentication\BackendUserAuthentication;
 use const JSON_THROW_ON_ERROR;
 

@@ -7,7 +7,7 @@ namespace MarekSkopal\MsMcpServer\Tests\Unit\Tool\Content;
 use MarekSkopal\MsMcpServer\Service\DataHandlerService;
 use MarekSkopal\MsMcpServer\Tool\Content\ContentCopyTool;
 use MarekSkopal\MsMcpServer\Tool\Result\RecordCopiedResult;
-use Mcp\Exception\ToolCallException;
+use Mcp\Server\Exception\ToolCallException;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 

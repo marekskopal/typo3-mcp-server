@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace MarekSkopal\MsMcpServer\Service;
 
-use Mcp\Exception\ToolCallException;
+use Mcp\Server\Exception\ToolCallException;
 use TYPO3\CMS\Core\Utility\MathUtility;
 
 /**

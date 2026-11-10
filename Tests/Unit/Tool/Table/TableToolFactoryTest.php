@@ -16,7 +16,7 @@ use MarekSkopal\MsMcpServer\Tool\Table\Handler\TranslatableListHandler;
 use MarekSkopal\MsMcpServer\Tests\Unit\Support\JsonResult;
 use MarekSkopal\MsMcpServer\Tool\Table\TableToolConfig;
 use MarekSkopal\MsMcpServer\Tool\Table\TableToolFactory;
-use Mcp\Exception\ToolCallException;
+use Mcp\Server\Exception\ToolCallException;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;

@@ -6,7 +6,7 @@ namespace MarekSkopal\MsMcpServer\Tool\Permission;
 
 use MarekSkopal\MsMcpServer\Service\PermissionService;
 use MarekSkopal\MsMcpServer\Tool\Result\PermissionSummaryResult;
-use Mcp\Capability\Attribute\McpTool;
+use Mcp\Server\Capability\Attribute\McpTool;
 
 readonly class PermissionCheckSummaryTool
 {

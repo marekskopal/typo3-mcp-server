@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace MarekSkopal\MsMcpServer\Tool\Helper;
 
-use Mcp\Exception\ToolCallException;
+use Mcp\Server\Exception\ToolCallException;
 
 /**
  * Translates the user-facing (targetPid, afterUid) pair into the integer
