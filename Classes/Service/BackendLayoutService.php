@@ -8,7 +8,7 @@ use MarekSkopal\MsMcpServer\Resource\Result\BackendLayoutCellResult;
 use MarekSkopal\MsMcpServer\Resource\Result\BackendLayoutColumnResult;
 use MarekSkopal\MsMcpServer\Resource\Result\BackendLayoutResult;
 use MarekSkopal\MsMcpServer\Resource\Result\BackendLayoutStructureResult;
-use Mcp\Exception\ResourceReadException;
+use Mcp\Server\Exception\ResourceReadException;
 use TYPO3\CMS\Backend\View\BackendLayout\BackendLayout;
 use TYPO3\CMS\Backend\View\BackendLayoutView;
 

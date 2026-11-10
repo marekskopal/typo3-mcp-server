@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace MarekSkopal\MsMcpServer\Server;
 
 use MarekSkopal\MsMcpServer\Logging\AuditLogger;
-use Mcp\Exception\PromptGetException;
-use Mcp\Exception\ResourceReadException;
-use Mcp\Exception\ToolCallException;
+use Mcp\Server\Exception\PromptGetException;
+use Mcp\Server\Exception\ResourceReadException;
+use Mcp\Server\Exception\ToolCallException;
 use Psr\Log\LoggerInterface;
 use ReflectionClass;
 

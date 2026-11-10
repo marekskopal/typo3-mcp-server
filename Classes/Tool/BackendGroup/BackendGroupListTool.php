@@ -9,8 +9,8 @@ use MarekSkopal\MsMcpServer\Service\RecordService;
 use MarekSkopal\MsMcpServer\Tool\Helper\RowField;
 use MarekSkopal\MsMcpServer\Tool\Result\BackendGroupListResult;
 use MarekSkopal\MsMcpServer\Tool\Result\BackendGroupSummaryResult;
-use Mcp\Capability\Attribute\McpTool;
-use Mcp\Exception\ToolCallException;
+use Mcp\Server\Capability\Attribute\McpTool;
+use Mcp\Server\Exception\ToolCallException;
 
 readonly class BackendGroupListTool
 {

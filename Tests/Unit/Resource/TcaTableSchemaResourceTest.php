@@ -7,7 +7,7 @@ namespace MarekSkopal\MsMcpServer\Tests\Unit\Resource;
 use MarekSkopal\MsMcpServer\Resource\TcaTableSchemaResource;
 use MarekSkopal\MsMcpServer\Service\PermissionService;
 use MarekSkopal\MsMcpServer\Service\TcaSchemaService;
-use Mcp\Exception\ResourceReadException;
+use Mcp\Server\Exception\ResourceReadException;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 use const JSON_THROW_ON_ERROR;

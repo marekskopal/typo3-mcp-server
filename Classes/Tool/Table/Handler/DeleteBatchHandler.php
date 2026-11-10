@@ -10,7 +10,7 @@ use MarekSkopal\MsMcpServer\Service\RecordService;
 use MarekSkopal\MsMcpServer\Tool\Helper\UidListParser;
 use MarekSkopal\MsMcpServer\Tool\Result\BatchRecordsDeletedResult;
 use MarekSkopal\MsMcpServer\Tool\Table\TableToolConfig;
-use Mcp\Exception\ToolCallException;
+use Mcp\Server\Exception\ToolCallException;
 use Psr\Log\LoggerInterface;
 
 /** `<prefix>_delete_batch`. @internal */

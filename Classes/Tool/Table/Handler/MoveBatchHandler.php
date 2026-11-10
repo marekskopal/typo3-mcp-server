@@ -11,7 +11,7 @@ use MarekSkopal\MsMcpServer\Tool\Helper\MoveTarget;
 use MarekSkopal\MsMcpServer\Tool\Helper\UidListParser;
 use MarekSkopal\MsMcpServer\Tool\Result\BatchRecordsMovedResult;
 use MarekSkopal\MsMcpServer\Tool\Table\TableToolConfig;
-use Mcp\Exception\ToolCallException;
+use Mcp\Server\Exception\ToolCallException;
 use Psr\Log\LoggerInterface;
 
 /** `<prefix>_move_batch`. @internal */

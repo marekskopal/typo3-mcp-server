@@ -13,8 +13,9 @@ use MarekSkopal\MsMcpServer\Tests\Unit\Support\JsonResult;
 use MarekSkopal\MsMcpServer\Tool\Result\RecordDeletedResult;
 use MarekSkopal\MsMcpServer\Tool\Result\RecordUpdatedResult;
 use MarekSkopal\MsMcpServer\Tool\Workspace\WorkspaceToolRegistrar;
-use Mcp\Exception\ToolCallException;
-use Mcp\Server;
+use Mcp\Server\Exception\ToolCallException;
+use Mcp\Server\Builder;
+use Mcp\Server\Server;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
@@ -693,7 +694,7 @@ final class WorkspaceToolRegistrarTest extends TestCase
     }
 
     /** @return list<array{handler: \Closure, name: string}> */
-    private function getRegisteredTools(Server\Builder $builder): array
+    private function getRegisteredTools(Builder $builder): array
     {
         $reflection = new \ReflectionClass($builder);
         $property = $reflection->getProperty('tools');

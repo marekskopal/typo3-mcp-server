@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace MarekSkopal\MsMcpServer\Resource;
 
 use MarekSkopal\MsMcpServer\Service\BackendLayoutService;
-use Mcp\Capability\Attribute\McpResourceTemplate;
+use Mcp\Server\Capability\Attribute\McpResourceTemplate;
 use const JSON_THROW_ON_ERROR;
 
 readonly class BackendLayoutResource

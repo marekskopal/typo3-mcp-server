@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace MarekSkopal\MsMcpServer\Tool\Helper;
 
-use Mcp\Exception\ToolCallException;
+use Mcp\Server\Exception\ToolCallException;
 
 /**
  * The one message every writer uses when a `fields` object survives the writable-field filter with

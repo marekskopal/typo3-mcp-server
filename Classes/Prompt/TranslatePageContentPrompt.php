@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace MarekSkopal\MsMcpServer\Prompt;
 
 use MarekSkopal\MsMcpServer\Service\SiteLanguageService;
-use Mcp\Capability\Attribute\McpPrompt;
+use Mcp\Server\Capability\Attribute\McpPrompt;
 
 readonly class TranslatePageContentPrompt
 {

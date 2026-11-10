@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace MarekSkopal\MsMcpServer\Tool\Helper;
 
 use MarekSkopal\MsMcpServer\Service\RecordService;
-use Mcp\Exception\ToolCallException;
+use Mcp\Server\Exception\ToolCallException;
 
 /**
  * Where a create tool puts the new record, as the pid DataHandler expects: a positive pid puts it first

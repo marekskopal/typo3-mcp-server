@@ -9,7 +9,7 @@ use MarekSkopal\MsMcpServer\Service\RecordService;
 use MarekSkopal\MsMcpServer\Tool\BackendUser\BackendUserGetTool;
 use MarekSkopal\MsMcpServer\Tool\Result\BackendUserDetailResult;
 use MarekSkopal\MsMcpServer\Tool\Result\RecordNotFoundResult;
-use Mcp\Exception\ToolCallException;
+use Mcp\Server\Exception\ToolCallException;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 

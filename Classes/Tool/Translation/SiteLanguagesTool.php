@@ -6,7 +6,7 @@ namespace MarekSkopal\MsMcpServer\Tool\Translation;
 
 use MarekSkopal\MsMcpServer\Service\SiteLanguageService;
 use MarekSkopal\MsMcpServer\Tool\Result\SiteLanguagesResult;
-use Mcp\Capability\Attribute\McpTool;
+use Mcp\Server\Capability\Attribute\McpTool;
 
 readonly class SiteLanguagesTool
 {

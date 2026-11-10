@@ -12,7 +12,7 @@ use MarekSkopal\MsMcpServer\Tool\Helper\CreatePosition;
 use MarekSkopal\MsMcpServer\Tool\Helper\FieldRejection;
 use MarekSkopal\MsMcpServer\Tool\Helper\JsonObjectParser;
 use MarekSkopal\MsMcpServer\Tool\Result\RecordCreatedResult;
-use Mcp\Capability\Attribute\McpTool;
+use Mcp\Server\Capability\Attribute\McpTool;
 
 readonly class ContentCreateTool
 {

@@ -69,8 +69,11 @@ readonly class McpServerMiddleware implements MiddlewareInterface
         // ProtocolVersionMiddleware is deliberately NOT listed: since SDK 0.8 the transport
         // applies it itself to handshake-era traffic only. Passing it here would run it before
         // the era is classified and reject every modern-era (2026-07-28) request.
+        // Binds the session to the backend user that opened it (SDK 0.10+): a request for that
+        // session under another user's token gets the same 404 as an unknown session. The session
+        // store enforces the same ownership; this keeps the SDK's own check in agreement with it.
         $transport = new StreamableHttpTransport(
-            $request,
+            $request->withAttribute(StreamableHttpTransport::PRINCIPAL_ATTRIBUTE, 'be_users:' . $beUserUid),
             $this->responseFactory,
             $this->streamFactory,
             middleware: [new CorsMiddleware()],
@@ -79,7 +82,9 @@ readonly class McpServerMiddleware implements MiddlewareInterface
         /** @var ResponseInterface $response */
         $response = $server->run($transport);
 
-        if ($this->isSessionNotFoundResponse($response)) {
+        // A DELETE of a session that is already gone answers 404 since SDK 0.10, as the spec
+        // requires. The client is done with it, so do not send it through a new OAuth round.
+        if ($request->getMethod() !== 'DELETE' && $this->isSessionNotFoundResponse($response)) {
             return $this->withCorsHeaders($this->createUnauthorizedResponse($request, 'Session expired'));
         }
 

@@ -7,8 +7,8 @@ namespace MarekSkopal\MsMcpServer\Resource;
 use MarekSkopal\MsMcpServer\Resource\Result\TcaTableSchemaResult;
 use MarekSkopal\MsMcpServer\Service\PermissionService;
 use MarekSkopal\MsMcpServer\Service\TcaSchemaService;
-use Mcp\Capability\Attribute\McpResourceTemplate;
-use Mcp\Exception\ResourceReadException;
+use Mcp\Server\Capability\Attribute\McpResourceTemplate;
+use Mcp\Server\Exception\ResourceReadException;
 use const JSON_THROW_ON_ERROR;
 
 readonly class TcaTableSchemaResource

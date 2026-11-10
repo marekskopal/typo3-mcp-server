@@ -11,7 +11,7 @@ use MarekSkopal\MsMcpServer\Tool\Helper\JsonObjectParser;
 use MarekSkopal\MsMcpServer\Tool\Helper\UidListParser;
 use MarekSkopal\MsMcpServer\Tool\Result\BatchRecordsUpdatedResult;
 use MarekSkopal\MsMcpServer\Tool\Table\TableToolConfig;
-use Mcp\Exception\ToolCallException;
+use Mcp\Server\Exception\ToolCallException;
 use Psr\Log\LoggerInterface;
 
 /** `<prefix>_update_batch`. @internal */

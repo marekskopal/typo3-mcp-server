@@ -6,7 +6,7 @@ namespace MarekSkopal\MsMcpServer\Resource;
 
 use MarekSkopal\MsMcpServer\Resource\Result\SiteLanguageResult;
 use MarekSkopal\MsMcpServer\Resource\Result\SiteResult;
-use Mcp\Capability\Attribute\McpResource;
+use Mcp\Server\Capability\Attribute\McpResource;
 use TYPO3\CMS\Core\Site\Entity\Site;
 use TYPO3\CMS\Core\Site\Entity\SiteLanguage;
 use TYPO3\CMS\Core\Site\SiteFinder;
